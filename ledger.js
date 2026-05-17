@@ -1,0 +1,18396 @@
+const { useState, useEffect, useMemo } = React;
+const STORAGE_KEY = "ledger_v16";
+const APP_VERSION = "1150515AE";
+const BLOCK_ORDER_KEY = "ledger_block_order_v13";
+const NOTE_COLOR_KEY = "ledger_note_color_v1";
+const DEFAULT_NOTE_COLOR = "";
+const NOTE_PREF_KEY = "ledger_note_pref_v1";
+const DEFAULT_NOTE_PREF = {
+  textColor: "",
+  // 備註文字色;空字串=預設
+  bgColor: "",
+  // 備註輸入框背景色;空字串=預設
+  applyToInput: true,
+  // 套用到新增/編輯輸入框
+  applyToList: true
+  // 套用到交易列表的備註文字
+};
+const THEME_KEY = "ledger_theme_v1";
+const DEFAULT_THEME = "light";
+const NUM_FONT_KEY = "ledger_num_font_v1";
+const DEFAULT_NUM_FONT = "sans";
+const NUM_FONT_STACKS = {
+  // 無襯線(預設,現代 iOS 風):iOS SF Pro / Android Roboto / Windows Segoe UI
+  "sans": "-apple-system, BlinkMacSystemFont, SF Pro Display, Segoe UI, Roboto, sans-serif",
+  // 等寬數字(財務報表感):iOS SF Mono / Android Roboto Mono / Windows Consolas
+  "mono": "ui-monospace, SF Mono, Menlo, Monaco, Consolas, Cascadia Code, Roboto Mono, Droid Sans Mono, monospace"
+};
+const LEND_BUCKET_ACCOUNT_NAME = "\u4EE3\u588A\u66AB\u5B58";
+const getLendBucketAccount = (accounts) => accounts.find((a) => a.name === LEND_BUCKET_ACCOUNT_NAME && a.isSystem === "lend_bucket");
+const DEFAULT_CATEGORIES = {
+  expense: [
+    { label: "\u98F2\u98DF", icon: "cart", subs: ["\u65E9\u9910", "\u5348\u9910", "\u665A\u9910", "\u5BB5\u591C", "\u98F2\u6599", "\u5916\u98DF", "\u5496\u5561"] },
+    { label: "\u65E5\u5E38", icon: "box", subs: ["\u96DC\u8CA8", "\u751F\u6D3B\u7528\u54C1", "\u4FBF\u5229\u5546\u5E97"] },
+    { label: "\u5C45\u5BB6", icon: "home", subs: ["\u623F\u79DF\u623F\u8CB8", "\u6C34\u8CBB", "\u96FB\u8CBB", "\u74E6\u65AF", "\u7DB2\u8DEF", "\u7BA1\u7406\u8CBB", "\u4FEE\u7E55"] },
+    { label: "\u4EA4\u901A", icon: "car", subs: ["\u5927\u773E\u904B\u8F38", "\u8A08\u7A0B\u8ECA", "\u52A0\u6CB9", "\u505C\u8ECA", "ETC", "\u4FDD\u990A\u7DAD\u4FEE"] },
+    { label: "\u901A\u8A0A", icon: "phone", subs: ["\u624B\u6A5F\u8CBB", "\u5BB6\u7528\u7DB2\u8DEF", "\u5F71\u97F3\u8A02\u95B1"] },
+    { label: "\u5A1B\u6A02\u4F11\u9592", icon: "movie", subs: ["\u96FB\u5F71", "\u904A\u6232", "\u904B\u52D5\u5065\u8EAB", "\u65C5\u904A", "\u66F8\u7C4D", "KTV"] },
+    { label: "\u91AB\u7642\u5065\u5EB7", icon: "hospital", subs: ["\u770B\u8A3A", "\u85E5\u54C1", "\u4FDD\u5065\u98DF\u54C1", "\u4FDD\u96AA"] },
+    { label: "\u8863\u8457\u7F8E\u5BB9", icon: "bag", subs: ["\u670D\u98FE", "\u978B\u5305", "\u7F8E\u9AEE", "\u4FDD\u990A\u54C1", "\u5316\u599D\u54C1"] },
+    { label: "\u6559\u80B2\u5B78\u7FD2", icon: "book", subs: ["\u8AB2\u7A0B", "\u66F8\u672C", "\u7DDA\u4E0A\u5B78\u7FD2", "\u8B49\u7167\u8003\u8A66"] },
+    { label: "\u4EBA\u60C5\u5F80\u4F86", icon: "gift", subs: ["\u7D05\u5305", "\u79AE\u7269", "\u805A\u9910\u8ACB\u5BA2", "\u6350\u6B3E"] },
+    { label: "\u5BF5\u7269", icon: "paw", subs: ["\u98FC\u6599", "\u7528\u54C1", "\u91AB\u7642", "\u7F8E\u5BB9"] },
+    { label: "\u4FE1\u7528\u5361\u8CBB", icon: "card", subs: [] },
+    { label: "\u624B\u7E8C\u8CBB", icon: "coin", subs: ["\u8F49\u5E33\u624B\u7E8C\u8CBB", "\u63D0\u6B3E\u624B\u7E8C\u8CBB", "ATM \u8DE8\u884C"] },
+    { label: "\u6295\u8CC7\u76F8\u95DC", icon: "chart", subs: ["\u8B49\u5238\u624B\u7E8C\u8CBB", "\u8B49\u4EA4\u7A05", "\u6295\u8CC7\u8667\u640D"] },
+    { label: "\u5176\u4ED6", icon: "box", subs: ["\u5176\u4ED6\u652F\u51FA"] }
+  ],
+  income: [
+    { label: "\u85AA\u8CC7", icon: "salary", subs: ["\u672C\u85AA", "\u52A0\u73ED\u8CBB", "\u734E\u91D1", "\u5E74\u7D42", "\u5206\u7D05"] },
+    { label: "\u517C\u5DEE\u526F\u696D", icon: "briefcase", subs: ["\u63A5\u6848", "\u6559\u5B78", "\u5BEB\u7A3F", "\u5176\u4ED6"] },
+    { label: "\u6295\u8CC7\u6536\u5165", icon: "chart", subs: ["\u80A1\u606F\u914D\u606F", "\u8CE3\u80A1\u7372\u5229", "\u5229\u606F"] },
+    { label: "\u9000\u6B3E", icon: "bill", subs: ["\u5546\u54C1\u9000\u6B3E", "\u4FDD\u96AA\u7406\u8CE0", "\u9000\u7A05"] },
+    { label: "\u79AE\u91D1\u7D05\u5305", icon: "gift", subs: ["\u7D05\u5305", "\u79AE\u91D1"] },
+    { label: "\u4E2D\u734E", icon: "spark", subs: ["\u767C\u7968\u4E2D\u734E", "\u6D3B\u52D5\u734E\u91D1"] },
+    { label: "\u5176\u4ED6", icon: "box", subs: ["\u5176\u4ED6\u6536\u5165"] }
+  ]
+};
+const DEFAULT_ACCOUNTS = [];
+const DEFAULT_ACCOUNT_TYPES = [
+  { value: "cash", label: "\u73FE\u91D1", icon: "cash", color: "#f5d49c" },
+  { value: "bank", label: "\u9280\u884C", icon: "bank", color: "#a8c8f5" },
+  { value: "card", label: "\u4FE1\u7528\u5361", icon: "card", color: "#7ee0c0" },
+  { value: "epay", label: "\u96FB\u5B50\u652F\u4ED8", icon: "phone", color: "#c9b5f0" },
+  { value: "invest", label: "\u6295\u8CC7", icon: "chart", color: "#9ae0d4" },
+  { value: "receivable", label: "\u61C9\u6536", icon: "coin", color: "#f5d84a" },
+  { value: "debt", label: "\u8CA0\u50B5", icon: "home", color: "#e88a8a" },
+  { value: "other", label: "\u5176\u4ED6", icon: "box", color: "#f5c29c" }
+];
+const TYPE_ICONS = [
+  "cash",
+  "bank",
+  "card",
+  "phone",
+  "chart",
+  "box",
+  "home",
+  "car",
+  "bag",
+  "gem",
+  "target",
+  "coin",
+  "briefcase",
+  "cart",
+  "fuel",
+  "hospital",
+  "plane",
+  "gift",
+  "barchart",
+  "bill",
+  "building"
+];
+const TYPE_COLORS = [
+  "#f5d49c",
+  // 黃
+  "#a8c8f5",
+  // 藍
+  "#7ee0c0",
+  // 綠
+  "#c9b5f0",
+  // 紫
+  "#f5b5c0",
+  // 粉
+  "#f5c29c",
+  // 橘
+  "#9ae0d4",
+  // 青
+  "#e8b8d4",
+  // 桃
+  "#b8d4b0",
+  // 橄欖
+  "#f5a5a5",
+  // 紅
+  "#d4c4a8",
+  // 卡其
+  "#a8e0c4"
+  // 薄荷
+];
+const SOLID_COLORS = [
+  "#f5a623",
+  // 橙
+  "#4a90e2",
+  // 藍
+  "#2ecc71",
+  // 綠
+  "#9b59b6",
+  // 紫
+  "#e91e63",
+  // 桃紅
+  "#e74c3c",
+  // 紅
+  "#1abc9c",
+  // 青
+  "#ff5722",
+  // 橘紅
+  "#795548",
+  // 咖啡
+  "#607d8b",
+  // 藍灰
+  "#ffc107",
+  // 金
+  "#00bcd4"
+  // 天青
+];
+function adjustShade(hex, shade) {
+  if (!hex || shade === 0) return hex;
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const adj = (v) => {
+    if (shade > 0) return Math.round(v + (255 - v) * (shade / 100));
+    return Math.round(v * (1 + shade / 100));
+  };
+  const toHex = (v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0");
+  return "#" + toHex(adj(r)) + toHex(adj(g)) + toHex(adj(b));
+}
+const CHART_COLORS = [
+  "#5b8def",
+  // 藍
+  "#f5605a",
+  // 紅珊瑚
+  "#ffb547",
+  // 橘金
+  "#3dc88f",
+  // 翠綠
+  "#a572f0",
+  // 紫
+  "#ff85a8",
+  // 粉
+  "#22c5d6",
+  // 青藍
+  "#f5d448",
+  // 黃
+  "#7c8fa8",
+  // 灰藍
+  "#e88554"
+  // 焦糖
+];
+const LIST_SORT_KEY = "ledger_list_sort_v1";
+const DEFAULT_BUY_ACCOUNT_KEY = "ledger_default_buy_account_v1";
+const DEFAULT_SELL_ACCOUNT_KEY = "ledger_default_sell_account_v1";
+const LIST_SORT_OPTIONS = [
+  { value: "date_desc", label: "\u4EE5\u65E5\u671F\u6392\u5E8F(\u5F9E\u8FD1\u5230\u9060)" },
+  { value: "date_asc", label: "\u4EE5\u65E5\u671F\u6392\u5E8F(\u5F9E\u9060\u5230\u8FD1)" },
+  { value: "amount_desc", label: "\u4EE5\u91D1\u984D\u6392\u5E8F(\u5F9E\u5927\u5230\u5C0F)" },
+  { value: "amount_asc", label: "\u4EE5\u91D1\u984D\u6392\u5E8F(\u5F9E\u5C0F\u5230\u5927)" }
+];
+const DEFAULT_LIST_SORT = "date_desc";
+function loadListSort() {
+  try {
+    const v = localStorage.getItem(LIST_SORT_KEY);
+    return LIST_SORT_OPTIONS.find((o) => o.value === v) ? v : DEFAULT_LIST_SORT;
+  } catch {
+    return DEFAULT_LIST_SORT;
+  }
+}
+function sortTxnList(txns, mode) {
+  const arr = [...txns];
+  switch (mode) {
+    case "date_asc":
+      arr.sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
+      break;
+    case "amount_desc":
+      arr.sort((a, b) => b.amount - a.amount || b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+      break;
+    case "amount_asc":
+      arr.sort((a, b) => a.amount - b.amount || b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+      break;
+    case "date_desc":
+    default:
+      arr.sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+      break;
+  }
+  return arr;
+}
+const isAmountSort = (mode) => mode === "amount_desc" || mode === "amount_asc";
+const listSortListeners = /* @__PURE__ */ new Set();
+const listSortBroadcast = (mode) => {
+  listSortListeners.forEach((cb) => cb(mode));
+};
+function useListSort() {
+  const [sortMode, setSortMode] = React.useState(loadListSort);
+  React.useEffect(() => {
+    listSortListeners.add(setSortMode);
+    return () => {
+      listSortListeners.delete(setSortMode);
+    };
+  }, []);
+  const setAndBroadcast = (mode) => {
+    setSortMode(mode);
+    try {
+      localStorage.setItem(LIST_SORT_KEY, mode);
+    } catch {
+    }
+    listSortBroadcast(mode);
+  };
+  return [sortMode, setAndBroadcast];
+}
+const fmt = (n) => {
+  const num = Math.round(n);
+  return Math.abs(num).toLocaleString("en-US");
+};
+const fmtSigned = (n) => {
+  const num = Math.round(n);
+  if (num < 0) return "-" + Math.abs(num).toLocaleString("en-US");
+  return num.toLocaleString("en-US");
+};
+const autoFitFontSize = (str, baseSize = 17) => {
+  const len = String(str || "").length;
+  if (len <= 7) return baseSize;
+  if (len === 8) return baseSize - 1;
+  if (len === 9) return baseSize - 2;
+  if (len === 10) return baseSize - 3;
+  if (len === 11) return baseSize - 4;
+  return baseSize - 5;
+};
+const todayStr = () => {
+  const d = /* @__PURE__ */ new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const formatCreatedAt = (ts) => {
+  if (!ts) return "\u5EFA\u7ACB\u6642\u9593\u672A\u77E5";
+  const d = new Date(ts);
+  const Y = d.getFullYear();
+  const M = String(d.getMonth() + 1).padStart(2, "0");
+  const D = String(d.getDate()).padStart(2, "0");
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  return `${Y}/${M}/${D} ${h}:${m} \u5EFA\u7ACB`;
+};
+let __globalToast = null;
+let __globalToastRich = null;
+const setGlobalToast = (fn) => {
+  __globalToast = fn;
+};
+const setGlobalToastRich = (fn) => {
+  __globalToastRich = fn;
+};
+const callGlobalToast = (msg) => {
+  if (__globalToast) __globalToast(msg);
+};
+const callGlobalToastRich = (data, ms) => {
+  if (__globalToastRich) __globalToastRich(data, ms);
+};
+const uid = () => "t_" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const calcBalance = (account, transactions) => {
+  const init = account.initAmount || 0;
+  const delta = transactions.reduce((sum, t) => {
+    if (t.accountId !== account.id) return sum;
+    return sum + (t.type === "income" ? t.amount : -t.amount);
+  }, 0);
+  return init + delta;
+};
+const holdingShares = (holding, trades) => {
+  const buys = trades.filter((t) => t.holdingId === holding.id && t.type === "buy");
+  const sells = trades.filter((t) => t.holdingId === holding.id && t.type === "sell");
+  const bought = buys.reduce((s, t) => s + (t.shares || 0), 0);
+  const sold = sells.reduce((s, t) => s + (t.shares || 0), 0);
+  return bought - sold;
+};
+const holdingTotalBought = (holding, trades) => {
+  return trades.filter((t) => t.holdingId === holding.id && t.type === "buy").reduce((sum, t) => sum + (t.totalCost || 0), 0);
+};
+const holdingTotalBoughtShares = (holding, trades) => {
+  return trades.filter((t) => t.holdingId === holding.id && t.type === "buy").reduce((sum, t) => sum + (t.shares || 0), 0);
+};
+const holdingAvgCost = (holding, trades) => {
+  const totalShares = holdingTotalBoughtShares(holding, trades);
+  if (totalShares === 0) return 0;
+  return holdingTotalBought(holding, trades) / totalShares;
+};
+const holdingCost = (holding, trades) => {
+  const shares = holdingShares(holding, trades);
+  return shares * holdingAvgCost(holding, trades);
+};
+const avgCostMatch = (holdingId, sellShares, trades, holdings) => {
+  const holding = holdings.find((h) => h.id === holdingId);
+  if (!holding) return { matchedCost: 0 };
+  const avg = holdingAvgCost(holding, trades);
+  return { matchedCost: sellShares * avg };
+};
+const holdingPnl = (holding, trades) => {
+  const cost = holdingCost(holding, trades);
+  const market = holding.marketValue || 0;
+  return market - cost;
+};
+const investAccountSummary = (account, holdings, trades) => {
+  const accountHoldings = holdings.filter((h) => h.accountId === account.id);
+  if (accountHoldings.length === 0) return null;
+  let totalMarket = 0, totalCost = 0;
+  for (const h of accountHoldings) {
+    const shares = holdingShares(h, trades);
+    if (shares === 0) continue;
+    totalMarket += h.marketValue || 0;
+    totalCost += holdingCost(h, trades);
+  }
+  return { totalMarket, totalCost, totalPnl: totalMarket - totalCost };
+};
+const acctDisplayName = (account) => {
+  if (!account) return "";
+  return account.name;
+};
+const acctDisplayNameStr = (account) => {
+  if (!account) return "";
+  return account.virtual ? `${account.name}(\u865B)` : account.name;
+};
+const isRealFlow = (t) => {
+  const r = t.transferRole;
+  if (r === "out" || r === "in") return false;
+  if (r === "lend_out" || r === "lend_in") return false;
+  if (r === "lend_collect_out" || r === "lend_collect_in") return false;
+  if (r === "settle_out" || r === "settle_in") return false;
+  return true;
+};
+const detectStockBuyImpact = (state, actuallyDeleteIds) => {
+  const affectedBuyTradeIds = /* @__PURE__ */ new Set();
+  for (const tx of state.transactions) {
+    if (!actuallyDeleteIds.has(tx.id) || !tx.tradeId) continue;
+    const tr = state.trades.find((x) => x.id === tx.tradeId);
+    if (tr && tr.type === "buy") affectedBuyTradeIds.add(tr.id);
+  }
+  if (affectedBuyTradeIds.size === 0) return { msg: null, anyHoldingDestroyed: false, highlightWords: [] };
+  const aliveBuyTradeIds = /* @__PURE__ */ new Set();
+  for (const tx of state.transactions) {
+    if (actuallyDeleteIds.has(tx.id) || !tx.tradeId) continue;
+    const tr = state.trades.find((x) => x.id === tx.tradeId);
+    if (tr && tr.type === "buy") aliveBuyTradeIds.add(tr.id);
+  }
+  const destroyedHoldings = [];
+  const visited = /* @__PURE__ */ new Set();
+  for (const buyId of affectedBuyTradeIds) {
+    const buyTr = state.trades.find((x) => x.id === buyId);
+    if (!buyTr) continue;
+    const hId = buyTr.holdingId;
+    if (visited.has(hId)) continue;
+    visited.add(hId);
+    const stillHasBuy = state.trades.some(
+      (tr) => tr.holdingId === hId && tr.type === "buy" && aliveBuyTradeIds.has(tr.id)
+    );
+    if (stillHasBuy) continue;
+    const holding = state.holdings.find((h) => h.id === hId);
+    if (!holding) continue;
+    const sellsCount = state.trades.filter((tr) => tr.holdingId === hId && tr.type === "sell").length;
+    destroyedHoldings.push({ symbol: holding.symbol || "\u672A\u77E5", sellsCount });
+  }
+  if (destroyedHoldings.length === 0) {
+    return {
+      msg: "\u26A0 \u5305\u542B\u80A1\u7968\u8CB7\u9032\u7D00\u9304,\u522A\u9664\u6703\u5F71\u97FF\u8A72\u80A1\u7968\u7684\u6210\u672C\u8A08\u7B97\u3002",
+      anyHoldingDestroyed: false,
+      highlightWords: []
+    };
+  }
+  let msg;
+  let highlightWords = ["\u5B8C\u5168\u6D88\u5931"];
+  if (destroyedHoldings.length === 1) {
+    const h = destroyedHoldings[0];
+    msg = `\u26A0 \u300C${h.symbol}\u300D\u6301\u80A1\u5C07 \u5B8C\u5168\u6D88\u5931 \u3002`;
+    if (h.sellsCount > 0) {
+      msg += `
+\u8A72\u6301\u80A1\u5DF2\u6709 ${h.sellsCount} \u7B46 \u8CE3\u51FA\u7D00\u9304
+\u7D50\u7B97\u8207\u640D\u76CA\u7D00\u9304\u4E5F\u6703\u4E00\u4F75\u6E05\u9664\u3002`;
+    }
+  } else {
+    const names = destroyedHoldings.map((h) => `\u300C${h.symbol}\u300D`).join("\u3001");
+    const totalSells = destroyedHoldings.reduce((sum, h) => sum + h.sellsCount, 0);
+    msg = `\u26A0 ${names}\u6301\u80A1\u5C07 \u5B8C\u5168\u6D88\u5931 \u3002`;
+    if (totalSells > 0) {
+      msg += `
+\u76F8\u95DC ${totalSells} \u7B46 \u8CE3\u51FA\u7D50\u7B97\u8207\u640D\u76CA\u7D00\u9304
+\u4E5F\u6703\u4E00\u4F75\u6E05\u9664\u3002`;
+    }
+  }
+  return { msg, anyHoldingDestroyed: true, highlightWords };
+};
+const buildBatchDeletePreview = (transactions, selectedIds, actuallyDeleteIds, maxLines = 5) => {
+  const fmtAmt = (t) => `${t.type === "expense" ? "-" : "+"}${t.amount.toLocaleString()}`;
+  const labelOf = (t) => {
+    if (t.transferRole === "out") return "\u8F49\u51FA";
+    if (t.transferRole === "in") return "\u8F49\u5165";
+    if (t.transferRole === "fee") return "\u624B\u7E8C\u8CBB";
+    return t.subCategory ? `${t.category || "\u672A\u5206\u985E"} \u203A ${t.subCategory}` : t.category || "\u672A\u5206\u985E";
+  };
+  const groupKeyOf = (t) => t.transferId || t.tradeId || t.settleId || t.txnGroupId || "__solo_" + t.id;
+  const ordered = transactions.filter((t) => actuallyDeleteIds.has(t.id));
+  ordered.sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+  const groupOrder = [];
+  const groupMap = {};
+  ordered.forEach((t) => {
+    const k = groupKeyOf(t);
+    if (!groupMap[k]) {
+      groupMap[k] = [];
+      groupOrder.push(k);
+    }
+    groupMap[k].push(t);
+  });
+  groupOrder.forEach((k) => {
+    groupMap[k].sort((a, b) => {
+      const aPri = selectedIds.has(a.id) ? 0 : 1;
+      const bPri = selectedIds.has(b.id) ? 0 : 1;
+      if (aPri !== bPri) return aPri - bPri;
+      return b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0);
+    });
+  });
+  const rows = [];
+  groupOrder.forEach((k) => {
+    groupMap[k].forEach((t) => {
+      const isCascade = !selectedIds.has(t.id);
+      rows.push({
+        cascade: isCascade,
+        text: isCascade ? `${labelOf(t)}  ${fmtAmt(t)}` : `\u30FB${labelOf(t)}  ${fmtAmt(t)}`
+      });
+    });
+  });
+  let shown = rows;
+  let extraText = null;
+  if (rows.length > maxLines) {
+    shown = rows.slice(0, maxLines);
+    extraText = `\u30FB\u4EE5\u53CA\u5176\u4ED6 ${rows.length - maxLines} \u7B46`;
+  }
+  return /* @__PURE__ */ React.createElement(React.Fragment, null, shown.map((r, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 4 } }, r.cascade && /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", marginRight: 2 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "link", size: 12, color: "var(--text-faint)" })), /* @__PURE__ */ React.createElement("span", null, r.text))), extraText && /* @__PURE__ */ React.createElement("div", null, extraText));
+};
+const expandStockBuyCascade = (state, actuallyDeleteIds) => {
+  const deletingBuyTradeIds = /* @__PURE__ */ new Set();
+  for (const tx of state.transactions) {
+    if (!actuallyDeleteIds.has(tx.id) || !tx.tradeId) continue;
+    const tr = state.trades.find((x) => x.id === tx.tradeId);
+    if (tr && tr.type === "buy") deletingBuyTradeIds.add(tr.id);
+  }
+  if (deletingBuyTradeIds.size === 0) return /* @__PURE__ */ new Set();
+  const aliveBuyTradeIds = /* @__PURE__ */ new Set();
+  for (const tx of state.transactions) {
+    if (actuallyDeleteIds.has(tx.id) || !tx.tradeId) continue;
+    const tr = state.trades.find((x) => x.id === tx.tradeId);
+    if (tr && tr.type === "buy") aliveBuyTradeIds.add(tr.id);
+  }
+  const orphanedHoldingIds = /* @__PURE__ */ new Set();
+  const visited = /* @__PURE__ */ new Set();
+  for (const buyId of deletingBuyTradeIds) {
+    const buyTr = state.trades.find((x) => x.id === buyId);
+    if (!buyTr) continue;
+    const hId = buyTr.holdingId;
+    if (visited.has(hId)) continue;
+    visited.add(hId);
+    const stillHasBuy = state.trades.some(
+      (tr) => tr.holdingId === hId && tr.type === "buy" && aliveBuyTradeIds.has(tr.id)
+    );
+    if (!stillHasBuy) orphanedHoldingIds.add(hId);
+  }
+  if (orphanedHoldingIds.size === 0) return /* @__PURE__ */ new Set();
+  const cascadeSellTradeIds = /* @__PURE__ */ new Set();
+  for (const tr of state.trades) {
+    if (tr.type !== "sell") continue;
+    if (!orphanedHoldingIds.has(tr.holdingId)) continue;
+    cascadeSellTradeIds.add(tr.id);
+  }
+  if (cascadeSellTradeIds.size === 0) return /* @__PURE__ */ new Set();
+  const extraTxnIds = /* @__PURE__ */ new Set();
+  for (const tx of state.transactions) {
+    if (!tx.tradeId) continue;
+    if (actuallyDeleteIds.has(tx.id)) continue;
+    if (cascadeSellTradeIds.has(tx.tradeId)) extraTxnIds.add(tx.id);
+  }
+  return extraTxnIds;
+};
+const txnsInMonth = (account, transactions, ym) => {
+  return transactions.filter((t) => t.accountId === account.id && t.date.startsWith(ym)).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+};
+const memStore = { data: null };
+const storageGet = () => {
+  try {
+    return localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return memStore.data;
+  }
+};
+const storageSet = (v) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, v);
+  } catch {
+    memStore.data = v;
+  }
+};
+const storageClear = () => {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    memStore.data = null;
+  }
+};
+const noteColorListeners = /* @__PURE__ */ new Set();
+const noteColorBroadcast = (color) => {
+  noteColorListeners.forEach((cb) => cb(color));
+};
+function useNoteColor() {
+  const [color, setColor] = useState(() => {
+    try {
+      return localStorage.getItem(NOTE_COLOR_KEY) || "";
+    } catch {
+      return "";
+    }
+  });
+  useEffect(() => {
+    noteColorListeners.add(setColor);
+    return () => {
+      noteColorListeners.delete(setColor);
+    };
+  }, []);
+  return color;
+}
+const notePrefListeners = /* @__PURE__ */ new Set();
+const notePrefBroadcast = (pref) => {
+  notePrefListeners.forEach((cb) => cb(pref));
+};
+function loadNotePref() {
+  try {
+    const raw = localStorage.getItem(NOTE_PREF_KEY);
+    if (!raw) return { ...DEFAULT_NOTE_PREF };
+    return { ...DEFAULT_NOTE_PREF, ...JSON.parse(raw) };
+  } catch {
+    return { ...DEFAULT_NOTE_PREF };
+  }
+}
+function useNotePref() {
+  const [pref, setPref] = useState(loadNotePref);
+  useEffect(() => {
+    notePrefListeners.add(setPref);
+    return () => {
+      notePrefListeners.delete(setPref);
+    };
+  }, []);
+  return pref;
+}
+function useSwipeBack(onBack, options = {}) {
+  const { skipInPickerBackdrop = false, noDrag = false } = options;
+  const [dragX, setDragX] = useState(0);
+  const onBackRef = React.useRef(onBack);
+  React.useEffect(() => {
+    onBackRef.current = onBack;
+  }, [onBack]);
+  const cleanupRef = React.useRef(null);
+  const setDragXRef = React.useRef(setDragX);
+  setDragXRef.current = setDragX;
+  const refCallback = React.useCallback((el) => {
+    if (cleanupRef.current) {
+      cleanupRef.current();
+      cleanupRef.current = null;
+    }
+    if (!el) return;
+    let startX = null, startY = null;
+    let lastX = null, lastY = null;
+    let isHorizontal = false;
+    const onStart = (e) => {
+      const target = e.target;
+      if (target && (target.tagName === "INPUT" && target.type === "range" || target.closest?.('input[type="range"]'))) {
+        startX = null;
+        return;
+      }
+      if (target && target.closest?.('[data-slider="true"]')) {
+        startX = null;
+        return;
+      }
+      if (skipInPickerBackdrop && target && target.closest?.("[data-picker-backdrop]")) {
+        startX = null;
+        return;
+      }
+      if (document.body.hasAttribute("data-drag-active")) {
+        startX = null;
+        return;
+      }
+      const t = e.touches[0];
+      startX = t.clientX;
+      startY = t.clientY;
+      lastX = t.clientX;
+      lastY = t.clientY;
+      isHorizontal = false;
+    };
+    const onMove = (e) => {
+      if (startX == null) return;
+      if (document.body.hasAttribute("data-drag-active")) {
+        startX = null;
+        setDragXRef.current(0);
+        return;
+      }
+      const t = e.touches[0];
+      lastX = t.clientX;
+      lastY = t.clientY;
+      const dx = t.clientX - startX;
+      const dy = Math.abs(t.clientY - startY);
+      if (!isHorizontal && Math.abs(dx) > 10 && Math.abs(dx) > dy) {
+        isHorizontal = true;
+      }
+      if (isHorizontal) {
+        e.preventDefault();
+        if (noDrag) return;
+        const clamped = Math.max(-200, Math.min(200, dx));
+        setDragXRef.current(clamped);
+      }
+    };
+    const onEnd = () => {
+      if (startX != null && lastX != null) {
+        const dx = lastX - startX;
+        const dy = Math.abs(lastY - startY);
+        if (Math.abs(dx) > 70 && Math.abs(dx) > dy) {
+          onBackRef.current();
+        }
+      }
+      setDragXRef.current(0);
+      startX = null;
+      startY = null;
+      lastX = null;
+      lastY = null;
+      isHorizontal = false;
+    };
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd, { passive: true });
+    el.addEventListener("touchcancel", onEnd, { passive: true });
+    cleanupRef.current = () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+    };
+  }, [skipInPickerBackdrop, noDrag]);
+  return { ref: refCallback, dragX };
+}
+function useSwipeToClose(onClose, threshold = 50) {
+  const startRef = React.useRef(null);
+  return {
+    onTouchStart: (e) => {
+      const t = e.touches[0];
+      startRef.current = { x: t.clientX, y: t.clientY };
+    },
+    onTouchMove: (e) => {
+      if (!startRef.current) return;
+      const t = e.touches[0];
+      const dx = t.clientX - startRef.current.x;
+      const dy = Math.abs(t.clientY - startRef.current.y);
+      if (Math.abs(dx) > 10 && Math.abs(dx) > dy) {
+        e.preventDefault?.();
+      }
+    },
+    onTouchEnd: (e) => {
+      if (!startRef.current) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - startRef.current.x;
+      const dy = Math.abs(t.clientY - startRef.current.y);
+      startRef.current = null;
+      if (Math.abs(dx) > threshold && Math.abs(dx) > dy) {
+        onClose?.();
+      }
+    },
+    onTouchCancel: () => {
+      startRef.current = null;
+    }
+  };
+}
+function useSwipeToCloseAny(onClose, threshold = 60) {
+  const startRef = React.useRef(null);
+  const onInputRef = React.useRef(false);
+  const [dragY, setDragY] = React.useState(0);
+  return {
+    dragY,
+    setDragY,
+    onTouchStart: (e) => {
+      const tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : "";
+      onInputRef.current = tag === "input" || tag === "textarea" || tag === "select";
+      const t = e.touches[0];
+      startRef.current = { x: t.clientX, y: t.clientY };
+    },
+    onTouchMove: (e) => {
+      if (onInputRef.current || !startRef.current) return;
+      const t = e.touches[0];
+      const dx = t.clientX - startRef.current.x;
+      const dy = t.clientY - startRef.current.y;
+      if (dy > 0 && Math.abs(dy) > Math.abs(dx)) {
+        setDragY(dy);
+        e.preventDefault?.();
+      } else if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+        e.preventDefault?.();
+      }
+    },
+    onTouchEnd: (e) => {
+      if (onInputRef.current) {
+        onInputRef.current = false;
+        startRef.current = null;
+        return;
+      }
+      if (!startRef.current) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - startRef.current.x;
+      const dy = t.clientY - startRef.current.y;
+      startRef.current = null;
+      if (Math.abs(dx) > threshold && Math.abs(dx) > Math.abs(dy)) {
+        setDragY(0);
+        onClose?.();
+        return;
+      }
+      if (dy > threshold && dy > Math.abs(dx)) {
+        setDragY(0);
+        onClose?.();
+        return;
+      }
+      setDragY(0);
+    },
+    onTouchCancel: () => {
+      startRef.current = null;
+      onInputRef.current = false;
+      setDragY(0);
+    }
+  };
+}
+function TypeIcon({ name, size = 22, color = "#fff" }) {
+  const props = {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: color,
+    strokeWidth: 1.6,
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  };
+  const f = { fill: color, stroke: "none" };
+  switch (name) {
+    // 現金 / 紙鈔(共用同一個圖示)
+    case "bill":
+    case "cash":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("rect", { x: "3", y: "7", width: "18", height: "10", rx: "2" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "2" }));
+    // 銀行（希臘神殿形）
+    case "bank":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M4 10 L12 5 L20 10" }), /* @__PURE__ */ React.createElement("line", { x1: "4", y1: "10", x2: "20", y2: "10" }), /* @__PURE__ */ React.createElement("line", { x1: "6", y1: "10", x2: "6", y2: "17" }), /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "10", x2: "12", y2: "17" }), /* @__PURE__ */ React.createElement("line", { x1: "18", y1: "10", x2: "18", y2: "17" }), /* @__PURE__ */ React.createElement("line", { x1: "3", y1: "19", x2: "21", y2: "19" }));
+    // 信用卡（簡潔長方形 + 單條線）
+    case "card":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("rect", { x: "3", y: "6", width: "18", height: "12", rx: "2" }), /* @__PURE__ */ React.createElement("line", { x1: "3", y1: "11", x2: "21", y2: "11" }));
+    // 手機（圓角長方形 + 小點）
+    case "phone":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("rect", { x: "7", y: "3", width: "10", height: "18", rx: "2" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "18", r: "0.6", ...f }));
+    // 折線圖（單一向上箭頭線）
+    case "chart":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("polyline", { points: "4 17 10 11 14 14 20 7" }), /* @__PURE__ */ React.createElement("polyline", { points: "15 7 20 7 20 12" }));
+    // 箱子（立體感但簡潔）
+    case "box":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M3 8 L12 4 L21 8 L12 12 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M3 8 L3 16 L12 20 L12 12" }), /* @__PURE__ */ React.createElement("path", { d: "M21 8 L21 16 L12 20" }));
+    // 房子（屋頂 + 方塊）
+    case "home":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M4 11 L12 4 L20 11 L20 20 L4 20 Z" }));
+    // 汽車
+    case "car":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M5 14 L6 9 L18 9 L19 14" }), /* @__PURE__ */ React.createElement("rect", { x: "4", y: "14", width: "16", height: "5", rx: "1" }));
+    // 錢袋
+    case "bag":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M7 8 Q7 4 12 4 Q17 4 17 8 L19 20 L5 20 Z" }));
+    // 鑽石
+    case "gem":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M6 4 L18 4 L21 10 L12 21 L3 10 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M3 10 L21 10" }));
+    // 靶心（兩層圓 + 中心點）
+    case "target":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "8" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "2", ...f }));
+    // 硬幣（₽符號風格）
+    case "coin":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "8" }), /* @__PURE__ */ React.createElement("path", { d: "M10 8 L10 16 M10 8 L13 8 Q15 8 15 10 Q15 12 13 12 L10 12" }));
+    // 公事包
+    case "briefcase":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("rect", { x: "3", y: "8", width: "18", height: "12", rx: "1.5" }), /* @__PURE__ */ React.createElement("path", { d: "M9 8 L9 6 Q9 5 10 5 L14 5 Q15 5 15 6 L15 8" }));
+    // 購物車
+    case "cart":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M3 5 L5 5 L7 15 L18 15 L20 8 L7 8" }), /* @__PURE__ */ React.createElement("circle", { cx: "9", cy: "19", r: "1", ...f }), /* @__PURE__ */ React.createElement("circle", { cx: "17", cy: "19", r: "1", ...f }));
+    // 加油槍
+    case "fuel":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("rect", { x: "4", y: "4", width: "9", height: "16", rx: "1.5" }), /* @__PURE__ */ React.createElement("path", { d: "M13 10 L17 10 L17 17 Q17 19 18.5 19 Q20 19 20 17 L20 9 L18 7" }));
+    // 醫院（方塊 + 十字）
+    case "hospital":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("rect", { x: "4", y: "4", width: "16", height: "16", rx: "2" }), /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "9", x2: "12", y2: "15" }), /* @__PURE__ */ React.createElement("line", { x1: "9", y1: "12", x2: "15", y2: "12" }));
+    // 飛機（簡化成向上的樣子）
+    case "plane":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M12 3 L14 10 L21 12 L14 14 L12 21 L10 14 L3 12 L10 10 Z" }));
+    // 禮物（方塊 + 十字緞帶）
+    case "gift":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("rect", { x: "4", y: "10", width: "16", height: "10", rx: "1" }), /* @__PURE__ */ React.createElement("line", { x1: "4", y1: "13", x2: "20", y2: "13" }), /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "10", x2: "12", y2: "20" }), /* @__PURE__ */ React.createElement("path", { d: "M8 10 Q6 8 7 6 Q9 5 12 10" }), /* @__PURE__ */ React.createElement("path", { d: "M16 10 Q18 8 17 6 Q15 5 12 10" }));
+    // 長條圖（三根柱子）
+    case "barchart":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("line", { x1: "6", y1: "20", x2: "6", y2: "12" }), /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "20", x2: "12", y2: "6" }), /* @__PURE__ */ React.createElement("line", { x1: "18", y1: "20", x2: "18", y2: "15" }));
+    // 大樓
+    case "building":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("rect", { x: "5", y: "3", width: "14", height: "18" }), /* @__PURE__ */ React.createElement("line", { x1: "9", y1: "7", x2: "9", y2: "7.5" }), /* @__PURE__ */ React.createElement("line", { x1: "15", y1: "7", x2: "15", y2: "7.5" }), /* @__PURE__ */ React.createElement("line", { x1: "9", y1: "11", x2: "9", y2: "11.5" }), /* @__PURE__ */ React.createElement("line", { x1: "15", y1: "11", x2: "15", y2: "11.5" }), /* @__PURE__ */ React.createElement("line", { x1: "9", y1: "15", x2: "9", y2: "15.5" }), /* @__PURE__ */ React.createElement("line", { x1: "15", y1: "15", x2: "15", y2: "15.5" }));
+    // 學士帽
+    case "cap":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M3 10 L12 5 L21 10 L12 15 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M7 12 L7 16 Q7 18 12 18 Q17 18 17 16 L17 12" }));
+    // 餐盤（圓圈）
+    case "plate":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "8" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "3" }));
+    // 遊戲手把
+    case "game":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("rect", { x: "3", y: "8", width: "18", height: "10", rx: "4" }), /* @__PURE__ */ React.createElement("line", { x1: "7", y1: "13", x2: "10", y2: "13" }), /* @__PURE__ */ React.createElement("line", { x1: "8.5", y1: "11.5", x2: "8.5", y2: "14.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "15", cy: "12", r: "0.8", ...f }), /* @__PURE__ */ React.createElement("circle", { cx: "17", cy: "14", r: "0.8", ...f }));
+    // 床/住宿
+    case "bed":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M3 17 L3 9 L10 9 L10 13 L21 13 L21 17" }), /* @__PURE__ */ React.createElement("line", { x1: "3", y1: "19", x2: "21", y2: "19" }), /* @__PURE__ */ React.createElement("circle", { cx: "7", cy: "11", r: "1" }));
+    // 購物袋
+    case "shopping":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M5 8 L7 20 L17 20 L19 8 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M9 8 Q9 4 12 4 Q15 4 15 8" }));
+    // 電影/娛樂（膠卷板）
+    case "movie":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("rect", { x: "3", y: "8", width: "18", height: "12" }), /* @__PURE__ */ React.createElement("path", { d: "M3 12 L21 12" }), /* @__PURE__ */ React.createElement("path", { d: "M6 4 L8 8 M10 4 L12 8 M14 4 L16 8 M18 4 L20 8" }));
+    // 書本（教育）
+    case "book":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M4 5 L12 7 L12 20 L4 18 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M20 5 L12 7 L12 20 L20 18 Z" }));
+    // 寵物（爪印）
+    case "paw":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("circle", { cx: "7", cy: "9", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "7", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "17", cy: "9", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "5", cy: "14", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "19", cy: "14", r: "1.5" }), /* @__PURE__ */ React.createElement("path", { d: "M8 19 Q8 15 12 15 Q16 15 16 19 Q16 21 12 21 Q8 21 8 19" }));
+    // 閃電/水電費
+    case "bolt":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M13 3 L5 14 L11 14 L10 21 L19 9 L13 9 Z" }));
+    // 咖啡
+    case "coffee":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M4 8 L4 17 Q4 20 8 20 L14 20 Q18 20 18 17 L18 8 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M18 10 L20 10 Q22 10 22 12 L22 14 Q22 16 20 16 L18 16" }), /* @__PURE__ */ React.createElement("path", { d: "M8 4 Q8 6 10 6 M12 4 Q12 6 14 6" }));
+    // 音符
+    case "music":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("circle", { cx: "7", cy: "18", r: "2.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "17", cy: "16", r: "2.5" }), /* @__PURE__ */ React.createElement("line", { x1: "9.5", y1: "18", x2: "9.5", y2: "6" }), /* @__PURE__ */ React.createElement("line", { x1: "19.5", y1: "16", x2: "19.5", y2: "4" }), /* @__PURE__ */ React.createElement("path", { d: "M9.5 6 L19.5 4" }));
+    // 筆記/備註/其他
+    case "note":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M5 4 L15 4 L19 8 L19 20 L5 20 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M15 4 L15 8 L19 8" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "12", x2: "16", y2: "12" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "15", x2: "14", y2: "15" }));
+    // 薪資錢袋
+    case "salary":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M7 8 Q7 4 12 4 Q17 4 17 8 L19 20 L5 20 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M10 12 L14 12 M10 14 L14 14 M12 10 L12 16" }));
+    // 火花/其他
+    case "spark":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M12 3 L13 10 L20 11 L13 12 L12 19 L11 12 L4 11 L11 10 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M18 4 L18.5 6 L20 6.5 L18.5 7 L18 9 L17.5 7 L16 6.5 L17.5 6 Z" }));
+    // 明細列表（剪貼板）
+    case "list":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("rect", { x: "5", y: "4", width: "14", height: "17", rx: "2" }), /* @__PURE__ */ React.createElement("path", { d: "M9 4 L9 2 L15 2 L15 4" }), /* @__PURE__ */ React.createElement("line", { x1: "8.5", y1: "10", x2: "15.5", y2: "10" }), /* @__PURE__ */ React.createElement("line", { x1: "8.5", y1: "14", x2: "15.5", y2: "14" }), /* @__PURE__ */ React.createElement("line", { x1: "8.5", y1: "17", x2: "13", y2: "17" }));
+    // 日曆
+    case "calendar":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("rect", { x: "4", y: "5", width: "16", height: "16", rx: "2" }), /* @__PURE__ */ React.createElement("line", { x1: "4", y1: "10", x2: "20", y2: "10" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "3", x2: "8", y2: "7" }), /* @__PURE__ */ React.createElement("line", { x1: "16", y1: "3", x2: "16", y2: "7" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "15", r: "1", ...f }));
+    // 鎖（關閉）
+    case "lock":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("rect", { x: "5", y: "11", width: "14", height: "10", rx: "2" }), /* @__PURE__ */ React.createElement("path", { d: "M8 11 V7 a4 4 0 0 1 8 0 V11" }));
+    // 鎖（開啟）
+    case "unlock":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("rect", { x: "5", y: "11", width: "14", height: "10", rx: "2" }), /* @__PURE__ */ React.createElement("path", { d: "M8 11 V7 a4 4 0 0 1 8 0" }));
+    // 統計（圓餅圖）
+    case "pie":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M12 3 A9 9 0 1 1 3 12 L12 12 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M12 3 L12 12 L21 12 A9 9 0 0 0 12 3 Z" }));
+    // 齒輪（設定）
+    case "gear":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "3" }), /* @__PURE__ */ React.createElement("path", { d: "M12 2 L12 5 M12 19 L12 22 M2 12 L5 12 M19 12 L22 12 M4.9 4.9 L7 7 M17 17 L19.1 19.1 M4.9 19.1 L7 17 M17 7 L19.1 4.9" }));
+    // 鉛筆（編輯）
+    case "pencil":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M17 3 L21 7 L8 20 L3 21 L4 16 L17 3 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M15 5 L19 9" }));
+    // 星星(空心,標記為預設/常用)
+    case "star":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M12 3 L14.5 9 L21 9.5 L16 14 L17.5 20.5 L12 17 L6.5 20.5 L8 14 L3 9.5 L9.5 9 Z" }));
+    // 星星(實心,已標記為預設)
+    case "star-filled":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M12 3 L14.5 9 L21 9.5 L16 14 L17.5 20.5 L12 17 L6.5 20.5 L8 14 L3 9.5 L9.5 9 Z", ...f }));
+    // 垃圾桶（刪除）
+    case "trash":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M4 7 L20 7" }), /* @__PURE__ */ React.createElement("path", { d: "M10 3 L14 3 L14 7 L10 7 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M6 7 L7 21 L17 21 L18 7" }), /* @__PURE__ */ React.createElement("path", { d: "M10 11 L10 17 M14 11 L14 17" }));
+    // 搜尋(放大鏡)
+    case "search":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("circle", { cx: "10.5", cy: "10.5", r: "6.5" }), /* @__PURE__ */ React.createElement("line", { x1: "21", y1: "21", x2: "15.5", y2: "15.5" }));
+    // 下載（匯出 JSON — 向下箭頭進盒子）
+    case "download":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M12 3 L12 15" }), /* @__PURE__ */ React.createElement("path", { d: "M7 10 L12 15 L17 10" }), /* @__PURE__ */ React.createElement("path", { d: "M4 19 L20 19" }));
+    // 上傳（匯入 — 向上箭頭出盒子）
+    case "upload":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M12 15 L12 3" }), /* @__PURE__ */ React.createElement("path", { d: "M7 8 L12 3 L17 8" }), /* @__PURE__ */ React.createElement("path", { d: "M4 19 L20 19" }));
+    // CSV/試算表
+    case "sheet":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("rect", { x: "4", y: "3", width: "16", height: "18", rx: "1" }), /* @__PURE__ */ React.createElement("path", { d: "M4 9 L20 9 M4 15 L20 15 M10 3 L10 21 M16 3 L16 21" }));
+    // 資料夾
+    case "folder":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M3 6 L3 19 L21 19 L21 9 L12 9 L10 6 L3 6 Z" }));
+    // 扳手（工具/設定）
+    case "wrench":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M14 6 L18 2 L22 6 L18 10 L14 6 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M14 6 L4 16 L4 20 L8 20 L18 10" }));
+    // 時鐘（提醒）
+    case "clock":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "9" }), /* @__PURE__ */ React.createElement("path", { d: "M12 7 L12 12 L16 14" }));
+    // 連結鏈條
+    case "link":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M10 14 A4 4 0 0 1 10 8 L13 5 A4 4 0 0 1 19 11 L17 13" }), /* @__PURE__ */ React.createElement("path", { d: "M14 10 A4 4 0 0 1 14 16 L11 19 A4 4 0 0 1 5 13 L7 11" }));
+    // 警告（三角驚嘆）
+    case "warning":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M12 3 L22 20 L2 20 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M12 10 L12 15 M12 17.5 L12 18" }));
+    // 筆記本（紀錄筆數）
+    case "clipboard":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("rect", { x: "5", y: "4", width: "14", height: "17", rx: "1" }), /* @__PURE__ */ React.createElement("path", { d: "M9 4 L9 2 L15 2 L15 4" }), /* @__PURE__ */ React.createElement("path", { d: "M8 10 L16 10 M8 14 L16 14 M8 18 L12 18" }));
+    // 盾牌（保險）
+    case "shield":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M12 3 L4 6 L4 12 C4 17 8 20 12 22 C16 20 20 17 20 12 L20 6 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M9 12 L11 14 L15 10" }));
+    // 標籤(分類)
+    case "tag":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M3 12 L3 4 L11 4 L21 14 L13 22 Z" }), /* @__PURE__ */ React.createElement("circle", { cx: "7", cy: "8", r: "1", ...f }));
+    default:
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "8" }));
+  }
+}
+function App() {
+  const [state, setState] = useState(() => {
+    try {
+      const raw = storageGet();
+      if (raw) {
+        const d = JSON.parse(raw);
+        return {
+          transactions: d.transactions || [],
+          accounts: d.accounts?.length ? d.accounts : [...DEFAULT_ACCOUNTS],
+          categories: d.categories || JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
+          accountTypes: d.accountTypes?.length ? d.accountTypes : [...DEFAULT_ACCOUNT_TYPES],
+          holdings: d.holdings || [],
+          trades: d.trades || []
+        };
+      }
+    } catch {
+    }
+    return {
+      transactions: [],
+      accounts: [...DEFAULT_ACCOUNTS],
+      categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
+      accountTypes: [...DEFAULT_ACCOUNT_TYPES],
+      holdings: [],
+      trades: []
+    };
+  });
+  const [page, setPage] = useState("home");
+  const [sheet, setSheet] = useState(null);
+  const [sheetType, setSheetType] = useState("expense");
+  const [editingTxn, setEditingTxn] = useState(null);
+  const [toastMsg, setToastMsg] = useState("");
+  const [currentMonth, setCurrentMonth] = useState(todayStr().slice(0, 7));
+  const [selectedDate, setSelectedDate] = useState(todayStr());
+  const [periodKey, setPeriodKey] = useState(null);
+  const [detailDate, setDetailDate] = useState(null);
+  const [lendDetail, setLendDetail] = useState(null);
+  const [settleDetail, setSettleDetail] = useState(null);
+  const [editMode, setEditMode] = useState(false);
+  const [txnSelectMode, setTxnSelectMode] = useState(false);
+  const [homeSelectMode, setHomeSelectMode] = useState(false);
+  const [settingsSubSheet, setSettingsSubSheet] = useState(false);
+  const [noteColor, setNoteColor] = useState(() => {
+    try {
+      return localStorage.getItem(NOTE_COLOR_KEY) || DEFAULT_NOTE_COLOR;
+    } catch {
+      return DEFAULT_NOTE_COLOR;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(NOTE_COLOR_KEY, noteColor);
+    } catch {
+    }
+    noteColorBroadcast(noteColor);
+  }, [noteColor]);
+  useEffect(() => {
+    let migrated = false;
+    setState((s) => {
+      const now = Date.now();
+      const tenDaysMs = 10 * 24 * 60 * 60 * 1e3;
+      const randomPastTime = () => now - Math.floor(Math.random() * tenDaysMs);
+      const newAccounts = s.accounts.map((a) => {
+        const patches = {};
+        if (!a.createdAt) {
+          patches.createdAt = randomPastTime();
+          migrated = true;
+        }
+        if (a.type === "debt" && (a.initAmount || 0) > 0) {
+          patches.initAmount = -Math.abs(a.initAmount);
+          migrated = true;
+        }
+        if (a.type === "invest" && !a.investSubType) {
+          patches.investSubType = "stock";
+          migrated = true;
+        }
+        return Object.keys(patches).length ? { ...a, ...patches } : a;
+      });
+      const newTxns = s.transactions.map((t) => {
+        const patches = {};
+        if (t._deletedAccountName && !t._deletedAccountCreatedAt) {
+          patches._deletedAccountCreatedAt = randomPastTime();
+          migrated = true;
+        }
+        if (t._deletedPeerName && !t._deletedPeerCreatedAt) {
+          patches._deletedPeerCreatedAt = randomPastTime();
+          migrated = true;
+        }
+        return Object.keys(patches).length ? { ...t, ...patches } : t;
+      });
+      let newTrades = s.trades || [];
+      let newHoldings = s.holdings || [];
+      let newTxns2 = newTxns;
+      const txTradeIds = /* @__PURE__ */ new Set();
+      for (const tx of newTxns2) {
+        if (tx.tradeId) txTradeIds.add(tx.tradeId);
+      }
+      const orphanedTradeIds = /* @__PURE__ */ new Set();
+      for (const tr of newTrades) {
+        if (!txTradeIds.has(tr.id)) orphanedTradeIds.add(tr.id);
+      }
+      if (orphanedTradeIds.size > 0) {
+        newTrades = newTrades.filter((tr) => !orphanedTradeIds.has(tr.id));
+        migrated = true;
+      }
+      const validTradeIds = new Set(newTrades.map((tr) => tr.id));
+      const orphanedTxnsBefore = newTxns2.length;
+      newTxns2 = newTxns2.filter((tx) => !tx.tradeId || validTradeIds.has(tx.tradeId));
+      if (newTxns2.length !== orphanedTxnsBefore) {
+        migrated = true;
+      }
+      const holdingIds = new Set(newHoldings.map((h) => h.id));
+      const cascadeSellIds = /* @__PURE__ */ new Set();
+      for (const hId of holdingIds) {
+        const buys = newTrades.filter((tr) => tr.holdingId === hId && tr.type === "buy");
+        if (buys.length > 0) continue;
+        const sells = newTrades.filter((tr) => tr.holdingId === hId && tr.type === "sell");
+        for (const s2 of sells) cascadeSellIds.add(s2.id);
+      }
+      if (cascadeSellIds.size > 0) {
+        newTrades = newTrades.filter((tr) => !cascadeSellIds.has(tr.id));
+        newTxns2 = newTxns2.filter((tx) => !tx.tradeId || !cascadeSellIds.has(tx.tradeId));
+        migrated = true;
+      }
+      const newHoldingsFiltered = newHoldings.filter(
+        (h) => newTrades.some((tr) => tr.holdingId === h.id)
+      );
+      if (newHoldingsFiltered.length !== newHoldings.length) {
+        newHoldings = newHoldingsFiltered;
+        migrated = true;
+      }
+      if (!migrated) return s;
+      return { ...s, accounts: newAccounts, transactions: newTxns2, trades: newTrades, holdings: newHoldings };
+    });
+  }, []);
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem(THEME_KEY) || DEFAULT_THEME;
+    } catch {
+      return DEFAULT_THEME;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch {
+    }
+  }, [theme]);
+  const [numFont, setNumFont] = useState(() => {
+    try {
+      const v = localStorage.getItem(NUM_FONT_KEY);
+      if (v === "sans" || v === "mono") return v;
+      if (v === "grotesk" || v === "system") return "sans";
+      if (v === "sf-mono" || v === "consolas" || v === "roboto-mono") return "mono";
+      return DEFAULT_NUM_FONT;
+    } catch {
+      return DEFAULT_NUM_FONT;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(NUM_FONT_KEY, numFont);
+    } catch {
+    }
+    try {
+      const stack = NUM_FONT_STACKS[numFont] || NUM_FONT_STACKS[DEFAULT_NUM_FONT];
+      document.documentElement.style.setProperty("--num-font", stack);
+    } catch {
+    }
+  }, [numFont]);
+  const [manageCat, setManageCat] = useState(null);
+  const [editAccountId, setEditAccountId] = useState(null);
+  const [accountsFromAddTxn, setAccountsFromAddTxn] = useState(false);
+  const [detailAccount, setDetailAccount] = useState(null);
+  const [sellSheet, setSellSheet] = useState(null);
+  const [buyHoldingSheet, setBuyHoldingSheet] = useState(null);
+  const [sellHoldingSheet, setSellHoldingSheet] = useState(null);
+  const [marketValueDialog, setMarketValueDialog] = useState(null);
+  const [highlightedTxnInfo, setHighlightedTxnInfo] = useState(null);
+  const highlightTokenRef = React.useRef(0);
+  const [editHoldingDialog, setEditHoldingDialog] = useState(null);
+  const [editBuyTradeDialog, setEditBuyTradeDialog] = useState(null);
+  const [holdingDetailSheet, setHoldingDetailSheet] = useState(null);
+  const [showStockEntryPicker, setShowStockEntryPicker] = useState(false);
+  const [reopenOtherTypeTrigger, setReopenOtherTypeTrigger] = useState(0);
+  const stockEntryPickerSwipe = useSwipeToClose(() => {
+    setShowStockEntryPicker(false);
+    setReopenOtherTypeTrigger((n) => n + 1);
+  });
+  const [confirmDialog, setConfirmDialog] = useState(null);
+  const [lastBackupAt, setLastBackupAt] = useState(() => {
+    try {
+      return parseInt(localStorage.getItem("ledger_last_backup") || "0");
+    } catch {
+      return 0;
+    }
+  });
+  const [backupReminderDays, setBackupReminderDays] = useState(() => {
+    try {
+      return parseInt(localStorage.getItem("ledger_backup_reminder_days") || "7");
+    } catch {
+      return 7;
+    }
+  });
+  const [driveFolderUrl, setDriveFolderUrl] = useState(() => {
+    try {
+      return localStorage.getItem("ledger_drive_folder") || "";
+    } catch {
+      return "";
+    }
+  });
+  const [blockOrder, setBlockOrder] = useState(() => {
+    const defaults = {
+      home: ["summary", "dateStrip", "actions", "periods", "recent"],
+      txn: ["summary", "period", "list"],
+      stats: ["summary", "period", "chart", "compare", "top5", "transfer"],
+      settings: ["dataStat", "appearance", "backup-local", "backup-ext", "account", "cleanup", "danger"],
+      addTxn: ["amount", "typeToggle", "date", "category", "subCategory", "note", "account"]
+    };
+    const merge = (savedPage, defPage) => {
+      const defSet = new Set(defPage);
+      const filtered = Array.isArray(savedPage) ? savedPage.filter((k) => defSet.has(k)) : [];
+      const missing = defPage.filter((k) => !filtered.includes(k));
+      return [...filtered, ...missing];
+    };
+    try {
+      const raw = localStorage.getItem(BLOCK_ORDER_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        const result = {};
+        Object.keys(defaults).forEach((pageKey) => {
+          result[pageKey] = merge(saved[pageKey], defaults[pageKey]);
+        });
+        return result;
+      }
+    } catch {
+    }
+    return defaults;
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(BLOCK_ORDER_KEY, JSON.stringify(blockOrder));
+    } catch {
+    }
+  }, [blockOrder]);
+  const moveBlock = (pageKey) => (blockKey, delta) => {
+    setBlockOrder((o) => {
+      const arr = [...o[pageKey] || []];
+      const idx = arr.indexOf(blockKey);
+      if (idx < 0) return o;
+      const newIdx = idx + delta;
+      if (newIdx < 0 || newIdx >= arr.length) return o;
+      [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
+      return { ...o, [pageKey]: arr };
+    });
+  };
+  const setPageOrder = (pageKey) => (newOrder) => {
+    setBlockOrder((o) => ({ ...o, [pageKey]: newOrder }));
+  };
+  React.useEffect(() => {
+    let startY = null;
+    let startX = null;
+    let active = false;
+    const onStart = (e) => {
+      const ae = document.activeElement;
+      const isInputFocused = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.isContentEditable);
+      if (!isInputFocused) {
+        active = false;
+        return;
+      }
+      const t = e.touches[0];
+      startY = t.clientY;
+      startX = t.clientX;
+      active = true;
+    };
+    const onMove = (e) => {
+      if (!active || startY === null) return;
+      const t = e.touches[0];
+      const dy = t.clientY - startY;
+      const dx = Math.abs(t.clientX - startX);
+      if (dy > 30 && dy > dx * 1.5) {
+        const ae = document.activeElement;
+        if (ae && typeof ae.blur === "function") ae.blur();
+        active = false;
+        startY = null;
+        startX = null;
+      }
+    };
+    const onEnd = () => {
+      active = false;
+      startY = null;
+      startX = null;
+    };
+    document.addEventListener("touchstart", onStart, { passive: true });
+    document.addEventListener("touchmove", onMove, { passive: true });
+    document.addEventListener("touchend", onEnd, { passive: true });
+    document.addEventListener("touchcancel", onEnd, { passive: true });
+    return () => {
+      document.removeEventListener("touchstart", onStart);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onEnd);
+      document.removeEventListener("touchcancel", onEnd);
+    };
+  }, []);
+  useEffect(() => {
+    storageSet(JSON.stringify(state));
+  }, [state]);
+  const toast = (msg, ms = 2400) => {
+    setToastMsg(msg);
+    try {
+      if (navigator.vibrate) navigator.vibrate(30);
+    } catch {
+    }
+    setTimeout(() => setToastMsg(""), ms);
+  };
+  React.useEffect(() => {
+    setGlobalToast(toast);
+  }, []);
+  const [centerAlert, setCenterAlert] = useState("");
+  const alertCenter = (msg, ms = 1600) => {
+    setCenterAlert(msg);
+    try {
+      if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+    } catch {
+    }
+    setTimeout(() => setCenterAlert(""), ms);
+  };
+  const toastRich = (data, ms = 1180) => {
+    setToastMsg(data);
+    setTimeout(() => setToastMsg(""), ms);
+  };
+  React.useEffect(() => {
+    setGlobalToastRich(toastRich);
+  }, []);
+  const catIconMap = React.useMemo(() => {
+    const map = /* @__PURE__ */ new Map();
+    for (const type of Object.keys(state.categories || {})) {
+      for (const c of state.categories[type] || []) {
+        map.set(`${type}:${c.label}`, c.icon);
+      }
+    }
+    return map;
+  }, [state.categories]);
+  const catIcon = (type, label) => {
+    const iconName = catIconMap.get(`${type}:${label}`) || (type === "income" ? "bag" : "note");
+    return /* @__PURE__ */ React.createElement(TypeIcon, { name: iconName, size: 18, color: "var(--text)" });
+  };
+  const saveTxn = (txn) => {
+    const isEditing = txn._transfer ? state.transactions.some((t) => t.transferId === txn._transfer.transferId) : txn._lend ? state.transactions.some((t) => t.lendId === txn._lend.lendId) : state.transactions.some((t) => t.id === txn.id);
+    let isUnchanged = false;
+    if (isEditing && !txn._transfer && !txn._lend) {
+      const old = state.transactions.find((t) => t.id === txn.id);
+      if (old) {
+        const fields = ["type", "amount", "date", "category", "subCategory", "accountId", "note"];
+        const sameMain = fields.every((k) => (old[k] || "") === (txn[k] || ""));
+        const oldGroupId = old.txnGroupId;
+        const oldFee = oldGroupId ? state.transactions.find((t) => t.txnGroupId === oldGroupId && t.transferRole === "grouped_fee" && t.id !== txn.id) : null;
+        const oldFeeAmt = oldFee?.amount || 0;
+        const newFeeAmt = Number(txn._groupedFee?.amount || 0);
+        const sameFee = oldFeeAmt === newFeeAmt && (newFeeAmt === 0 || (oldFee?.category || "") === (txn._groupedFee?.category || "") && (oldFee?.subCategory || "") === (txn._groupedFee?.subCategory || ""));
+        isUnchanged = sameMain && sameFee;
+      }
+    } else if (isEditing && txn._transfer) {
+      const tr = txn._transfer;
+      const oldGroup = state.transactions.filter((t) => t.transferId === tr.transferId);
+      const oldOut = oldGroup.find((t) => t.transferRole === "out");
+      const oldIn = oldGroup.find((t) => t.transferRole === "in");
+      const oldFee = oldGroup.find((t) => t.transferRole === "fee");
+      if (oldOut && oldIn) {
+        const sameCore = oldOut.accountId === tr.fromId && oldIn.accountId === tr.toId && oldOut.amount === tr.amount && oldOut.date === tr.date && (oldOut.note || "") === (tr.note || "");
+        const sameFee = (oldFee?.amount || 0) === (tr.fee || 0);
+        isUnchanged = sameCore && sameFee;
+      }
+    }
+    setState((s) => {
+      if (txn._transfer) {
+        const tr = txn._transfer;
+        const group = tr.transferId || "tr_" + uid().slice(2, 10);
+        const baseMeta = {
+          transferId: group,
+          transferPeer: { fromId: tr.fromId, toId: tr.toId },
+          createdAt: tr.createdAt || Date.now()
+        };
+        const oldGroup = s.transactions.filter((t) => t.transferId === group);
+        const oldOut = oldGroup.find((t) => t.transferRole === "out");
+        const oldIn = oldGroup.find((t) => t.transferRole === "in");
+        const oldFee2 = oldGroup.find((t) => t.transferRole === "fee");
+        const pickStamps = (t) => {
+          if (!t) return {};
+          const stamps = {};
+          if (t._deletedAccountName) stamps._deletedAccountName = t._deletedAccountName;
+          if (t._deletedAccountVirtual) stamps._deletedAccountVirtual = t._deletedAccountVirtual;
+          if (t._deletedPeerName) stamps._deletedPeerName = t._deletedPeerName;
+          if (t._deletedPeerVirtual) stamps._deletedPeerVirtual = t._deletedPeerVirtual;
+          return stamps;
+        };
+        let kept2 = s.transactions.filter((t) => t.transferId !== group);
+        const outTxn = {
+          id: "to_" + uid().slice(2, 10),
+          type: "expense",
+          amount: tr.amount,
+          date: tr.date,
+          note: tr.note || "[\u5E33\u6236\u8F49\u5E33]",
+          category: "\u8F49\u5E33",
+          subCategory: "",
+          accountId: tr.fromId,
+          ...baseMeta,
+          ...pickStamps(oldOut),
+          transferRole: "out"
+        };
+        const inTxn = {
+          id: "ti_" + uid().slice(2, 10),
+          type: "income",
+          amount: tr.amount,
+          date: tr.date,
+          note: tr.note || "[\u5E33\u6236\u8F49\u5E33]",
+          category: "\u8F49\u5E33",
+          subCategory: "",
+          accountId: tr.toId,
+          ...baseMeta,
+          ...pickStamps(oldIn),
+          transferRole: "in"
+        };
+        const newTxns = [...kept2, outTxn, inTxn];
+        if (tr.fee > 0) {
+          newTxns.push({
+            id: "tf_" + uid().slice(2, 10),
+            type: "expense",
+            amount: tr.fee,
+            date: tr.date,
+            note: "\u8F49\u5E33\u624B\u7E8C\u8CBB",
+            category: tr.feeCategory || "\u624B\u7E8C\u8CBB\u7528",
+            subCategory: tr.feeSubCategory || "\u8F49\u5E33\uFF08\u624B\u7E8C\u8CBB\uFF09",
+            accountId: tr.fromId,
+            ...baseMeta,
+            ...pickStamps(oldFee2),
+            transferRole: "fee"
+          });
+        }
+        return { ...s, transactions: newTxns };
+      }
+      if (txn._lend) {
+        const ld = txn._lend;
+        const group = ld.lendId || "ld_" + uid().slice(2, 10);
+        const baseMeta = {
+          lendId: group,
+          createdAt: ld.createdAt || Date.now()
+        };
+        const bucket = getLendBucketAccount(s.accounts);
+        if (!bucket) {
+          return s;
+        }
+        let kept2 = s.transactions.filter((t) => t.lendId !== group);
+        const lendMeta = {
+          expectDate: ld.expectDate || "",
+          debtor: ld.debtor || "",
+          status: "pending",
+          // pending / collected / partial
+          collectedAmount: 0
+        };
+        const oldOut = s.transactions.find((t) => t.lendId === group && t.transferRole === "lend_out");
+        if (oldOut && oldOut.lendMeta) {
+          lendMeta.status = oldOut.lendMeta.status || "pending";
+          lendMeta.collectedAmount = oldOut.lendMeta.collectedAmount || 0;
+        }
+        const lendOut = {
+          id: "lo_" + uid().slice(2, 10),
+          type: "expense",
+          amount: ld.amount,
+          date: ld.date,
+          note: ld.note || "[\u4EE3\u588A]",
+          category: "\u4EE3\u588A",
+          subCategory: "",
+          accountId: ld.fromId,
+          ...baseMeta,
+          transferRole: "lend_out",
+          lendMeta
+        };
+        const lendIn = {
+          id: "li_" + uid().slice(2, 10),
+          type: "income",
+          amount: ld.amount,
+          date: ld.date,
+          note: ld.note || "[\u4EE3\u588A]",
+          category: "\u4EE3\u588A",
+          subCategory: "",
+          accountId: bucket.id,
+          ...baseMeta,
+          transferRole: "lend_in"
+        };
+        return { ...s, transactions: [...kept2, lendOut, lendIn] };
+      }
+      const gf = txn._groupedFee;
+      const cleanTxn = (() => {
+        const { _groupedFee, ...rest } = txn;
+        return rest;
+      })();
+      const oldMain = s.transactions.find((t) => t.id === txn.id);
+      const oldGroupId = oldMain?.txnGroupId;
+      const oldFee = oldGroupId ? s.transactions.find((t) => t.txnGroupId === oldGroupId && t.transferRole === "grouped_fee" && t.id !== txn.id) : null;
+      const hasFee = gf && Number(gf.amount) > 0;
+      const groupId = hasFee ? oldGroupId || "gf_" + uid().slice(2, 10) : null;
+      const newMain = { ...cleanTxn };
+      if (hasFee) {
+        newMain.txnGroupId = groupId;
+      } else {
+        delete newMain.txnGroupId;
+      }
+      let newFee = null;
+      if (hasFee) {
+        newFee = {
+          id: oldFee?.id || "gfe_" + uid().slice(2, 10),
+          type: "expense",
+          amount: Number(gf.amount),
+          date: txn.date,
+          note: "",
+          category: gf.category || "\u624B\u7E8C\u8CBB\u7528",
+          subCategory: gf.subCategory || "\u63D0\u6B3E(\u624B\u7E8C\u8CBB)",
+          accountId: txn.accountId,
+          // 從同一個帳戶扣
+          txnGroupId: groupId,
+          transferRole: "grouped_fee",
+          createdAt: oldFee?.createdAt || Date.now()
+        };
+      }
+      let kept = s.transactions.filter(
+        (t) => t.id !== txn.id && (!oldFee || t.id !== oldFee.id)
+      );
+      const toAdd = newFee ? [newMain, newFee] : [newMain];
+      return { ...s, transactions: [...kept, ...toAdd] };
+    });
+    setSheet(null);
+    setEditingTxn(null);
+    if (isEditing) {
+      if (isUnchanged) {
+        toastRich({
+          title: "\u672A\u8B8A\u66F4",
+          amount: null,
+          lines: []
+        }, 700);
+      } else {
+        let amount, lines, titleSuffix, badgeColor;
+        if (txn._transfer) {
+          const tr = txn._transfer;
+          const fromName = state.accounts.find((a) => a.id === tr.fromId)?.name || "";
+          const toName = state.accounts.find((a) => a.id === tr.toId)?.name || "";
+          amount = fmt(tr.amount);
+          lines = [amount, `${fromName} \u2192 ${toName}`, tr.fee > 0 ? `\u542B\u624B\u7E8C\u8CBB ${fmt(tr.fee)}` : null].filter(Boolean);
+          titleSuffix = "\u8F49\u5E33";
+          badgeColor = "var(--mint)";
+        } else {
+          const isInc = txn.type === "income";
+          const sign = isInc ? "+" : "-";
+          const cat = txn.category || "";
+          const subCat = txn.subCategory || "";
+          const acctName = state.accounts.find((a) => a.id === txn.accountId)?.name || "";
+          amount = `${sign}${fmt(txn.amount)}`;
+          lines = [amount, subCat ? `${cat} \u203A ${subCat}` : cat, acctName].filter(Boolean);
+          titleSuffix = isInc ? "\u6536\u5165" : "\u652F\u51FA";
+          badgeColor = "var(--mint)";
+        }
+        toastRich({
+          title: txn._transfer ? "\u8F49\u5E33\u5DF2\u66F4\u65B0" : `\u5DF2\u66F4\u65B0${titleSuffix}`,
+          amount: "\u2713",
+          amountColor: badgeColor,
+          lines
+        }, 1800);
+      }
+      return;
+    }
+    if (txn._transfer) {
+      const tr = txn._transfer;
+      const fromName = state.accounts.find((a) => a.id === tr.fromId)?.name || "";
+      const toName = state.accounts.find((a) => a.id === tr.toId)?.name || "";
+      toastRich({
+        title: "\u5DF2\u65B0\u589E\u8F49\u5E33",
+        amount: "\u2713",
+        amountColor: "var(--mint)",
+        lines: [
+          fmt(tr.amount),
+          `${fromName} \u2192 ${toName}`,
+          tr.fee > 0 ? `\u542B\u624B\u7E8C\u8CBB ${fmt(tr.fee)}` : null
+        ].filter(Boolean)
+      }, 1800);
+    } else {
+      const isInc = txn.type === "income";
+      const sign = isInc ? "+" : "-";
+      const cat = txn.category || "";
+      const subCat = txn.subCategory || "";
+      const acctName = state.accounts.find((a) => a.id === txn.accountId)?.name || "";
+      toastRich({
+        title: `\u5DF2\u65B0\u589E${isInc ? "\u6536\u5165" : "\u652F\u51FA"}`,
+        amount: "\u2713",
+        amountColor: isInc ? "var(--mint)" : "var(--pink)",
+        lines: [
+          `${sign}${fmt(txn.amount)}`,
+          subCat ? `${cat} \u203A ${subCat}` : cat,
+          acctName
+        ].filter(Boolean)
+      }, 1800);
+    }
+  };
+  const deleteTxn = (id) => {
+    const target = state.transactions.find((t) => t.id === id);
+    const isTransfer = target && target.transferId;
+    const isSettle = target && target.settleId && !isTransfer;
+    if (isSettle) {
+      const group = state.transactions.filter((t) => t.settleId === target.settleId);
+      const actuallyDeleteIds = new Set(group.map((t) => t.id));
+      const selectedIds = /* @__PURE__ */ new Set([target.id]);
+      const listText = buildBatchDeletePreview(state.transactions, selectedIds, actuallyDeleteIds);
+      setConfirmDialog({
+        title: "\u522A\u9664\u80A1\u7968\u7D50\u7B97",
+        target: { label: "\u5C07\u522A\u9664", name: listText, multiline: true },
+        message: "\u672C\u91D1\u6B78\u9084\u8207\u640D\u76CA\u5C6C\u540C\u4E00\u7D44,\u5C07\u4E00\u4F75\u522A\u9664\u3002",
+        warning: "\u6B64\u64CD\u4F5C\u7121\u6CD5\u5FA9\u539F",
+        confirmText: "\u5168\u90E8\u522A\u9664",
+        danger: true,
+        onConfirm: () => {
+          setState((s) => syncTradesAfterTxnDelete(s, s.transactions.filter((t) => t.settleId !== target.settleId)));
+          setSheet(null);
+          setEditingTxn(null);
+          toastRich({
+            title: "\u5DF2\u522A\u9664\u80A1\u7968\u7D50\u7B97",
+            amount: "\u2713",
+            amountColor: "var(--pink-text)",
+            lines: [`\u5171\u79FB\u9664 ${group.length} \u7B46\u95DC\u806F\u7D00\u9304`]
+          }, 2e3);
+        }
+      });
+      return;
+    }
+    if (isTransfer) {
+      const group = state.transactions.filter((t) => t.transferId === target.transferId);
+      const linkedTradeId = group.find((t) => t.tradeId)?.tradeId;
+      const linkedTrade = linkedTradeId && state.trades.find((tr) => tr.id === linkedTradeId);
+      const isStockBuy = !!(linkedTrade && linkedTrade.type === "buy");
+      const actuallyDeleteIds = new Set(group.map((t) => t.id));
+      const cascadeIds = expandStockBuyCascade(state, actuallyDeleteIds);
+      for (const id2 of cascadeIds) actuallyDeleteIds.add(id2);
+      const selectedIds = /* @__PURE__ */ new Set([target.id]);
+      const listText = buildBatchDeletePreview(state.transactions, selectedIds, actuallyDeleteIds);
+      let linkMsg = "\u8F49\u5E33\u5169\u7AEF\u7D00\u9304\u5C6C\u540C\u4E00\u7D44,\u5C07\u4E00\u4F75\u522A\u9664\u3002";
+      const stockImpact = detectStockBuyImpact(state, actuallyDeleteIds);
+      if (stockImpact.msg) {
+        linkMsg += "\n\n" + stockImpact.msg;
+      }
+      setConfirmDialog({
+        title: stockImpact.anyHoldingDestroyed || isStockBuy ? "\u522A\u9664\u80A1\u7968\u8CB7\u9032" : "\u522A\u9664\u8F49\u5E33\u7D00\u9304",
+        target: { label: "\u5C07\u522A\u9664", name: listText, multiline: true },
+        message: linkMsg,
+        warning: "\u6B64\u64CD\u4F5C\u7121\u6CD5\u5FA9\u539F",
+        confirmText: stockImpact.anyHoldingDestroyed ? "\u4ECD\u8981\u522A\u9664\u6301\u80A1" : "\u5168\u90E8\u522A\u9664",
+        highlightWords: stockImpact.highlightWords,
+        danger: true,
+        onConfirm: () => {
+          setState((s) => syncTradesAfterTxnDelete(s, s.transactions.filter((t) => t.transferId !== target.transferId)));
+          setSheet(null);
+          setEditingTxn(null);
+          const outTxn = group.find((t) => t.transferRole === "out");
+          const inTxn = group.find((t) => t.transferRole === "in");
+          const nameOf = (txn) => {
+            if (!txn) return "";
+            const acct = state.accounts.find((a) => a.id === txn.accountId);
+            if (acct) return acctDisplayNameStr(acct);
+            if (txn._deletedAccountName) return `${txn._deletedAccountName}(\u5DF2\u522A)`;
+            return "";
+          };
+          const fromName = nameOf(outTxn);
+          const toName = nameOf(inTxn);
+          toastRich({
+            title: "\u5DF2\u522A\u9664\u8F49\u5E33",
+            amount: "\u2713",
+            amountColor: "var(--pink-text)",
+            lines: [
+              outTxn ? `\u91D1\u984D:${outTxn.amount.toLocaleString()}` : null,
+              fromName && toName ? `${fromName} \u2192 ${toName}` : null,
+              `\u5171\u79FB\u9664 ${group.length} \u7B46\u95DC\u806F\u7D00\u9304`
+            ].filter(Boolean)
+          }, 2400);
+        }
+      });
+      return;
+    }
+    const isInc = target.type === "income";
+    const sign = isInc ? "+" : "-";
+    const catText = target.subCategory ? `${target.category} \u203A ${target.subCategory}` : target.category || "";
+    const liveAcct = state.accounts.find((a) => a.id === target.accountId);
+    const isDeletedAcct = !liveAcct && !!target._deletedAccountName;
+    const acctName = liveAcct?.name || target._deletedAccountName || "";
+    const items = [
+      {
+        icon: isInc ? "coin" : "card",
+        type: "remove",
+        label: "\u91D1\u984D",
+        detail: `${sign}${target.amount.toLocaleString()}`,
+        // 已刪帳戶的紀錄:加說明告訴使用者只動統計、不動總資產
+        sublabel: isDeletedAcct ? "\u50C5\u5F71\u97FF\u6536\u652F\u7D71\u8A08,\u4E0D\u5F71\u97FF\u7E3D\u8CC7\u7522" : void 0
+      }
+    ];
+    if (catText) {
+      items.push({ icon: "tag", type: "remove", label: "\u5206\u985E", detail: catText });
+    }
+    if (acctName) {
+      items.push({
+        icon: "box",
+        type: "remove",
+        label: "\u5E33\u6236",
+        detail: isDeletedAcct ? `${acctName}(\u5E33\u865F\u5DF2\u522A)` : acctName
+      });
+    }
+    if (target.note && target.note.trim()) {
+      items.push({ icon: "note", type: "remove", label: "\u5099\u8A3B", detail: target.note });
+    }
+    setConfirmDialog({
+      title: "\u522A\u9664\u7D00\u9304",
+      itemsHint: "\u4EE5\u4E0B\u5167\u5BB9\u5C07\u88AB\u79FB\u9664:",
+      items,
+      message: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F\u3002",
+      confirmText: "\u522A\u9664",
+      danger: true,
+      onConfirm: () => {
+        setState((s) => {
+          const groupId = target.txnGroupId;
+          const filtered = groupId ? s.transactions.filter((t) => t.id !== id && t.txnGroupId !== groupId) : s.transactions.filter((t) => t.id !== id);
+          return syncTradesAfterTxnDelete(s, filtered);
+        });
+        setSheet(null);
+        setEditingTxn(null);
+        if (target) {
+          toastRich({
+            title: "\u5DF2\u522A\u9664\u7D00\u9304",
+            amount: "\u2713",
+            amountColor: "var(--pink-text)",
+            lines: [
+              `${sign}${target.amount.toLocaleString()}`,
+              catText || null,
+              acctName || null
+            ].filter(Boolean)
+          }, 2200);
+        } else {
+          toast("\u5DF2\u522A\u9664");
+        }
+      }
+    });
+  };
+  const collectLend = (lendOut, amount, toAccountId) => {
+    if (!lendOut || !lendOut.lendId) return;
+    const bucket = getLendBucketAccount(state.accounts);
+    if (!bucket) {
+      toast("\u627E\u4E0D\u5230\u4EE3\u588A\u66AB\u5B58\u5E33\u6236");
+      return;
+    }
+    setState((s) => {
+      const today = todayStr();
+      const collectId = "lc_" + uid().slice(2, 10);
+      const baseMeta = {
+        lendId: lendOut.lendId,
+        createdAt: Date.now()
+      };
+      const collectOut = {
+        id: "lco_" + uid().slice(2, 10),
+        type: "expense",
+        amount,
+        date: today,
+        note: "\u4EE3\u588A\u6536\u56DE",
+        category: "\u4EE3\u588A",
+        subCategory: "",
+        accountId: bucket.id,
+        ...baseMeta,
+        transferRole: "lend_collect_out"
+      };
+      const collectIn = {
+        id: "lci_" + uid().slice(2, 10),
+        type: "income",
+        amount,
+        date: today,
+        note: "\u4EE3\u588A\u6536\u56DE",
+        category: "\u4EE3\u588A",
+        subCategory: "",
+        accountId: toAccountId,
+        ...baseMeta,
+        transferRole: "lend_collect_in"
+      };
+      const newTxns = s.transactions.map((t) => {
+        if (t.id === lendOut.id) {
+          const newCollected = (t.lendMeta?.collectedAmount || 0) + amount;
+          const newStatus = newCollected >= t.amount ? "collected" : "partial";
+          return {
+            ...t,
+            lendMeta: {
+              ...t.lendMeta,
+              collectedAmount: newCollected,
+              status: newStatus
+            }
+          };
+        }
+        return t;
+      });
+      return { ...s, transactions: [...newTxns, collectOut, collectIn] };
+    });
+    const acct = state.accounts.find((a) => a.id === toAccountId);
+    const isFullCollect = amount >= lendOut.amount - (lendOut.lendMeta?.collectedAmount || 0);
+    toastRich && toastRich({
+      title: isFullCollect ? "\u5DF2\u5168\u984D\u6536\u56DE" : "\u5DF2\u90E8\u5206\u6536\u56DE",
+      amount: "\u2713",
+      amountColor: "var(--mint-text)",
+      lines: [
+        `\u6536\u56DE ${fmt(amount)} \u5230\u300C${acct?.name || ""}\u300D`,
+        ...isFullCollect ? ["\u4EE3\u588A\u5B8C\u6210,\u5C07\u5F9E\u9996\u9801\u63D0\u9192\u4E2D\u79FB\u9664"] : [`\u4ECD\u6709 ${fmt(lendOut.amount - (lendOut.lendMeta?.collectedAmount || 0) - amount)} \u672A\u6536\u56DE`]
+      ]
+    }, 2200);
+  };
+  const deleteLend = (lendOut) => {
+    if (!lendOut || !lendOut.lendId) return;
+    setState((s) => syncTradesAfterTxnDelete(s, s.transactions.filter((t) => t.lendId !== lendOut.lendId)));
+    toastRich && toastRich({
+      title: "\u5DF2\u522A\u9664\u4EE3\u588A",
+      amount: "\u2713",
+      amountColor: "var(--pink-text)",
+      lines: [`\u91D1\u984D ${fmt(lendOut.amount)} \u53CA\u6240\u6709\u76F8\u95DC\u7D00\u9304\u5DF2\u79FB\u9664`]
+    }, 1800);
+  };
+  const saveBuyHolding = (p) => {
+    if (!p || !p.accountId || !p.symbol || !p.shares || !p.totalCost || !p.fromAccountId) {
+      toast && toast("\u53C3\u6578\u4E0D\u5B8C\u6574,\u7121\u6CD5\u5132\u5B58");
+      return;
+    }
+    const shares = Number(p.shares);
+    const totalCost = Number(p.totalCost);
+    const fee = Number(p.fee) || 0;
+    const grandTotal = totalCost + fee;
+    const symbol = String(p.symbol).trim().toUpperCase();
+    const name = (p.name || "").trim();
+    const currency = p.currency || "TWD";
+    const date = p.date || todayStr();
+    const note = (p.note || "").trim();
+    setState((s) => {
+      const defaultMarketValue = p.marketValue !== void 0 && p.marketValue !== null && p.marketValue > 0 ? Number(p.marketValue) : totalCost;
+      let holding = s.holdings.find((h) => h.accountId === p.accountId && h.symbol === symbol);
+      let newHoldings = s.holdings;
+      if (!holding) {
+        holding = {
+          id: "h_" + uid().slice(2, 10),
+          accountId: p.accountId,
+          symbol,
+          name,
+          currency,
+          marketValue: defaultMarketValue,
+          marketValueUpdatedAt: Date.now(),
+          notes: "",
+          createdAt: Date.now()
+        };
+        newHoldings = [...s.holdings, holding];
+      } else {
+        const userProvidedMV = p.marketValue !== void 0 && p.marketValue !== null && p.marketValue > 0;
+        const newMV = userProvidedMV ? Number(p.marketValue) : (holding.marketValue || 0) + totalCost;
+        newHoldings = s.holdings.map((h) => h.id === holding.id ? {
+          ...h,
+          marketValue: newMV,
+          marketValueUpdatedAt: Date.now(),
+          name: name && !h.name ? name : h.name
+          // 若這次補了名字,寫入
+        } : h);
+      }
+      const tradeId = "tr_" + uid().slice(2, 10);
+      const newTrade = {
+        id: tradeId,
+        holdingId: holding.id,
+        type: "buy",
+        date,
+        shares,
+        totalCost: totalCost + fee,
+        // 把手續費算進成本(會反映在 FIFO 計算)
+        fee,
+        remainingShares: shares,
+        // FIFO 用,初始 = shares
+        note,
+        createdAt: Date.now()
+      };
+      const transferId = "bt_" + uid().slice(2, 10);
+      const baseMeta = { transferId, createdAt: Date.now(), tradeId };
+      const outTxn = {
+        id: "bo_" + uid().slice(2, 10),
+        type: "expense",
+        amount: grandTotal,
+        date,
+        note: `[\u8CB7\u9032 ${symbol}]${note ? " " + note : ""}`,
+        category: "\u8F49\u5E33",
+        subCategory: "",
+        accountId: p.fromAccountId,
+        ...baseMeta,
+        transferRole: "out"
+      };
+      const inTxn = {
+        id: "bi_" + uid().slice(2, 10),
+        type: "income",
+        amount: grandTotal,
+        date,
+        note: `[\u8CB7\u9032 ${symbol}]${note ? " " + note : ""}`,
+        category: "\u8F49\u5E33",
+        subCategory: "",
+        accountId: p.accountId,
+        ...baseMeta,
+        transferRole: "in"
+      };
+      newTrade.linkedTxnId = inTxn.id;
+      return {
+        ...s,
+        holdings: newHoldings,
+        trades: [...s.trades, newTrade],
+        transactions: [...s.transactions, outTxn, inTxn]
+      };
+    });
+  };
+  const saveSellHolding = (p) => {
+    if (!p || !p.holdingId || !p.shares || !p.totalReceived || !p.toAccountId) {
+      toast && toast("\u53C3\u6578\u4E0D\u5B8C\u6574,\u7121\u6CD5\u5132\u5B58");
+      return;
+    }
+    const sellShares = Number(p.shares);
+    const totalReceived = Number(p.totalReceived);
+    const fee = Number(p.fee) || 0;
+    const tax = Number(p.tax) || 0;
+    const date = p.date || todayStr();
+    const note = (p.note || "").trim();
+    const holding = state.holdings.find((h) => h.id === p.holdingId);
+    if (!holding) {
+      toast && toast("\u627E\u4E0D\u5230\u6301\u80A1");
+      return;
+    }
+    const currentShares = holdingShares(holding, state.trades);
+    if (sellShares > currentShares) {
+      toast && toast(`\u8CE3\u51FA\u80A1\u6578\u4E0D\u80FD\u8D85\u904E\u6301\u6709\u80A1\u6578(${currentShares})`);
+      return;
+    }
+    const match = avgCostMatch(p.holdingId, sellShares, state.trades, state.holdings);
+    const matchedCost = match.matchedCost;
+    const netReceived = totalReceived - fee - tax;
+    const realizedPnl = netReceived - matchedCost;
+    setState((s) => {
+      const targetHolding = s.holdings.find((h) => h.id === p.holdingId);
+      const marketValueBefore = targetHolding?.marketValue || 0;
+      const sellTradeId = "tr_" + uid().slice(2, 10);
+      const sellTrade = {
+        id: sellTradeId,
+        holdingId: p.holdingId,
+        type: "sell",
+        date,
+        shares: sellShares,
+        totalReceived,
+        fee,
+        tax,
+        matchedCost,
+        realizedPnl,
+        marketValueBefore,
+        // 記住賣出前的市值,刪除這筆時用於還原
+        note,
+        createdAt: Date.now()
+      };
+      const settleId = "st_" + uid().slice(2, 10);
+      const baseMeta = { settleId, createdAt: Date.now(), tradeId: sellTradeId };
+      const newTxns = [];
+      newTxns.push({
+        id: "so_" + uid().slice(2, 10),
+        type: "expense",
+        amount: matchedCost,
+        date,
+        note: `[\u8CE3\u51FA ${holding.symbol} - \u672C\u91D1]${note ? " " + note : ""}`,
+        category: "\u80A1\u7968\u7D50\u7B97",
+        subCategory: "\u672C\u91D1\u6B78\u9084",
+        accountId: holding.accountId,
+        ...baseMeta,
+        transferRole: "settle_out"
+      });
+      newTxns.push({
+        id: "si_" + uid().slice(2, 10),
+        type: "income",
+        amount: matchedCost,
+        date,
+        note: `[\u8CE3\u51FA ${holding.symbol} - \u672C\u91D1]${note ? " " + note : ""}`,
+        category: "\u80A1\u7968\u7D50\u7B97",
+        subCategory: "\u672C\u91D1\u6B78\u9084",
+        accountId: p.toAccountId,
+        ...baseMeta,
+        transferRole: "settle_in"
+      });
+      if (realizedPnl > 0) {
+        newTxns.push({
+          id: "sp_" + uid().slice(2, 10),
+          type: "income",
+          amount: realizedPnl,
+          date,
+          note: `[\u8CE3\u51FA ${holding.symbol} - \u7372\u5229]${note ? " " + note : ""}`,
+          category: "\u80A1\u7968\u76F8\u95DC",
+          subCategory: "\u7372\u5229\u4E86\u7D50",
+          accountId: p.toAccountId,
+          ...baseMeta,
+          transferRole: "settle_pnl_in"
+        });
+      } else if (realizedPnl < 0) {
+        newTxns.push({
+          id: "sl_" + uid().slice(2, 10),
+          type: "expense",
+          amount: -realizedPnl,
+          date,
+          note: `[\u8CE3\u51FA ${holding.symbol} - \u8667\u640D]${note ? " " + note : ""}`,
+          category: "\u6295\u8CC7\u5931\u5229",
+          subCategory: "",
+          accountId: p.toAccountId,
+          ...baseMeta,
+          transferRole: "settle_pnl_out"
+        });
+      }
+      let newHoldings = s.holdings;
+      const newRemainingShares = currentShares - sellShares;
+      if (newRemainingShares === 0) {
+        newHoldings = s.holdings.map((h) => h.id === p.holdingId ? { ...h, marketValue: 0 } : h);
+      } else if (currentShares > 0) {
+        const ratio = newRemainingShares / currentShares;
+        newHoldings = s.holdings.map((h) => {
+          if (h.id !== p.holdingId) return h;
+          const newMv = Math.round((h.marketValue || 0) * ratio);
+          return { ...h, marketValue: newMv };
+        });
+      }
+      return {
+        ...s,
+        trades: [...s.trades, sellTrade],
+        transactions: [...s.transactions, ...newTxns],
+        holdings: newHoldings
+      };
+    });
+  };
+  const updateHoldingMarketValue = (holdingId, marketValue) => {
+    const mv = Number(marketValue) || 0;
+    setState((s) => ({
+      ...s,
+      holdings: s.holdings.map(
+        (h) => h.id === holdingId ? { ...h, marketValue: mv, marketValueUpdatedAt: Date.now() } : h
+      )
+    }));
+  };
+  const updateHoldingIdentity = (holdingId, newSymbol, newName) => {
+    const targetSymbol = String(newSymbol || "").trim().toUpperCase();
+    const targetName = String(newName || "").trim();
+    let affectedCount = 0;
+    setState((s) => {
+      const h = s.holdings.find((x) => x.id === holdingId);
+      if (!h) return s;
+      const oldSymbol = h.symbol;
+      const symbolChanged = oldSymbol !== targetSymbol && targetSymbol.length > 0;
+      const finalSymbol = targetSymbol || oldSymbol;
+      const newHoldings = s.holdings.map(
+        (x) => x.id === holdingId ? { ...x, symbol: finalSymbol, name: targetName } : x
+      );
+      let newTxns = s.transactions;
+      if (symbolChanged) {
+        const relevantTradeIds = new Set(
+          s.trades.filter((t) => t.holdingId === holdingId).map((t) => t.id)
+        );
+        const escaped = oldSymbol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const tagRe = new RegExp(`\\[(\u8CB7\u9032|\u8CE3\u51FA) ${escaped}([^\\]]*)\\]`, "g");
+        newTxns = s.transactions.map((tx) => {
+          if (!tx.tradeId || !relevantTradeIds.has(tx.tradeId)) return tx;
+          if (!tx.note) return tx;
+          const newNote = tx.note.replace(tagRe, (m, action, rest) => `[${action} ${finalSymbol}${rest}]`);
+          if (newNote === tx.note) return tx;
+          affectedCount += 1;
+          return { ...tx, note: newNote };
+        });
+      }
+      return { ...s, holdings: newHoldings, transactions: newTxns };
+    });
+    return affectedCount;
+  };
+  const updateBuyTrade = (tradeId, newData) => {
+    setState((s) => {
+      const trade = s.trades.find((t) => t.id === tradeId);
+      if (!trade || trade.type !== "buy") return s;
+      const holding = s.holdings.find((h) => h.id === trade.holdingId);
+      if (!holding) return s;
+      const newShares = Number(newData.shares) || 0;
+      const newCost = Number(newData.totalCost) || 0;
+      const newDate = newData.date || trade.date;
+      if (newShares <= 0 || newCost < 0) return s;
+      const oldCost = trade.totalCost || 0;
+      const costDiff = newCost - oldCost;
+      const oldShares = trade.shares || 0;
+      const consumed = oldShares - (trade.remainingShares || 0);
+      const newRemaining = Math.max(0, newShares - consumed);
+      const newTrades = s.trades.map((t) => t.id === tradeId ? {
+        ...t,
+        date: newDate,
+        shares: newShares,
+        totalCost: newCost,
+        remainingShares: newRemaining
+      } : t);
+      const newTxns = s.transactions.map((tx) => {
+        if (tx.tradeId !== tradeId) return tx;
+        if (tx.transferRole !== "out" && tx.transferRole !== "in") return tx;
+        return {
+          ...tx,
+          date: newDate,
+          amount: newCost
+        };
+      });
+      let newHoldings = s.holdings;
+      const currentMV = holding.marketValue || 0;
+      const mvSeemsLinked = Math.abs(currentMV - oldCost) < 0.01;
+      if (mvSeemsLinked) {
+        newHoldings = s.holdings.map((h) => h.id === holding.id ? {
+          ...h,
+          marketValue: newCost,
+          marketValueUpdatedAt: Date.now()
+        } : h);
+      }
+      return { ...s, trades: newTrades, transactions: newTxns, holdings: newHoldings };
+    });
+  };
+  const findLinkedTxns = (txn) => {
+    if (!txn) return [];
+    if (txn.settleId) return state.transactions.filter((t) => t.settleId === txn.settleId);
+    if (txn.transferId) return state.transactions.filter((t) => t.transferId === txn.transferId);
+    if (txn.txnGroupId) return state.transactions.filter((t) => t.txnGroupId === txn.txnGroupId);
+    if (txn.tradeId) return state.transactions.filter((t) => t.tradeId === txn.tradeId);
+    return [txn];
+  };
+  const visibleTxnIdsRef = React.useRef(/* @__PURE__ */ new Set());
+  const handleLinkClick = (txn) => {
+    const linked = findLinkedTxns(txn);
+    if (linked.length <= 1) return;
+    const ids = new Set(linked.map((t) => t.id));
+    let color = "accent";
+    if (txn.txnGroupId && !txn.transferId && !txn.tradeId && !txn.settleId) {
+      const main = linked.find((t) => t.transferRole !== "grouped_fee") || linked[0];
+      if (main.type === "expense") color = "pink";
+      else if (main.type === "income") color = "mint";
+    } else if (txn.settleId) {
+      const incomeMain = linked.find((t) => !t.transferRole && t.type === "income");
+      if (incomeMain) color = "mint";
+    }
+    const myToken = ++highlightTokenRef.current;
+    setHighlightedTxnInfo({ ids, color });
+    setTimeout(() => {
+      if (highlightTokenRef.current === myToken) {
+        setHighlightedTxnInfo(null);
+      }
+    }, 1e3);
+    const visibleIds = visibleTxnIdsRef.current;
+    let visibleCount = 0;
+    let invisibleCount = 0;
+    linked.forEach((t) => {
+      if (visibleIds.has(t.id)) visibleCount += 1;
+      else invisibleCount += 1;
+    });
+    const totalText = `\u7D81\u5B9A ${linked.length} \u7B46\u7D00\u9304`;
+    if (invisibleCount > 0 && visibleIds.size > 0) {
+      toast && toast(`${totalText} \xB7 \u5176\u4E2D ${invisibleCount} \u7B46\u5728\u5176\u4ED6\u6708\u4EFD`);
+    } else {
+      toast && toast(totalText);
+    }
+  };
+  const deleteTrade = (tradeId) => {
+    setState((s) => {
+      const t = s.trades.find((tr) => tr.id === tradeId);
+      if (!t) return s;
+      const holdingId = t.holdingId;
+      const newTxns = s.transactions.filter((tx) => tx.tradeId !== tradeId);
+      const newTrades = s.trades.filter((tr) => tr.id !== tradeId);
+      const remainingForHolding = newTrades.filter((tr) => tr.holdingId === holdingId);
+      let newHoldings;
+      if (remainingForHolding.length === 0) {
+        newHoldings = s.holdings.filter((h) => h.id !== holdingId);
+      } else if (t.type === "sell" && typeof t.marketValueBefore === "number") {
+        newHoldings = s.holdings.map(
+          (h) => h.id === holdingId ? { ...h, marketValue: t.marketValueBefore, marketValueUpdatedAt: Date.now() } : h
+        );
+      } else {
+        newHoldings = s.holdings;
+      }
+      return { ...s, transactions: newTxns, trades: newTrades, holdings: newHoldings };
+    });
+  };
+  const syncTradesAfterTxnDelete = (s, newTransactions) => {
+    const oldTxnIds = new Set(s.transactions.map((t) => t.id));
+    const newTxnIds = new Set(newTransactions.map((t) => t.id));
+    const orphanedTradeIds = /* @__PURE__ */ new Set();
+    for (const t of s.transactions) {
+      if (oldTxnIds.has(t.id) && !newTxnIds.has(t.id) && t.tradeId) {
+        const stillHasOther = newTransactions.some((tx) => tx.tradeId === t.tradeId);
+        if (!stillHasOther) orphanedTradeIds.add(t.tradeId);
+      }
+    }
+    if (orphanedTradeIds.size === 0) {
+      return { ...s, transactions: newTransactions };
+    }
+    const restoreMap = /* @__PURE__ */ new Map();
+    const sortedDeletedSells = s.trades.filter((tr) => orphanedTradeIds.has(tr.id) && tr.type === "sell" && typeof tr.marketValueBefore === "number").sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    for (const tr of sortedDeletedSells) {
+      if (!restoreMap.has(tr.holdingId)) {
+        restoreMap.set(tr.holdingId, tr.marketValueBefore);
+      }
+    }
+    const affectedHoldingIds = /* @__PURE__ */ new Set();
+    for (const tr of s.trades) {
+      if (orphanedTradeIds.has(tr.id)) affectedHoldingIds.add(tr.holdingId);
+    }
+    let newTrades = s.trades.filter((tr) => !orphanedTradeIds.has(tr.id));
+    const buyOrphans = s.trades.filter((tr) => orphanedTradeIds.has(tr.id) && tr.type === "buy");
+    const cascadeSellIds = /* @__PURE__ */ new Set();
+    for (const buyTr of buyOrphans) {
+      const hId = buyTr.holdingId;
+      const stillHasBuy = newTrades.some((tr) => tr.holdingId === hId && tr.type === "buy");
+      if (stillHasBuy) continue;
+      for (const tr of newTrades) {
+        if (tr.holdingId === hId && tr.type === "sell") {
+          cascadeSellIds.add(tr.id);
+          affectedHoldingIds.add(hId);
+        }
+      }
+    }
+    if (cascadeSellIds.size > 0) {
+      newTrades = newTrades.filter((tr) => !cascadeSellIds.has(tr.id));
+      newTransactions = newTransactions.filter((tx) => !tx.tradeId || !cascadeSellIds.has(tx.tradeId));
+      for (const sellId of cascadeSellIds) {
+        const tr = s.trades.find((x) => x.id === sellId);
+        if (tr) restoreMap.delete(tr.holdingId);
+      }
+    }
+    const newHoldings = s.holdings.filter((h) => {
+      if (!affectedHoldingIds.has(h.id)) return true;
+      return newTrades.some((tr) => tr.holdingId === h.id);
+    }).map((h) => {
+      if (restoreMap.has(h.id)) {
+        return { ...h, marketValue: restoreMap.get(h.id), marketValueUpdatedAt: Date.now() };
+      }
+      return h;
+    });
+    return { ...s, transactions: newTransactions, trades: newTrades, holdings: newHoldings };
+  };
+  const setStateWithSync = React.useCallback((updater) => {
+    setState((s) => {
+      const result = typeof updater === "function" ? updater(s) : updater;
+      if (result && result.transactions && result.transactions !== s.transactions) {
+        return syncTradesAfterTxnDelete(s, result.transactions);
+      }
+      return result;
+    });
+  }, []);
+  const saveSettlement = (p) => {
+    if (!p || !p.fromId || !p.toId || !p.principal) {
+      toast && toast("\u53C3\u6578\u4E0D\u5B8C\u6574,\u7121\u6CD5\u5132\u5B58");
+      return;
+    }
+    const principal = Number(p.principal);
+    const received = Number(p.received);
+    const pnl = received - principal;
+    const settleId = "st_" + uid().slice(2, 10);
+    const baseMeta = {
+      settleId,
+      createdAt: Date.now()
+    };
+    const newTxns = [];
+    newTxns.push({
+      id: "so_" + uid().slice(2, 10),
+      type: "expense",
+      amount: principal,
+      date: p.date,
+      note: p.note || "[\u80A1\u7968\u8CE3\u51FA - \u672C\u91D1]",
+      category: "\u80A1\u7968\u7D50\u7B97",
+      subCategory: "\u672C\u91D1\u6B78\u9084",
+      accountId: p.fromId,
+      ...baseMeta,
+      transferRole: "settle_out"
+    });
+    newTxns.push({
+      id: "si_" + uid().slice(2, 10),
+      type: "income",
+      amount: principal,
+      date: p.date,
+      note: p.note || "[\u80A1\u7968\u8CE3\u51FA - \u672C\u91D1]",
+      category: "\u80A1\u7968\u7D50\u7B97",
+      subCategory: "\u672C\u91D1\u6B78\u9084",
+      accountId: p.toId,
+      ...baseMeta,
+      transferRole: "settle_in"
+    });
+    if (pnl > 0) {
+      newTxns.push({
+        id: "sp_" + uid().slice(2, 10),
+        type: "income",
+        amount: pnl,
+        date: p.date,
+        note: p.note ? `${p.note}(\u7372\u5229)` : "\u80A1\u7968\u8CE3\u51FA\u7372\u5229",
+        category: p.pnlCategory || "\u80A1\u7968\u76F8\u95DC",
+        subCategory: p.pnlSubCategory || "\u7372\u5229\u4E86\u7D50",
+        accountId: p.toId,
+        ...baseMeta,
+        transferRole: "settle_pnl_in"
+      });
+    } else if (pnl < 0) {
+      newTxns.push({
+        id: "sl_" + uid().slice(2, 10),
+        type: "expense",
+        amount: -pnl,
+        date: p.date,
+        note: p.note ? `${p.note}(\u8667\u640D)` : "\u80A1\u7968\u8CE3\u51FA\u8667\u640D",
+        category: p.pnlCategory || "\u6295\u8CC7\u5931\u5229",
+        subCategory: p.pnlSubCategory || "",
+        accountId: p.toId,
+        ...baseMeta,
+        transferRole: "settle_pnl_out"
+      });
+    }
+    setState((s) => ({ ...s, transactions: [...s.transactions, ...newTxns] }));
+    const fromName = state.accounts.find((a) => a.id === p.fromId)?.name || "";
+    const toName = state.accounts.find((a) => a.id === p.toId)?.name || "";
+    if (toastRich) {
+      const lines = [
+        `${fromName} \u2192 ${toName}`,
+        `\u672C\u91D1 ${fmt(principal)} \xB7 \u62FF\u56DE ${fmt(received)}`
+      ];
+      if (pnl > 0) lines.push(`\u7372\u5229 +${fmt(pnl)}`);
+      else if (pnl < 0) lines.push(`\u8667\u640D -${fmt(-pnl)}`);
+      else lines.push("\u640D\u76CA\u6253\u5E73");
+      toastRich({
+        title: "\u5DF2\u8A18\u9304\u80A1\u7968\u8CE3\u51FA",
+        amount: "\u2713",
+        amountColor: pnl >= 0 ? "var(--mint-text)" : "var(--pink-text)",
+        lines
+      }, 2400);
+    }
+  };
+  const doReset = () => {
+    setConfirmDialog({
+      title: "\u6E05\u9664\u6240\u6709\u8CC7\u6599",
+      confirmText: "\u6E05\u9664",
+      danger: true,
+      items: [
+        { type: "remove", icon: "note", label: "\u79FB\u9664", detail: "\u6240\u6709\u4EA4\u6613\u7D00\u9304" },
+        { type: "remove", icon: "bank", label: "\u79FB\u9664", detail: "\u6240\u6709\u5E33\u6236", resetTo: "\u6062\u5FA9\u9810\u8A2D" },
+        { type: "remove", icon: "bag", label: "\u79FB\u9664", detail: "\u6240\u6709\u5206\u985E", resetTo: "\u6062\u5FA9\u9810\u8A2D" },
+        { type: "keep", icon: "clipboard", label: "\u4FDD\u7559", detail: "\u5FEB\u7167\u5099\u4EFD" },
+        { type: "keep", icon: "gear", label: "\u4FDD\u7559", detail: "\u4ECB\u9762\u6392\u5E8F" }
+      ],
+      itemsFooter: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F",
+      onConfirm: () => {
+        const prevTxnCount = state.transactions.length;
+        const prevAcctCount = state.accounts.length;
+        storageClear();
+        setState({
+          transactions: [],
+          accounts: [...DEFAULT_ACCOUNTS],
+          categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
+          accountTypes: [...DEFAULT_ACCOUNT_TYPES],
+          holdings: [],
+          trades: []
+        });
+        toastRich({
+          title: "\u5DF2\u6E05\u9664\u6240\u6709\u8CC7\u6599",
+          amount: "\u2713",
+          amountColor: "var(--pink-text)",
+          lines: [
+            `\u5DF2\u79FB\u9664 ${prevTxnCount} \u7B46\u4EA4\u6613\u3001${prevAcctCount} \u500B\u5E33\u6236`,
+            "\u5E33\u6236 / \u5206\u985E\u5DF2\u91CD\u7F6E\u70BA\u9810\u8A2D",
+            "\u5FEB\u7167\u5099\u4EFD\u8207\u4ECB\u9762\u6392\u5E8F\u5DF2\u4FDD\u7559"
+          ]
+        }, 2800);
+      }
+    });
+  };
+  const doCleanupHistory = (cutoffDate, preserveBalance) => {
+    const oldTxns = state.transactions.filter((t) => t.date < cutoffDate);
+    const keepTxns = state.transactions.filter((t) => t.date >= cutoffDate);
+    if (oldTxns.length === 0) {
+      toast("\u6C92\u6709\u65E9\u65BC\u8A72\u65E5\u671F\u7684\u8CC7\u6599\u53EF\u6E05\u7406");
+      return;
+    }
+    let newAccounts = state.accounts;
+    if (preserveBalance) {
+      const deltaByAcct = /* @__PURE__ */ new Map();
+      for (const t of oldTxns) {
+        if (!t.accountId) continue;
+        const cur = deltaByAcct.get(t.accountId) || 0;
+        if (t.type === "income") deltaByAcct.set(t.accountId, cur + t.amount);
+        else if (t.type === "expense") deltaByAcct.set(t.accountId, cur - t.amount);
+      }
+      newAccounts = state.accounts.map((a) => {
+        const delta = deltaByAcct.get(a.id) || 0;
+        if (delta === 0) return a;
+        return { ...a, initAmount: (a.initAmount || 0) + delta };
+      });
+    }
+    setState((s) => ({
+      ...s,
+      transactions: keepTxns,
+      accounts: newAccounts
+    }));
+    const d = /* @__PURE__ */ new Date(`${cutoffDate}T00:00:00`);
+    const dateStr = `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+    toastRich({
+      title: "\u2713 \u5DF2\u6E05\u7406\u6B77\u53F2\u7D00\u9304",
+      amount: `${oldTxns.length} \u7B46`,
+      amountColor: "var(--mint-text)",
+      lines: [
+        `\u6E05\u9664 ${dateStr} \u4E4B\u524D\u7684\u7D00\u9304`,
+        preserveBalance ? "\u5E33\u6236\u9918\u984D\u5DF2\u4FDD\u7559(\u5BEB\u5165\u8D77\u59CB\u9918\u984D)" : "\u5E33\u6236\u9918\u984D\u4F9D\u5269\u9918\u7D00\u9304\u91CD\u65B0\u8A08\u7B97"
+      ]
+    }, 2800);
+  };
+  const openAddSheet = (type) => {
+    setSheetType(type);
+    setEditingTxn(null);
+    setSheet("add");
+  };
+  const openEditSheet = (txn) => {
+    if (txn.transferRole === "lend_out") {
+      setSheetType("lend");
+    } else if (txn.transferRole === "lend_in" || txn.transferRole === "lend_collect_out" || txn.transferRole === "lend_collect_in") {
+      const mainOut = state.transactions.find((t) => t.lendId === txn.lendId && t.transferRole === "lend_out");
+      if (mainOut) {
+        setLendDetail(mainOut);
+        return;
+      }
+      setSheetType(txn.type);
+    } else if (txn.transferId && (txn.transferRole === "out" || txn.transferRole === "in" || txn.transferRole === "fee")) {
+      setSheetType("transfer");
+      const outTxn = state.transactions.find((t) => t.transferId === txn.transferId && t.transferRole === "out");
+      if (outTxn) {
+        setEditingTxn(outTxn);
+        setSheet("add");
+        return;
+      }
+      setEditingTxn(txn);
+      setSheet("add");
+      return;
+    } else if (txn.transferRole === "settle_out" || txn.transferRole === "settle_in" || txn.transferRole === "settle_pnl_in" || txn.transferRole === "settle_pnl_out") {
+      const group = state.transactions.filter((t) => t.settleId && t.settleId === txn.settleId).sort((a, b) => {
+        const order = { settle_out: 0, settle_in: 1, settle_pnl_in: 2, settle_pnl_out: 2 };
+        return (order[a.transferRole] ?? 99) - (order[b.transferRole] ?? 99);
+      });
+      setSettleDetail(group);
+      return;
+    } else {
+      setSheetType(txn.type);
+    }
+    setEditingTxn(txn);
+    setSheet("add");
+  };
+  const linkCtxValue = React.useMemo(() => ({
+    onLinkClick: handleLinkClick,
+    highlightInfo: highlightedTxnInfo
+  }), [highlightedTxnInfo]);
+  return /* @__PURE__ */ React.createElement(LinkContext.Provider, { value: linkCtxValue }, /* @__PURE__ */ React.createElement("div", { style: styles.root }, /* @__PURE__ */ React.createElement(Style, { theme, numFont }), /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      className: "page-fade",
+      style: { background: "var(--bg)" }
+    },
+    page === "home" && /* @__PURE__ */ React.createElement(
+      HomePage,
+      {
+        state,
+        setState: setStateWithSync,
+        catIcon,
+        currentMonth,
+        setCurrentMonth,
+        selectedDate,
+        setSelectedDate,
+        onAdd: openAddSheet,
+        onClickTxn: openEditSheet,
+        onViewAll: () => setPage("txn"),
+        onOpenPeriod: (key) => setPeriodKey(key),
+        onOpenAccount: () => setSheet("accounts"),
+        onOpenDate: (date) => setDetailDate(date),
+        onOpenLend: (lendOut) => setLendDetail(lendOut),
+        editMode,
+        setEditMode,
+        blockOrder: blockOrder.home,
+        moveBlock: moveBlock("home"),
+        setPageOrder: setPageOrder("home"),
+        setConfirmDialog,
+        toastRich,
+        toast,
+        onSelectModeChange: setHomeSelectMode
+      }
+    ),
+    page === "txn" && /* @__PURE__ */ React.createElement(
+      TxnListPage,
+      {
+        state,
+        setState: setStateWithSync,
+        setConfirmDialog,
+        toastRich,
+        toast,
+        catIcon,
+        currentMonth,
+        setCurrentMonth,
+        onClickTxn: openEditSheet,
+        editMode,
+        setEditMode,
+        onSelectModeChange: setTxnSelectMode,
+        blockOrder: blockOrder.txn,
+        moveBlock: moveBlock("txn"),
+        setPageOrder: setPageOrder("txn")
+      }
+    ),
+    page === "stats" && /* @__PURE__ */ React.createElement(
+      StatsPage,
+      {
+        state,
+        catIcon,
+        currentMonth,
+        setCurrentMonth,
+        editMode,
+        setEditMode,
+        blockOrder: blockOrder.stats,
+        moveBlock: moveBlock("stats"),
+        setPageOrder: setPageOrder("stats"),
+        onClickTxn: openEditSheet
+      }
+    ),
+    page === "settings" && /* @__PURE__ */ React.createElement(
+      SettingsPage,
+      {
+        state,
+        setState: setStateWithSync,
+        toast,
+        toastRich,
+        onReset: doReset,
+        onCleanupHistory: doCleanupHistory,
+        lastBackupAt,
+        setLastBackupAt,
+        backupReminderDays,
+        setBackupReminderDays,
+        driveFolderUrl,
+        setDriveFolderUrl,
+        setConfirmDialog,
+        editMode,
+        setEditMode,
+        onSubSheetChange: setSettingsSubSheet,
+        noteColor,
+        setNoteColor,
+        theme,
+        setTheme,
+        numFont,
+        setNumFont,
+        blockOrder: blockOrder.settings,
+        moveBlock: moveBlock("settings"),
+        setPageOrder: setPageOrder("settings")
+      }
+    )
+  ), !txnSelectMode && !homeSelectMode && !settingsSubSheet && /* @__PURE__ */ React.createElement("div", { style: styles.bottomnav }, [
+    { k: "home", icon: "home", label: "\u9996\u9801" },
+    { k: "txn", icon: "list", label: "\u660E\u7D30" },
+    { k: "stats", icon: "pie", label: "\u7D71\u8A08" },
+    { k: "settings", icon: "gear", label: "\u8A2D\u5B9A" }
+  ].map((p) => {
+    const isActive = page === p.k;
+    const color = isActive ? "var(--mint)" : "var(--text-faint)";
+    return /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        key: p.k,
+        style: { ...styles.navItem, color },
+        onClick: () => setPage(p.k)
+      },
+      /* @__PURE__ */ React.createElement("div", { style: styles.navIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: p.icon, size: 22, color })),
+      /* @__PURE__ */ React.createElement("div", null, p.label)
+    );
+  })), sheet && /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: styles.backdrop,
+      onClick: () => {
+        setSheet(null);
+        setEditingTxn(null);
+      }
+    }
+  ), sheet === "add" && /* @__PURE__ */ React.createElement(
+    AddTxnSheet,
+    {
+      state,
+      type: sheetType,
+      setType: setSheetType,
+      editing: editingTxn,
+      defaultDate: selectedDate,
+      onSave: saveTxn,
+      onDelete: deleteTxn,
+      toast,
+      toastRich,
+      alertCenter,
+      noteColor,
+      onClose: () => {
+        setSheet(null);
+        setEditingTxn(null);
+      },
+      editMode,
+      setEditMode,
+      blockOrder: blockOrder.addTxn,
+      moveBlock: moveBlock("addTxn"),
+      onManageCategory: (t, initialLabel) => setManageCat({ type: t, initialLabel }),
+      onManageAccount: (mode) => {
+        if (mode === "__new__") setEditAccountId("__new__");
+        setAccountsFromAddTxn(true);
+      },
+      onEditAccountName: (acctId) => {
+        setEditAccountId(acctId);
+        setAccountsFromAddTxn(true);
+      },
+      onAddSubCategory: (t, catLabel, subLabel) => {
+        setState((s) => {
+          const newCats = s.categories[t].map(
+            (c) => c.label === catLabel ? { ...c, subs: [...c.subs || [], subLabel] } : c
+          );
+          return { ...s, categories: { ...s.categories, [t]: newCats } };
+        });
+      },
+      setConfirmDialog,
+      onOpenStockEntry: () => {
+        setShowStockEntryPicker(true);
+      },
+      reopenOtherTypeTrigger
+    }
+  ), (sheet === "accounts" || accountsFromAddTxn) && /* @__PURE__ */ React.createElement(
+    AccountsSheet,
+    {
+      state,
+      setState: setStateWithSync,
+      toast,
+      toastRich,
+      initialEditId: editAccountId,
+      onClose: () => {
+        if (accountsFromAddTxn) {
+          setAccountsFromAddTxn(false);
+          setEditAccountId(null);
+        } else {
+          setSheet(null);
+          setEditAccountId(null);
+        }
+      },
+      onOpenDetail: (a) => setDetailAccount(a),
+      setConfirmDialog
+    }
+  ), detailAccount && /* @__PURE__ */ React.createElement(
+    AccountDetailSheet,
+    {
+      state,
+      catIcon,
+      account: detailAccount,
+      onClose: () => setDetailAccount(null),
+      onClickTxn: (t) => {
+        openEditSheet(t);
+      },
+      onSell: (acct) => setSellSheet({ account: acct }),
+      onBuyHolding: (acct, prefillSymbol) => setBuyHoldingSheet({ account: acct, prefillSymbol }),
+      onSellHolding: (holding) => setSellHoldingSheet({ holding }),
+      onUpdateMarketValue: (holding) => setMarketValueDialog({ holding }),
+      onOpenHolding: (holding) => setHoldingDetailSheet({ holding })
+    }
+  ), sellSheet && /* @__PURE__ */ React.createElement(
+    SellSheet,
+    {
+      state,
+      account: sellSheet.account,
+      onClose: () => setSellSheet(null),
+      onConfirm: (payload) => {
+        saveSettlement(payload);
+        setSellSheet(null);
+      },
+      toast
+    }
+  ), buyHoldingSheet && /* @__PURE__ */ React.createElement(
+    BuyHoldingSheet,
+    {
+      state,
+      account: buyHoldingSheet.account,
+      prefillSymbol: buyHoldingSheet.prefillSymbol,
+      onClose: () => setBuyHoldingSheet(null),
+      onConfirm: (payload) => {
+        saveBuyHolding(payload);
+        setBuyHoldingSheet(null);
+        toastRich && toastRich({
+          title: "\u5DF2\u8CB7\u9032",
+          amount: "\u2713",
+          amountColor: "var(--mint)",
+          lines: [`${payload.symbol} ${payload.shares} \u80A1`]
+        }, 1800);
+      },
+      toast,
+      toastRich
+    }
+  ), sellHoldingSheet && /* @__PURE__ */ React.createElement(
+    SellHoldingSheet,
+    {
+      state,
+      holding: sellHoldingSheet.holding,
+      onClose: () => setSellHoldingSheet(null),
+      onConfirm: (payload) => {
+        saveSellHolding(payload);
+        setSellHoldingSheet(null);
+        toastRich && toastRich({
+          title: "\u5DF2\u8CE3\u51FA",
+          amount: "\u2713",
+          amountColor: "var(--mint)",
+          lines: [`${sellHoldingSheet.holding.symbol} ${payload.shares} \u80A1`]
+        }, 1800);
+      },
+      toast,
+      toastRich
+    }
+  ), showStockEntryPicker && (() => {
+    const investAccounts = state.accounts.filter((a) => a.type === "invest" && !a.isSystem && (a.investSubType || "stock") === "stock");
+    return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: () => setShowStockEntryPicker(false) }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.centerDialogCard, maxHeight: "80vh", display: "flex", flexDirection: "column" }, onClick: (e) => e.stopPropagation(), ...stockEntryPickerSwipe }, /* @__PURE__ */ React.createElement("div", { style: { padding: "14px 18px", borderBottom: "1px solid var(--border)" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600 } }, "\u9078\u64C7\u6295\u8CC7\u5E33\u6236"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2 } }, "\u9032\u5165\u5E33\u6236\u5F8C\u53EF\u8CB7\u9032\u3001\u8CE3\u51FA\u3001\u4F30\u5E02\u503C")), /* @__PURE__ */ React.createElement("div", { style: { overflowY: "auto", maxHeight: "60vh" } }, investAccounts.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { padding: 32, textAlign: "center", color: "var(--text-faint)", fontSize: 13 } }, "\u5C1A\u672A\u5EFA\u7ACB\u6295\u8CC7\u5E33\u6236", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11 } }, "\u8ACB\u5148\u5230\u300C\u5E33\u6236\u7BA1\u7406\u300D\u65B0\u589E\u6295\u8CC7\u985E\u578B\u5E33\u6236")) : /* @__PURE__ */ React.createElement("div", { style: { padding: 12, display: "flex", flexDirection: "column", gap: 6 } }, investAccounts.map((a) => {
+      const summary = investAccountSummary(a, state.holdings, state.trades);
+      const myHoldings = state.holdings.filter((h) => h.accountId === a.id);
+      const activeCount = myHoldings.filter((h) => holdingShares(h, state.trades) > 0).length;
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: a.id,
+          onClick: () => {
+            setShowStockEntryPicker(false);
+            setSheet(null);
+            setEditingTxn(null);
+            setDetailAccount(a);
+          },
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "12px 14px",
+            borderRadius: 12,
+            background: "var(--bg-card)",
+            border: "1.5px solid var(--border)",
+            cursor: "pointer"
+          }
+        },
+        /* @__PURE__ */ React.createElement("div", { style: {
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          background: "#9ae0d4",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "chart", size: 18, color: "#fff" })),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600 } }, a.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2 } }, activeCount > 0 ? `\u6301\u6709 ${activeCount} \u652F\u80A1\u7968` : "\u5C1A\u7121\u6301\u80A1")),
+        summary && summary.totalMarket > 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)" } }, "\u5E02\u503C"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600 } }, fmt(summary.totalMarket))),
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, color: "var(--text-faint)" } }, "\u203A")
+      );
+    }))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", borderTop: "1px solid var(--border)" } }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: { flex: 1, padding: "12px 20px", fontSize: 13, color: "var(--text-dim)", textAlign: "center", cursor: "pointer", borderRight: "1px solid var(--border)" },
+        onClick: () => {
+          setShowStockEntryPicker(false);
+          setReopenOtherTypeTrigger((n) => n + 1);
+        }
+      },
+      "\u2039 \u8FD4\u56DE"
+    ), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: { flex: 1, padding: "12px 20px", fontSize: 13, color: "var(--text-dim)", textAlign: "center", cursor: "pointer" },
+        onClick: () => setShowStockEntryPicker(false)
+      },
+      "\u53D6\u6D88"
+    ))));
+  })(), holdingDetailSheet && /* @__PURE__ */ React.createElement(
+    HoldingDetailSheet,
+    {
+      state,
+      holding: state.holdings.find((h) => h.id === holdingDetailSheet.holding.id),
+      onClose: () => setHoldingDetailSheet(null),
+      onUpdateMarketValue: (holding) => setMarketValueDialog({ holding }),
+      onBuyMore: (holding) => {
+        const acct = state.accounts.find((a) => a.id === holding.accountId);
+        setHoldingDetailSheet(null);
+        if (acct) setBuyHoldingSheet({ account: acct, prefillSymbol: holding.symbol });
+      },
+      onSell: (holding) => {
+        setHoldingDetailSheet(null);
+        setSellHoldingSheet({ holding });
+      },
+      onDeleteTrade: (tradeId) => {
+        const t = state.trades.find((tr) => tr.id === tradeId);
+        const holdingTrades = t ? state.trades.filter((tr) => tr.holdingId === t.holdingId) : [];
+        const isLastTrade = holdingTrades.length === 1;
+        deleteTrade(tradeId);
+        if (isLastTrade) {
+          setHoldingDetailSheet(null);
+          toastRich && toastRich({
+            title: "\u5DF2\u522A\u9664\u6301\u80A1",
+            amount: "\u2713",
+            amountColor: "var(--pink-text)"
+          }, 1400);
+        } else {
+          toastRich && toastRich({
+            title: "\u5DF2\u522A\u9664\u7D00\u9304",
+            amount: "\u2713",
+            amountColor: "var(--pink-text)"
+          }, 1400);
+        }
+      },
+      setConfirmDialog,
+      onEditHolding: (holding, field) => setEditHoldingDialog({ holding, field }),
+      onEditTrade: (trade, holding) => setEditBuyTradeDialog({ trade, holding })
+    }
+  ), marketValueDialog && (() => {
+    const h = marketValueDialog.holding;
+    const shares = holdingShares(h, state.trades);
+    return /* @__PURE__ */ React.createElement(
+      UpdateMarketValueDialog,
+      {
+        holding: h,
+        shares,
+        onClose: () => setMarketValueDialog(null),
+        onConfirm: (mv) => {
+          updateHoldingMarketValue(h.id, mv);
+          setMarketValueDialog(null);
+        }
+      }
+    );
+  })(), editHoldingDialog && (() => {
+    const h = editHoldingDialog.holding;
+    const field = editHoldingDialog.field || "symbol";
+    const relTradeIds = new Set(state.trades.filter((t) => t.holdingId === h.id).map((t) => t.id));
+    const relTxnCount = state.transactions.filter((tx) => tx.tradeId && relTradeIds.has(tx.tradeId)).length;
+    return /* @__PURE__ */ React.createElement(
+      EditHoldingFieldDialog,
+      {
+        holding: h,
+        field,
+        relTxnCount,
+        toast,
+        onClose: () => setEditHoldingDialog(null),
+        onSubmitName: (newName) => {
+          updateHoldingIdentity(h.id, h.symbol, newName);
+          setEditHoldingDialog(null);
+          toastRich && toastRich({
+            title: "\u5DF2\u66F4\u65B0\u540D\u7A31",
+            amount: "\u2713",
+            amountColor: "var(--mint)"
+          }, 1200);
+        },
+        onSubmitSymbol: (newSym) => {
+          if (relTxnCount > 0) {
+            const changes = [
+              {
+                icon: "chart",
+                label: "\u4EE3\u865F",
+                from: h.symbol,
+                to: newSym,
+                changed: true
+              }
+            ];
+            setConfirmDialog({
+              title: "\u78BA\u8A8D\u8B8A\u66F4\u4EE3\u865F",
+              changesHint: `\u4EE3\u865F\u8B8A\u66F4\u6703\u540C\u6B65\u66F4\u65B0 ${relTxnCount} \u7B46\u4E3B\u5E33\u672C\u7D00\u9304(\u53EA\u66F4\u65B0\u7CFB\u7D71\u81EA\u52D5\u6A19\u8A18,\u4E0D\u52D5\u4F7F\u7528\u8005\u81EA\u5DF1\u5BEB\u7684\u5099\u8A3B)\u3002\u6B64\u52D5\u4F5C\u7121\u6CD5\u4EE5\u300C\u4E0A\u4E00\u6B65\u300D\u5FA9\u539F,\u5EFA\u8B70\u5148\u5132\u5B58\u5FEB\u7167\u3002`,
+              changes,
+              confirmText: "\u78BA\u5B9A\u8B8A\u66F4",
+              danger: true,
+              onConfirm: () => {
+                const n = updateHoldingIdentity(h.id, newSym, h.name || "");
+                setEditHoldingDialog(null);
+                toastRich && toastRich({
+                  title: "\u5DF2\u66F4\u65B0\u4EE3\u865F",
+                  amount: "\u2713",
+                  amountColor: "var(--mint)",
+                  lines: [`${h.symbol} \u2192 ${newSym}`, n > 0 ? `\u5DF2\u66F4\u65B0 ${n} \u7B46\u7D00\u9304` : null].filter(Boolean)
+                }, 1800);
+              }
+            });
+          } else {
+            updateHoldingIdentity(h.id, newSym, h.name || "");
+            setEditHoldingDialog(null);
+            toastRich && toastRich({
+              title: "\u5DF2\u66F4\u65B0\u4EE3\u865F",
+              amount: "\u2713",
+              amountColor: "var(--mint)"
+            }, 1200);
+          }
+        }
+      }
+    );
+  })(), editBuyTradeDialog && (() => {
+    const tr = editBuyTradeDialog.trade;
+    const h = editBuyTradeDialog.holding;
+    const consumed = (tr.shares || 0) - (tr.remainingShares || 0);
+    return /* @__PURE__ */ React.createElement(
+      EditBuyTradeDialog,
+      {
+        trade: tr,
+        holding: h,
+        consumed,
+        setConfirmDialog,
+        onClose: () => setEditBuyTradeDialog(null),
+        onConfirm: (newData) => {
+          updateBuyTrade(tr.id, newData);
+          setEditBuyTradeDialog(null);
+          toastRich && toastRich({
+            title: "\u5DF2\u66F4\u65B0\u8CB7\u9032\u7D00\u9304",
+            amount: "\u2713",
+            amountColor: "var(--mint)"
+          }, 1200);
+        }
+      }
+    );
+  })(), periodKey && /* @__PURE__ */ React.createElement(
+    PeriodDetailSheet,
+    {
+      state,
+      setState: setStateWithSync,
+      catIcon,
+      periodKey,
+      onClose: () => setPeriodKey(null),
+      onClickTxn: (t) => {
+        setPeriodKey(null);
+        openEditSheet(t);
+      },
+      setConfirmDialog,
+      toastRich,
+      toast
+    }
+  ), detailDate && /* @__PURE__ */ React.createElement(
+    DayDetailSheet,
+    {
+      state,
+      catIcon,
+      date: detailDate,
+      onClose: () => setDetailDate(null),
+      onClickTxn: (t) => {
+        setDetailDate(null);
+        openEditSheet(t);
+      },
+      onAdd: (type, date) => {
+        setDetailDate(null);
+        setSelectedDate(date);
+        openAddSheet(type);
+      }
+    }
+  ), lendDetail && /* @__PURE__ */ React.createElement(
+    LendDetailSheet,
+    {
+      state,
+      lendOut: state.transactions.find((t) => t.id === lendDetail.id) || lendDetail,
+      onClose: () => setLendDetail(null),
+      onCollect: collectLend,
+      onEdit: (t) => {
+        setLendDetail(null);
+        setSheetType("lend");
+        setEditingTxn(t);
+        setSheet("add");
+      },
+      onDelete: deleteLend,
+      setConfirmDialog,
+      toast,
+      toastRich
+    }
+  ), settleDetail && /* @__PURE__ */ React.createElement(
+    SettleDetailSheet,
+    {
+      state,
+      settleGroup: (
+        // 即時從 state 取最新紀錄,避免 sheet 開啟期間 state 變動造成不同步
+        (() => {
+          const settleId = settleDetail[0]?.settleId;
+          const fresh = state.transactions.filter((t) => t.settleId && t.settleId === settleId).sort((a, b) => {
+            const order = { settle_out: 0, settle_in: 1, settle_pnl_in: 2, settle_pnl_out: 2 };
+            return (order[a.transferRole] ?? 99) - (order[b.transferRole] ?? 99);
+          });
+          return fresh.length > 0 ? fresh : settleDetail;
+        })()
+      ),
+      onClose: () => setSettleDetail(null),
+      onDeleteGroup: (group) => {
+        setSettleDetail(null);
+        deleteTxn(group[0].id);
+      }
+    }
+  ), manageCat && /* @__PURE__ */ React.createElement(
+    CategoryManageSheet,
+    {
+      state,
+      setState: setStateWithSync,
+      toast,
+      toastRich,
+      catType: manageCat.type,
+      initialLabel: manageCat.initialLabel,
+      onClose: () => setManageCat(null),
+      setConfirmDialog
+    }
+  ), confirmDialog && /* @__PURE__ */ React.createElement(ConfirmDialogRenderer, { dialog: confirmDialog, onClose: () => setConfirmDialog(null) }), centerAlert && /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: styles.centerAlertBackdrop,
+      onClick: () => setCenterAlert(""),
+      onTouchStart: (e) => e.stopPropagation(),
+      onTouchMove: (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.centerAlertCard, onClick: () => setCenterAlert("") }, /* @__PURE__ */ React.createElement("div", { style: styles.centerAlertIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "warning", size: 28, color: "var(--pink-text)" })), /* @__PURE__ */ React.createElement("div", { style: styles.centerAlertText }, centerAlert))
+  ), toastMsg && (typeof toastMsg === "string" ? /* @__PURE__ */ React.createElement("div", { style: styles.toast }, toastMsg) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: {
+        ...styles.toastBackdrop,
+        pointerEvents: toastMsg.variant === "info_card" ? "auto" : styles.toastBackdrop.pointerEvents || "auto",
+        cursor: toastMsg.variant === "info_card" ? "pointer" : "default"
+      },
+      onClick: (e) => {
+        if (toastMsg.variant === "info_card") {
+          setToastMsg("");
+        } else {
+          e.stopPropagation();
+        }
+      },
+      onTouchStart: (e) => {
+        if (toastMsg.variant !== "info_card") e.stopPropagation();
+      },
+      onTouchMove: (e) => {
+        if (toastMsg.variant !== "info_card") {
+          e.stopPropagation();
+          e.preventDefault();
+        }
+      }
+    }
+  ), /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: {
+        ...styles.toastRich,
+        pointerEvents: toastMsg.variant === "info_card" ? "auto" : styles.toastRich.pointerEvents,
+        cursor: toastMsg.variant === "info_card" ? "pointer" : "default"
+      },
+      onClick: () => {
+        if (toastMsg.variant === "info_card") setToastMsg("");
+      }
+    },
+    (() => {
+      const isCheckmark = toastMsg.amount === "\u2713";
+      const isInfoBadge = toastMsg.variant === "info_badge";
+      const isInfoCard = toastMsg.variant === "info_card";
+      const hasDetails = toastMsg.amount || toastMsg.lines && toastMsg.lines.length > 0;
+      if (isInfoCard) {
+        return /* @__PURE__ */ React.createElement("div", { style: {
+          animation: "toastInfoSlideIn 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)",
+          textAlign: "center"
+        } }, (toastMsg.title || Array.isArray(toastMsg.titleSegments)) && /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 16,
+          fontWeight: 700,
+          color: "var(--text)",
+          lineHeight: 1.3,
+          marginBottom: 6
+        } }, Array.isArray(toastMsg.titleSegments) ? toastMsg.titleSegments.map((seg, i) => /* @__PURE__ */ React.createElement("span", { key: i, style: {
+          color: seg.color || "var(--text)",
+          fontWeight: seg.weight || 700
+        } }, seg.text)) : toastMsg.title), toastMsg.subtitle && /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 12,
+          fontWeight: 400,
+          color: "var(--text-faint)",
+          lineHeight: 1.3,
+          marginBottom: 4
+        } }, toastMsg.subtitle), toastMsg.highlight && /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 15,
+          fontWeight: 600,
+          color: toastMsg.highlightColor || "var(--blue)",
+          lineHeight: 1.3,
+          letterSpacing: "0.3px"
+        } }, toastMsg.highlight), /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 10,
+          color: "var(--text-faint)",
+          marginTop: 12,
+          opacity: 0.7
+        } }, "(\u9EDE\u9078\u756B\u9762\u4EFB\u4F55\u4E00\u8655\u95DC\u9589)"));
+      }
+      if (isInfoBadge) {
+        const badgeColor = toastMsg.badgeColor || toastMsg.amountColor || "var(--mint)";
+        const isPink = badgeColor.includes("pink") || badgeColor.includes("f5b") || badgeColor.includes("d96");
+        const isAccent = badgeColor.includes("accent") || badgeColor.includes("8f7") || badgeColor.includes("6b5");
+        const shadowColor = isPink ? "rgba(245,181,192,0.45)" : isAccent ? "rgba(143,127,240,0.45)" : "rgba(126,224,192,0.5)";
+        const tintBg = "rgba(126,224,192,0.06)";
+        const barColor = "var(--mint)";
+        return /* @__PURE__ */ React.createElement("div", { style: {
+          display: "flex",
+          alignItems: "stretch",
+          gap: 0,
+          position: "relative",
+          overflow: "hidden",
+          borderRadius: 14,
+          animation: "toastInfoSlideIn 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)"
+        } }, /* @__PURE__ */ React.createElement("div", { style: {
+          width: 3,
+          flexShrink: 0,
+          background: barColor,
+          borderRadius: "3px 0 0 3px",
+          animation: "toastInfoBarGrow 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.05s both",
+          transformOrigin: "top"
+        } }), /* @__PURE__ */ React.createElement("div", { style: {
+          flex: 1,
+          padding: "12px 14px",
+          background: tintBg
+        } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 16,
+          fontWeight: 700,
+          color: "var(--mint-text)",
+          letterSpacing: "0.2px",
+          marginBottom: 4,
+          textTransform: "none",
+          animation: "toastInfoTitleRise 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) 0.08s both",
+          textAlign: "center"
+        } }, toastMsg.title), toastMsg.amount && toastMsg.amount !== "\u2713" && /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 13,
+          fontWeight: 500,
+          color: "var(--text-faint)",
+          letterSpacing: "0px",
+          lineHeight: 1.3,
+          marginBottom: 4,
+          animation: "toastInfoAmountFade 0.5s ease-out 0.1s both"
+        } }, toastMsg.amount), toastMsg.lines && toastMsg.lines.length > 0 && /* @__PURE__ */ React.createElement("div", null, toastMsg.lines.map((line, i) => {
+          const isFirst = i === 0;
+          if (isFirst && typeof line === "string" && line.includes(" \u203A ")) {
+            const [main, sub] = line.split(" \u203A ");
+            return /* @__PURE__ */ React.createElement("div", { key: i, style: {
+              fontSize: 12.5,
+              lineHeight: 1.5,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap"
+            } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)" } }, main), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", margin: "0 5px" } }, "\u203A"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text)", fontWeight: 600 } }, sub));
+          }
+          return /* @__PURE__ */ React.createElement("div", { key: i, style: {
+            fontSize: 12,
+            color: isFirst ? "var(--text)" : "var(--text-faint)",
+            fontWeight: isFirst ? 500 : 400,
+            lineHeight: 1.55,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap"
+          } }, line);
+        })))));
+      }
+      if (isCheckmark) {
+        const badgeColor = toastMsg.amountColor || "var(--mint)";
+        const badgeShadowColor = badgeColor.includes("pink") || badgeColor.includes("f5b5") ? "rgba(245,181,192,0.4)" : badgeColor.includes("faint") || badgeColor.includes("dim") ? "rgba(160,160,160,0.35)" : "rgba(126,224,192,0.45)";
+        const customIcon = toastMsg.icon;
+        return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", padding: "4px 16px 6px" } }, /* @__PURE__ */ React.createElement("div", { style: {
+          width: 56,
+          height: 56,
+          borderRadius: "50%",
+          background: badgeColor,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: `0 6px 20px ${badgeShadowColor}, 0 0 0 6px rgba(255,255,255,0.04)`,
+          marginBottom: 14,
+          animation: "toastBadgePop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)"
+        } }, customIcon === "info" ? /* @__PURE__ */ React.createElement("svg", { width: "32", height: "32", viewBox: "0 0 24 24", fill: "none", stroke: "#1a1a1a", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "9" }), /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "11", x2: "12", y2: "17" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "7.5", r: "0.6", fill: "#1a1a1a", stroke: "none" })) : customIcon === "warn" ? (
+          // 警告:三角形 + 中間驚嘆號(直線+點)
+          /* @__PURE__ */ React.createElement("svg", { width: "34", height: "34", viewBox: "0 0 24 24", fill: "none", stroke: "#1a1a1a", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M12 3 L22 20 L2 20 Z" }), /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "10", x2: "12", y2: "14.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "17.2", r: "0.7", fill: "#1a1a1a", stroke: "none" }))
+        ) : customIcon === "minus" ? /* @__PURE__ */ React.createElement("svg", { width: "32", height: "32", viewBox: "0 0 24 24", fill: "none", stroke: "#1a1a1a", strokeWidth: "3.2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("line", { x1: "6", y1: "12", x2: "18", y2: "12" })) : /* @__PURE__ */ React.createElement("svg", { width: "32", height: "32", viewBox: "0 0 24 24", fill: "none", stroke: "#1a1a1a", strokeWidth: "3.2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "5 12 10 17 19 8" }))), /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, color: "var(--text)", letterSpacing: "0.5px", marginBottom: toastMsg.lines?.length > 0 ? 12 : 0, whiteSpace: "pre-line", textAlign: "center", lineHeight: 1.35 } }, Array.isArray(toastMsg.titleSegments) ? (() => {
+          let line = 0;
+          return toastMsg.titleSegments.map((seg, i) => {
+            if (seg === "\n") {
+              line += 1;
+              return /* @__PURE__ */ React.createElement("br", { key: i });
+            }
+            const fs = line === 0 ? 19 : 14;
+            if (typeof seg === "string") {
+              return /* @__PURE__ */ React.createElement("span", { key: i, style: { fontSize: fs } }, seg);
+            }
+            return /* @__PURE__ */ React.createElement("span", { key: i, style: {
+              fontSize: fs,
+              color: seg.color || "var(--text)",
+              fontWeight: seg.weight || 700
+            } }, seg.text);
+          });
+        })() : /* @__PURE__ */ React.createElement("span", { style: { fontSize: 17 } }, toastMsg.title)), toastMsg.lines && toastMsg.lines.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2, alignItems: "center" } }, toastMsg.lines.map((line, i) => {
+          const renameMatch = typeof line === "string" ? line.match(/^「(.+?)」\s*→\s*「(.+?)」$/) : null;
+          if (renameMatch) {
+            const oldName = renameMatch[1];
+            const newName = renameMatch[2];
+            return /* @__PURE__ */ React.createElement("div", { key: i, style: {
+              position: "relative",
+              width: "100%",
+              height: 28,
+              marginTop: 4,
+              marginBottom: 6
+            } }, /* @__PURE__ */ React.createElement("div", { style: {
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              display: "flex",
+              justifyContent: "center",
+              animation: "toastRenameOldFly 1.4s cubic-bezier(0.4, 0, 0.4, 1) 0.45s forwards"
+            } }, /* @__PURE__ */ React.createElement("span", { style: {
+              position: "relative",
+              display: "inline-block",
+              fontSize: 13,
+              color: "var(--text-dim)",
+              whiteSpace: "nowrap"
+            } }, oldName, /* @__PURE__ */ React.createElement("span", { style: {
+              position: "absolute",
+              left: 0,
+              top: "50%",
+              height: 1.5,
+              background: "var(--pink)",
+              borderRadius: 1,
+              pointerEvents: "none",
+              animation: "toastRenameStrike 1.3s cubic-bezier(0.4, 0, 0.2, 1) 0.55s forwards"
+            } }))), /* @__PURE__ */ React.createElement("div", { style: {
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              display: "flex",
+              justifyContent: "center",
+              opacity: 0,
+              animation: "toastRenameNewFloat 0.9s cubic-bezier(0.34, 1.4, 0.5, 1) 1.4s forwards"
+            } }, /* @__PURE__ */ React.createElement("span", { style: {
+              fontSize: 16,
+              fontWeight: 700,
+              whiteSpace: "nowrap"
+            } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)" } }, newName))));
+          }
+          return /* @__PURE__ */ React.createElement("div", { key: i, style: {
+            fontSize: 13,
+            color: "var(--text-dim)",
+            lineHeight: 1.4,
+            textAlign: "center",
+            wordBreak: "keep-all",
+            overflowWrap: "anywhere"
+          } }, line);
+        })));
+      }
+      if (hasDetails) {
+        return /* @__PURE__ */ React.createElement("div", { style: styles.toastRichTitle }, toastMsg.title);
+      }
+      return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "8px 20px" } }, /* @__PURE__ */ React.createElement("div", { style: {
+        width: 48,
+        height: 48,
+        borderRadius: "50%",
+        background: "var(--mint)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        boxShadow: "0 4px 16px rgba(126,224,192,0.4)"
+      } }, /* @__PURE__ */ React.createElement("svg", { width: "28", height: "28", viewBox: "0 0 24 24", fill: "none", stroke: "#1a1a1a", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "5 12 10 17 19 8" }))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: "var(--text)", letterSpacing: "1px" } }, toastMsg.title));
+    })(),
+    toastMsg.variant !== "info_badge" && toastMsg.amount && toastMsg.amount !== "\u2713" && /* @__PURE__ */ React.createElement("div", { style: { ...styles.toastRichAmount, color: toastMsg.amountColor || "var(--text)" } }, toastMsg.amount),
+    toastMsg.variant !== "info_badge" && toastMsg.amount !== "\u2713" && toastMsg.lines && toastMsg.lines.length > 0 && /* @__PURE__ */ React.createElement("div", { style: styles.toastRichLines }, toastMsg.lines.map((line, i) => {
+      const renameMatch = typeof line === "string" ? line.match(/^「(.+?)」\s*→\s*「(.+?)」$/) : null;
+      if (renameMatch) {
+        const oldName = renameMatch[1];
+        const newName = renameMatch[2];
+        return /* @__PURE__ */ React.createElement("div", { key: i, style: {
+          ...styles.toastRichLine,
+          position: "relative",
+          width: "100%",
+          marginTop: 4,
+          marginBottom: 6,
+          height: 26
+        } }, /* @__PURE__ */ React.createElement("div", { style: {
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          display: "flex",
+          justifyContent: "center",
+          animation: "toastRenameOldFly 1.4s cubic-bezier(0.4, 0, 0.4, 1) 0.45s forwards"
+        } }, /* @__PURE__ */ React.createElement("span", { style: {
+          position: "relative",
+          display: "inline-block",
+          fontSize: 15,
+          fontWeight: 600,
+          color: "var(--text)",
+          whiteSpace: "nowrap"
+        } }, oldName, /* @__PURE__ */ React.createElement("span", { style: {
+          position: "absolute",
+          left: 0,
+          top: "50%",
+          height: 2,
+          background: "var(--pink)",
+          borderRadius: 1,
+          pointerEvents: "none",
+          animation: "toastRenameStrike 1.3s cubic-bezier(0.4, 0, 0.2, 1) 0.55s forwards"
+        } }))), /* @__PURE__ */ React.createElement("div", { style: {
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          display: "flex",
+          justifyContent: "center",
+          opacity: 0,
+          animation: "toastRenameNewFloat 0.9s cubic-bezier(0.34, 1.4, 0.5, 1) 1.4s forwards"
+        } }, /* @__PURE__ */ React.createElement("span", { style: {
+          fontSize: 15,
+          fontWeight: 600,
+          whiteSpace: "nowrap"
+        } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)" } }, newName))));
+      }
+      const isQuoted = typeof line === "string" && line.startsWith("\u300C") && line.endsWith("\u300D");
+      const isAmount = typeof line === "string" && /^[+\-]\d[\d,]*(\.\d+)?$/.test(line.trim());
+      const isFirst = i === 0;
+      const isLast = i === toastMsg.lines.length - 1 && toastMsg.lines.length > 2;
+      let lineStyle = styles.toastRichLine;
+      if (isFirst && isAmount) {
+        const titleStr = toastMsg.title || "";
+        const isAdd = /新增/.test(titleStr);
+        const isDeleted = /刪除|清除|移除/.test(titleStr);
+        const trimmed = line.trim();
+        const sign = trimmed.charAt(0);
+        let amtColor;
+        if (isAdd) {
+          amtColor = sign === "-" ? "var(--pink-text)" : sign === "+" ? "var(--mint-text)" : "var(--text)";
+        } else {
+          amtColor = "var(--text-dim)";
+        }
+        if (isDeleted) {
+          return /* @__PURE__ */ React.createElement("div", { key: i, style: {
+            ...styles.toastRichLine,
+            fontSize: 32,
+            fontWeight: 700,
+            letterSpacing: "-0.8px",
+            lineHeight: 1.1,
+            marginBottom: 4,
+            marginTop: 0,
+            alignSelf: "center",
+            color: "var(--pink-text)",
+            animation: "toastDeletedFadeOut 0.7s cubic-bezier(0.4, 0, 0.4, 1) 0.25s forwards"
+          } }, line);
+        }
+        lineStyle = {
+          ...styles.toastRichLine,
+          fontSize: 32,
+          fontWeight: 700,
+          color: amtColor,
+          letterSpacing: "-0.8px",
+          lineHeight: 1.1,
+          marginBottom: 4,
+          marginTop: 0
+        };
+      } else if (isFirst && isQuoted) {
+        lineStyle = { ...styles.toastRichLine, fontSize: 15, color: "var(--text)", fontWeight: 500, marginBottom: 2 };
+      } else if (isLast) {
+        lineStyle = { ...styles.toastRichLine, fontSize: 11.5, color: "var(--text-faint)", marginTop: 4 };
+      }
+      return /* @__PURE__ */ React.createElement("div", { key: i, style: lineStyle }, line);
+    }))
+  )))));
+}
+function ConfirmDialogRenderer({ dialog, onClose }) {
+  const [locked, setLocked] = useState(!!dialog.danger);
+  const isDanger = !!dialog.danger;
+  const hasChanges = Array.isArray(dialog.changes);
+  const hasItems = Array.isArray(dialog.items);
+  const swipe = useSwipeToClose(onClose);
+  return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: onClose }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerCard, onClick: (e) => e.stopPropagation(), ...swipe }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerTitle, fontSize: 17, fontWeight: 700, padding: "14px 16px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text)" } }, (() => {
+    const title = dialog.title || "";
+    const dangerWords = ["\u522A\u9664", "\u6E05\u9664", "\u79FB\u9664"];
+    const safeWords = ["\u9084\u539F", "\u6062\u5FA9"];
+    if (title.includes(" ")) {
+      const segments = title.split(/\s+/).filter(Boolean);
+      return /* @__PURE__ */ React.createElement(React.Fragment, null, segments.map((seg, idx) => {
+        const isDangerSeg = dangerWords.includes(seg);
+        const isSafeSeg = safeWords.includes(seg);
+        let color = "var(--text)";
+        let fontWeight = 700;
+        if (isDangerSeg) {
+          color = "var(--pink)";
+        } else if (isSafeSeg) {
+          color = "var(--mint)";
+        } else if (idx > 0 && idx < segments.length - 1) {
+          color = "var(--blue)";
+          fontWeight = 600;
+        }
+        return /* @__PURE__ */ React.createElement("span", { key: idx, style: { color, fontWeight, marginRight: idx < segments.length - 1 ? 6 : 0 } }, seg);
+      }));
+    }
+    const allWords = [...dangerWords, ...safeWords];
+    let matchWord = null;
+    let matchIdx = -1;
+    for (const w of allWords) {
+      const i = title.indexOf(w);
+      if (i !== -1 && (matchIdx === -1 || i < matchIdx)) {
+        matchWord = w;
+        matchIdx = i;
+      }
+    }
+    if (!matchWord) return title;
+    const isDangerWord = dangerWords.includes(matchWord);
+    const before = title.slice(0, matchIdx);
+    const after = title.slice(matchIdx + matchWord.length);
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, before && /* @__PURE__ */ React.createElement("span", { style: { marginRight: 6 } }, before), /* @__PURE__ */ React.createElement("span", { style: { color: isDangerWord ? "var(--pink)" : "var(--mint)" } }, matchWord), after && /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 6 } }, after));
+  })()), isDanger && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: { ...styles.lockLabel, color: locked ? "var(--text-dim)" : "var(--pink)", display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: locked ? "lock" : "unlock", size: 12, color: locked ? "var(--text-dim)" : "var(--pink)" }), locked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: { ...styles.toggleTrack, background: locked ? "var(--bg-card)" : "var(--pink)" },
+      onClick: () => setLocked((v) => !v)
+    },
+    /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: locked ? "translateX(0)" : "translateX(18px)" } })
+  ))), dialog.target && /* @__PURE__ */ React.createElement("div", { style: {
+    margin: "12px 16px 8px",
+    padding: "10px 14px",
+    background: isDanger ? "rgba(245, 181, 192, 0.10)" : "rgba(126, 224, 192, 0.10)",
+    border: `1px solid ${isDanger ? "rgba(245, 181, 192, 0.25)" : "rgba(126, 224, 192, 0.25)"}`,
+    borderRadius: 10,
+    display: "flex",
+    alignItems: dialog.target.multiline ? "flex-start" : "center",
+    gap: 10
+  } }, dialog.target.label && /* @__PURE__ */ React.createElement("div", { style: {
+    fontSize: 11,
+    color: isDanger ? "var(--pink)" : "var(--mint)",
+    fontWeight: 600,
+    letterSpacing: 0.5,
+    flexShrink: 0,
+    marginTop: dialog.target.multiline ? 2 : 0
+  } }, dialog.target.label), /* @__PURE__ */ React.createElement("div", { style: {
+    fontSize: dialog.target.multiline ? 13 : 15,
+    color: "var(--text)",
+    fontWeight: dialog.target.multiline ? 500 : 600,
+    flex: 1,
+    overflow: "hidden",
+    textOverflow: dialog.target.multiline ? "clip" : "ellipsis",
+    whiteSpace: dialog.target.multiline ? "pre-line" : "nowrap",
+    lineHeight: dialog.target.multiline ? 1.7 : 1.3
+  } }, dialog.target.name)), hasChanges ? /* @__PURE__ */ React.createElement(React.Fragment, null, dialog.changesHint && /* @__PURE__ */ React.createElement("div", { style: { padding: "0 20px 8px", fontSize: 12, color: "var(--text-dim)", lineHeight: 1.6 } }, dialog.changesHint), /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 6px" } }, dialog.changes.map((c, i) => {
+    const unchanged = !c.changed;
+    return /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        key: i,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "8px 4px",
+          borderBottom: i < dialog.changes.length - 1 ? "1px solid var(--border)" : "none",
+          opacity: unchanged ? 0.45 : 1
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: {
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        background: unchanged ? "var(--bg-card)" : "rgba(126,224,192,0.12)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0
+      } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: c.icon, size: 15, color: unchanged ? "var(--text-faint)" : "var(--mint)" })),
+      /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginBottom: 2 } }, c.label), unchanged ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, c.from, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "var(--text-faint)", marginLeft: 6 } }, "\uFF08\u672A\u8B8A\u66F4\uFF09")) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text)", lineHeight: 1.35 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", textDecoration: "line-through" } }, c.from), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", margin: "0 6px" } }, "\u2192"), /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600 } }, c.to), c.diff && /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 6, fontSize: 12, color: c.diff.startsWith("+") ? "var(--mint)" : "var(--pink)" } }, "(", c.diff, ")")))
+    );
+  }), dialog.changes.every((c) => !c.changed) && /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 4px 2px", fontSize: 12, color: "var(--text-faint)", textAlign: "center" } }, "\u6240\u6709\u6B04\u4F4D\u5747\u7121\u66F4\u6539"))) : hasItems ? /* @__PURE__ */ React.createElement(React.Fragment, null, dialog.itemsHint && /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 20px 0", fontSize: 13, color: "var(--text-dim)", lineHeight: 1.5 } }, dialog.itemsHint), /* @__PURE__ */ React.createElement("div", { style: { padding: "8px 16px 6px" } }, dialog.items.map((it, i) => {
+    const isRemove = it.type === "remove";
+    const isKeep = it.type === "keep";
+    const accentColor = isRemove ? "var(--pink)" : isKeep ? "var(--mint)" : "var(--text-dim)";
+    const bgColor = isRemove ? "rgba(232,141,141,0.12)" : isKeep ? "rgba(126,224,192,0.12)" : "var(--bg-card)";
+    return /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        key: i,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "10px 4px",
+          borderBottom: i < dialog.items.length - 1 ? "1px solid var(--border)" : "none"
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: {
+        width: 30,
+        height: 30,
+        borderRadius: 8,
+        background: bgColor,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0
+      } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: it.icon, size: 16, color: accentColor })),
+      /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, it.label && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: accentColor, marginBottom: 2, fontWeight: 600, letterSpacing: 0.3 } }, it.label), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "var(--text)", lineHeight: 1.35 } }, isRemove ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: {
+        color: "var(--text-dim)",
+        textDecoration: "line-through",
+        textDecorationColor: "var(--pink)",
+        textDecorationThickness: 1.5
+      } }, it.detail), it.resetTo && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", margin: "0 6px" } }, "\u2192"), /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600 } }, it.resetTo))) : it.detail), it.sublabel && /* @__PURE__ */ React.createElement("div", { style: {
+        fontSize: 11,
+        color: "var(--text-faint)",
+        marginTop: 3,
+        lineHeight: 1.4
+      } }, it.sublabel))
+    );
+  })), dialog.itemsFooter && /* @__PURE__ */ React.createElement("div", { style: { padding: "6px 20px 0", fontSize: 12, color: "var(--text-faint)", lineHeight: 1.5 } }, dialog.itemsFooter)) : /* @__PURE__ */ React.createElement(React.Fragment, null, dialog.bigNumber && /* @__PURE__ */ React.createElement("div", { style: {
+    padding: "8px 20px 14px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 4
+  } }, /* @__PURE__ */ React.createElement("div", { style: {
+    fontSize: 44,
+    fontWeight: 700,
+    color: "var(--pink-text)",
+    letterSpacing: 1,
+    lineHeight: 1.1,
+    fontVariantNumeric: "tabular-nums"
+  } }, dialog.bigNumber.value), dialog.bigNumber.label && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", letterSpacing: 0.5 } }, dialog.bigNumber.label)), dialog.messageList && /* @__PURE__ */ React.createElement("div", { style: {
+    padding: "4px 20px 14px",
+    fontSize: 14,
+    color: "var(--text-dim)",
+    lineHeight: 1.6,
+    whiteSpace: "pre-wrap"
+  } }, dialog.messageList.before && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, dialog.messageList.before), Array.isArray(dialog.messageList.items) && dialog.messageList.items.length > 0 && /* @__PURE__ */ React.createElement("div", { style: {
+    margin: "0 0 10px",
+    display: "flex",
+    flexDirection: "column",
+    gap: 6
+  } }, dialog.messageList.items.map((it, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { color: "var(--text)", fontWeight: 500 } }, it))), dialog.messageList.after && /* @__PURE__ */ React.createElement("div", null, dialog.messageList.after)), dialog.message && !dialog.messageList && (() => {
+    const rawText = dialog.message;
+    const lines = rawText.split("\n").map((l) => l.trim()).filter(Boolean);
+    const warningPatterns = [
+      /^[•·・]?\s*此動作無法復原[。.]?$/,
+      /^[•·・]?\s*無法復原[。.]?$/,
+      /^[•·・]?\s*.*無法還原[。.]?$/,
+      /^[•·・]?\s*.*無法復原[,,].*$/
+    ];
+    const titleHasDelete = (dialog.title || "").includes("\u522A\u9664") || (dialog.title || "").includes("\u6E05\u9664") || (dialog.title || "").includes("\u79FB\u9664");
+    const dedupePattern = /^確定要(刪除|清除|移除).*嗎[?？]?$/;
+    const filteredLines = [];
+    const extractedWarnings = [];
+    lines.forEach((line, idx) => {
+      if (warningPatterns.some((re) => re.test(line))) {
+        extractedWarnings.push(line.replace(/^[•·・]\s*/, "").replace(/[。.]$/, ""));
+      } else if (idx === 0 && titleHasDelete && dedupePattern.test(line)) {
+      } else {
+        filteredLines.push(line);
+      }
+    });
+    const effectiveMessage = filteredLines.join("\n");
+    const autoWarning = extractedWarnings.length > 0 ? extractedWarnings.join("\u3001") : null;
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, effectiveMessage && (() => {
+      const msgLines = effectiveMessage.split("\n");
+      const headline = [];
+      const bullets = [];
+      const trailing = [];
+      let phase = "head";
+      msgLines.forEach((line) => {
+        const trimmed = line.trim();
+        const isBullet = /^[•·・]\s/.test(trimmed);
+        if (isBullet) {
+          phase = "bullet";
+          bullets.push(trimmed.replace(/^[•·・]\s*/, ""));
+        } else if (phase === "head") {
+          if (trimmed) headline.push(trimmed);
+        } else {
+          if (trimmed) trailing.push(trimmed);
+        }
+      });
+      const renderHighlighted = (text) => {
+        const quantRe = /\d+(?:,\d+)*\s*(?:筆|個|項|張|次|天|月|年)/;
+        const virtualRe = /\(已刪\)|\(虛\)/;
+        const userWords = Array.isArray(dialog.highlightWords) ? dialog.highlightWords.filter(Boolean) : [];
+        const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const sortedUserWords = [...userWords].sort((a, b) => b.length - a.length);
+        const userRe = sortedUserWords.length > 0 ? sortedUserWords.map(esc).join("|") : null;
+        const fullRe = userRe ? new RegExp(`(${quantRe.source}|${virtualRe.source}|${userRe})`, "g") : new RegExp(`(${quantRe.source}|${virtualRe.source})`, "g");
+        const parts = text.split(fullRe);
+        const quantTest = new RegExp(`^${quantRe.source}$`);
+        const virtualTest = new RegExp(`^${virtualRe.source}$`);
+        const userTest = userRe ? new RegExp(`^(?:${userRe})$`) : null;
+        return parts.map((part, i) => {
+          if (!part) return null;
+          if (virtualTest.test(part)) {
+            const isDeleted = part === "(\u5DF2\u522A)";
+            const label = isDeleted ? "\u5E33\u865F\u5DF2\u522A" : "\u865B\u64EC";
+            return /* @__PURE__ */ React.createElement("span", { key: i, style: {
+              color: isDeleted ? "var(--text-faint)" : "var(--mint)",
+              fontSize: 11,
+              fontWeight: 500,
+              marginLeft: 4,
+              padding: "1px 6px",
+              borderRadius: 4,
+              background: isDeleted ? "rgba(140, 140, 140, 0.12)" : "rgba(126, 224, 192, 0.12)",
+              verticalAlign: "middle",
+              display: "inline-block"
+            } }, label);
+          }
+          if (quantTest.test(part)) {
+            const m = part.match(/^(\d+(?:,\d+)*)\s*(.+)$/);
+            if (m) {
+              return /* @__PURE__ */ React.createElement("span", { key: i, style: { color: "var(--pink)", fontWeight: 700, marginRight: 2 } }, m[1], /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 4 } }, m[2]));
+            }
+            return /* @__PURE__ */ React.createElement("span", { key: i, style: { color: "var(--pink)", fontWeight: 700, marginRight: 2 } }, part);
+          }
+          if (userTest && userTest.test(part)) {
+            return /* @__PURE__ */ React.createElement("span", { key: i, style: {
+              color: isDanger ? "var(--pink)" : "var(--highlight)",
+              fontWeight: 700
+            } }, part);
+          }
+          return /* @__PURE__ */ React.createElement(React.Fragment, { key: i }, part);
+        });
+      };
+      if (bullets.length === 0) {
+        return /* @__PURE__ */ React.createElement("div", { style: {
+          padding: dialog.bigNumber ? "0 20px 14px" : dialog.target ? "0 20px 10px" : "4px 20px 8px",
+          fontSize: 14,
+          color: "var(--text-dim)",
+          lineHeight: 1.6,
+          whiteSpace: "pre-wrap",
+          textAlign: dialog.bigNumber ? "center" : "left"
+        } }, renderHighlighted(effectiveMessage));
+      }
+      return /* @__PURE__ */ React.createElement("div", { style: {
+        padding: dialog.target ? "4px 20px 6px" : "14px 20px 6px"
+      } }, headline.length > 0 && /* @__PURE__ */ React.createElement("div", { style: {
+        fontSize: 15,
+        color: "var(--text)",
+        fontWeight: 600,
+        lineHeight: 1.5,
+        marginBottom: 10
+      } }, renderHighlighted(headline.join("\n"))), /* @__PURE__ */ React.createElement("div", { style: {
+        background: "var(--bg)",
+        borderRadius: 10,
+        padding: "4px 14px",
+        display: "flex",
+        flexDirection: "column"
+      } }, bullets.map((b, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: {
+        fontSize: 13,
+        color: "var(--text-dim)",
+        lineHeight: 1.55,
+        display: "flex",
+        gap: 8,
+        padding: "10px 0",
+        borderTop: i > 0 ? "1px solid var(--text-faint)" : "none",
+        opacity: 1
+      } }, /* @__PURE__ */ React.createElement("span", { style: {
+        color: "var(--text-faint)",
+        flexShrink: 0,
+        marginTop: 1
+      } }, "\u2022"), /* @__PURE__ */ React.createElement("span", null, renderHighlighted(b))))), trailing.length > 0 && /* @__PURE__ */ React.createElement("div", { style: {
+        fontSize: 14,
+        color: "var(--text-dim)",
+        lineHeight: 1.6,
+        marginTop: 10
+      } }, renderHighlighted(trailing.join("\n"))));
+    })(), !dialog.warning && autoWarning && /* @__PURE__ */ React.createElement("div", { style: {
+      margin: effectiveMessage ? "0 16px 4px" : "4px 16px 4px",
+      padding: "8px 12px",
+      background: "rgba(245, 181, 192, 0.08)",
+      borderRadius: 6,
+      fontSize: 12.5,
+      color: "var(--pink-text)",
+      fontWeight: 500,
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "warning", size: 13, color: "var(--pink-text)" }), /* @__PURE__ */ React.createElement("span", null, autoWarning)));
+  })(), dialog.warning && /* @__PURE__ */ React.createElement("div", { style: {
+    margin: "0 16px 14px",
+    padding: "8px 12px",
+    background: "rgba(245, 181, 192, 0.08)",
+    borderRadius: 6,
+    fontSize: 13,
+    color: "var(--pink-text)",
+    fontWeight: 500,
+    display: "flex",
+    alignItems: "center",
+    gap: 8
+  } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "warning", size: 14, color: "var(--pink-text)" }), /* @__PURE__ */ React.createElement("span", null, dialog.warning))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "8px 16px 16px" } }, !dialog.singleAction && /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      style: {
+        flex: 1,
+        border: "1px solid var(--pink)",
+        borderRadius: 12,
+        padding: "11px 0",
+        fontSize: 15,
+        fontWeight: 600,
+        background: "transparent",
+        color: "var(--pink-text)",
+        cursor: "pointer",
+        boxSizing: "border-box"
+      },
+      onClick: onClose
+    },
+    "\u53D6\u6D88"
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      style: {
+        ...styles.saveBtn,
+        flex: 1,
+        padding: "12px 0",
+        background: isDanger && hasChanges ? "var(--mint)" : isDanger ? "var(--pink)" : "var(--mint)",
+        color: "var(--on-mint)",
+        marginTop: 0,
+        opacity: locked ? 0.4 : 1,
+        cursor: locked ? "not-allowed" : "pointer",
+        boxSizing: "border-box"
+      },
+      onClick: async () => {
+        if (locked) return;
+        const fn = dialog.onConfirm;
+        const before = dialog.beforeConfirm;
+        if (before) {
+          onClose();
+          try {
+            await before();
+          } catch {
+          }
+          if (fn) fn();
+        } else {
+          onClose();
+          if (fn) fn();
+        }
+      }
+    },
+    dialog.confirmText || "\u78BA\u5B9A"
+  ))));
+}
+function EditOrderButton({ editMode, setEditMode }) {
+  if (editMode) return null;
+  return /* @__PURE__ */ React.createElement("button", { style: styles.editOrderBtn, onClick: () => setEditMode && setEditMode(true) }, "\u7DE8\u8F2F\u6392\u5E8F");
+}
+function ListSortControl({ sortMode, setSortMode }) {
+  const [open, setOpen] = useState(false);
+  const current = LIST_SORT_OPTIONS.find((o) => o.value === sortMode) || LIST_SORT_OPTIONS[0];
+  const shortLabel = sortMode === "date_desc" ? "\u65E5\u671F\u2193" : sortMode === "date_asc" ? "\u65E5\u671F\u2191" : sortMode === "amount_desc" ? "\u91D1\u984D\u2193" : "\u91D1\u984D\u2191";
+  return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+    "span",
+    {
+      style: {
+        fontSize: 11,
+        padding: "6px 4px 6px 8px",
+        color: "var(--text-dim)",
+        cursor: "pointer",
+        WebkitTapHighlightColor: "transparent",
+        userSelect: "none",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 2,
+        lineHeight: 1,
+        opacity: 0.85
+      },
+      onClick: (e) => {
+        e.stopPropagation();
+        setOpen(true);
+      }
+    },
+    shortLabel,
+    /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, opacity: 0.7 } }, "\u25BE")
+  ), open && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setOpen(false) }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerCard, maxWidth: 320 }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, "\u8CC7\u6599\u6392\u5E8F\u65B9\u5F0F"), /* @__PURE__ */ React.createElement("div", { style: { padding: "4px 8px 12px" } }, LIST_SORT_OPTIONS.map((opt) => {
+    const active = opt.value === sortMode;
+    return /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: opt.value,
+        style: {
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "12px 14px",
+          borderRadius: 10,
+          background: active ? "rgba(126,224,192,0.10)" : "transparent",
+          border: active ? "1.5px solid var(--mint)" : "1.5px solid transparent",
+          color: "var(--text)",
+          cursor: "pointer",
+          textAlign: "left",
+          marginBottom: 4
+        },
+        onClick: () => {
+          setSortMode(opt.value);
+          setOpen(false);
+        }
+      },
+      /* @__PURE__ */ React.createElement("span", { style: {
+        width: 18,
+        height: 18,
+        borderRadius: "50%",
+        border: active ? "5px solid var(--mint)" : "1.5px solid var(--border)",
+        flexShrink: 0,
+        background: active ? "var(--bg-card)" : "transparent",
+        transition: "all 0.15s"
+      } }),
+      /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, fontWeight: active ? 600 : 400 } }, opt.label)
+    );
+  })))));
+}
+function EditModeBanner({ editMode, setEditMode }) {
+  if (!editMode) return null;
+  return /* @__PURE__ */ React.createElement("div", { style: styles.editModeBannerFloat }, /* @__PURE__ */ React.createElement("span", null, "\u7DE8\u8F2F\u6392\u5E8F\u6A21\u5F0F"), /* @__PURE__ */ React.createElement("button", { style: styles.editDoneBtn, onClick: () => setEditMode(false) }, "\u5B8C\u6210"));
+}
+function Block({ blockKey, title, headerRight, editMode, isFirst, isLast, onMoveUp, onMoveDown, onReorder, children, inline, compactInline, disableReorder }) {
+  const elRef = React.useRef(null);
+  const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
+  const onReorderRef = React.useRef(onReorder);
+  React.useEffect(() => {
+    onReorderRef.current = onReorder;
+  }, [onReorder]);
+  React.useEffect(() => {
+    if (!editMode || disableReorder) return;
+    const el = elRef.current;
+    if (!el) return;
+    el.style.removeProperty("display");
+    let draggedEl = null;
+    let placeholder = null;
+    let dragOffsetY = 0;
+    let startY = null;
+    let startX = null;
+    let moved = false;
+    let lastBoundary = null;
+    let boundaryToastEl = null;
+    let boundaryToastTimer = null;
+    const showBoundaryToast = (type) => {
+      if (boundaryToastEl) boundaryToastEl.remove();
+      if (boundaryToastTimer) clearTimeout(boundaryToastTimer);
+      const isTop = type === "top";
+      const arrow = isTop ? '<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="6"/><polyline points="5 13 12 6 19 13"/><line x1="5" y1="4" x2="19" y2="4" opacity="0.6"/></svg>' : '<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="18"/><polyline points="19 11 12 18 5 11"/><line x1="5" y1="20" x2="19" y2="20" opacity="0.6"/></svg>';
+      const text = isTop ? "\u5DF2\u5230\u9802\u7AEF" : "\u5DF2\u5230\u5E95\u7AEF";
+      boundaryToastEl = document.createElement("div");
+      boundaryToastEl.style.cssText = `
+        position:fixed;
+        top:50%;left:50%;
+        transform:translate(-50%,-50%) scale(0.88);
+        background:linear-gradient(135deg, #8be8cc 0%, #7ee0c0 100%);
+        color:#0a1410;
+        padding:14px 23px;
+        border-radius:17px;
+        font-size:17px;
+        font-weight:600;
+        letter-spacing:0.4px;
+        z-index:10000;
+        pointer-events:none;
+        box-shadow:
+          0 14px 38px rgba(0,0,0,0.45),
+          0 0 0 1px rgba(255,255,255,0.15) inset,
+          0 1px 0 rgba(255,255,255,0.3) inset,
+          0 0 60px rgba(126,224,192,0.35);
+        display:flex;
+        align-items:center;
+        gap:10px;
+        opacity:0;
+        transition:transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s ease-out;
+      `;
+      boundaryToastEl.innerHTML = `<span style="display:flex;align-items:center;opacity:0.85;">${arrow}</span><span>${text}</span>`;
+      document.body.appendChild(boundaryToastEl);
+      requestAnimationFrame(() => {
+        if (boundaryToastEl) {
+          boundaryToastEl.style.transform = "translate(-50%,-50%) scale(1)";
+          boundaryToastEl.style.opacity = "1";
+        }
+      });
+      boundaryToastTimer = setTimeout(() => {
+        if (boundaryToastEl) {
+          boundaryToastEl.style.opacity = "0";
+          boundaryToastEl.style.transform = "translate(-50%,-50%) scale(0.95)";
+          const toRemove = boundaryToastEl;
+          boundaryToastEl = null;
+          setTimeout(() => toRemove.remove(), 180);
+        }
+        boundaryToastTimer = null;
+      }, 700);
+      if (navigator.vibrate) navigator.vibrate([20, 40, 20]);
+    };
+    let dragClone = null;
+    const cleanupStray = () => {
+      document.querySelectorAll('[data-placeholder="true"]').forEach((n) => n.remove());
+      document.querySelectorAll('[data-drag-clone="true"]').forEach((n) => n.remove());
+    };
+    let dragScroller = null;
+    const startDragging = (clientX, clientY) => {
+      cleanupStray();
+      document.querySelectorAll("[data-block-key]").forEach((n) => {
+        if (n !== el && n.style.display === "none") n.style.removeProperty("display");
+      });
+      draggedEl = el;
+      const rect = el.getBoundingClientRect();
+      dragOffsetY = clientY - rect.top;
+      dragScroller = el.closest("[data-scroll-container]");
+      if (!dragScroller) {
+        let node = el.parentNode;
+        while (node && node !== document.body) {
+          const os = getComputedStyle(node).overflowY;
+          if ((os === "auto" || os === "scroll") && node.scrollHeight > node.clientHeight) {
+            dragScroller = node;
+            break;
+          }
+          node = node.parentNode;
+        }
+      }
+      placeholder = document.createElement("div");
+      placeholder.setAttribute("data-placeholder", "true");
+      placeholder.style.cssText = `height:${rect.height}px;margin:0;border-radius:12px;background:rgba(126,224,192,0.18);border:2px dashed rgba(126,224,192,0.85);box-sizing:border-box;transition:none;display:flex;align-items:center;justify-content:center;overflow:hidden;`;
+      const labelEl = document.createElement("div");
+      const sizeCandidates = [18, 15, 13, 11];
+      const charCount = 4;
+      const horizontalPadding = 24;
+      const minHeightFor = (fs) => fs + 8;
+      const minWidthFor = (fs) => charCount * (fs + 1) + horizontalPadding;
+      let chosen = null;
+      for (const fs of sizeCandidates) {
+        if (rect.height >= minHeightFor(fs) && rect.width >= minWidthFor(fs)) {
+          chosen = fs;
+          break;
+        }
+      }
+      const showText = chosen !== null;
+      const fontSize = chosen ?? 11;
+      labelEl.style.cssText = `color:var(--mint, #7ee0c0);font-size:${fontSize}px;font-weight:600;letter-spacing:1px;opacity:0.85;pointer-events:none;white-space:nowrap;`;
+      labelEl.textContent = showText ? "\u653E\u5728\u9019\u88E1" : "\u2022 \u2022 \u2022";
+      placeholder.appendChild(labelEl);
+      el.parentNode.insertBefore(placeholder, el);
+      dragClone = el.cloneNode(true);
+      dragClone.setAttribute("data-drag-clone", "true");
+      const elRadius = getComputedStyle(el).borderRadius || "12px";
+      dragClone.style.cssText = `position:fixed;top:${rect.top}px;left:${rect.left}px;width:${rect.width}px;z-index:9998;opacity:0.55;transform:scale(1.03) rotate(-0.5deg);box-shadow:0 16px 40px rgba(0,0,0,0.6), 0 0 0 2px rgba(126,224,192,0.4);pointer-events:none;margin:0;border-radius:${elRadius};`;
+      document.body.appendChild(dragClone);
+      el.style.display = "none";
+      document.body.style.touchAction = "none";
+      document.body.style.userSelect = "none";
+      document.body.style.webkitUserSelect = "none";
+      document.body.setAttribute("data-drag-active", "true");
+      if (navigator.vibrate) navigator.vibrate(30);
+    };
+    let autoScrollRaf = null;
+    let autoScrollSpeed = 0;
+    const autoScrollTick = () => {
+      if (autoScrollSpeed === 0) {
+        autoScrollRaf = null;
+        return;
+      }
+      if (dragScroller && dragScroller !== document.body) {
+        dragScroller.scrollTop += autoScrollSpeed;
+      } else {
+        window.scrollBy(0, autoScrollSpeed);
+      }
+      autoScrollRaf = requestAnimationFrame(autoScrollTick);
+    };
+    const startAutoScroll = () => {
+      if (autoScrollRaf) return;
+      autoScrollRaf = requestAnimationFrame(autoScrollTick);
+    };
+    const stopAutoScroll = () => {
+      if (autoScrollRaf) {
+        cancelAnimationFrame(autoScrollRaf);
+        autoScrollRaf = null;
+      }
+      autoScrollSpeed = 0;
+    };
+    const moveDragging = (clientY) => {
+      if (!draggedEl || !placeholder || !dragClone) return;
+      const EDGE_TOP = 120;
+      const EDGE_BOTTOM = 80;
+      const MAX_SPEED = 14;
+      const viewportH = window.innerHeight;
+      if (clientY < EDGE_TOP) {
+        const ratio = (EDGE_TOP - clientY) / EDGE_TOP;
+        autoScrollSpeed = -Math.max(2, Math.ceil(ratio * ratio * MAX_SPEED));
+        startAutoScroll();
+      } else if (clientY > viewportH - EDGE_BOTTOM) {
+        const ratio = (clientY - (viewportH - EDGE_BOTTOM)) / EDGE_BOTTOM;
+        autoScrollSpeed = Math.max(2, Math.ceil(ratio * ratio * MAX_SPEED));
+        startAutoScroll();
+      } else {
+        stopAutoScroll();
+      }
+      const parent = placeholder.parentNode;
+      if (!parent) return;
+      const siblings = Array.from(parent.children).filter(
+        (c) => c !== draggedEl && c !== placeholder && c.hasAttribute("data-block-key")
+      );
+      let insertedBefore = null;
+      for (const sib of siblings) {
+        const r = sib.getBoundingClientRect();
+        const mid = r.top + r.height / 2;
+        if (clientY < mid) {
+          insertedBefore = sib;
+          break;
+        }
+      }
+      if (insertedBefore) {
+        parent.insertBefore(placeholder, insertedBefore);
+      } else {
+        const last = siblings[siblings.length - 1];
+        if (last) parent.insertBefore(placeholder, last.nextSibling);
+      }
+      const allChildren = Array.from(parent.children);
+      const phIdx = allChildren.indexOf(placeholder);
+      let hasBlockBefore = false;
+      let hasBlockAfter = false;
+      for (let i = 0; i < allChildren.length; i++) {
+        const c = allChildren[i];
+        if (c === placeholder || c === draggedEl) continue;
+        if (!c.hasAttribute("data-block-key")) continue;
+        if (i < phIdx) hasBlockBefore = true;
+        else hasBlockAfter = true;
+      }
+      const atTop = !hasBlockBefore;
+      const atBottom = !hasBlockAfter;
+      const currentBoundary = atTop ? "top" : atBottom ? "bottom" : null;
+      if (currentBoundary !== lastBoundary) {
+        if (currentBoundary === "top") showBoundaryToast("top");
+        else if (currentBoundary === "bottom") showBoundaryToast("bottom");
+        lastBoundary = currentBoundary;
+      }
+      const phRect = placeholder.getBoundingClientRect();
+      let finalTop = clientY - dragOffsetY;
+      if (atTop && clientY < phRect.top) {
+        const maxTop = phRect.top - dragOffsetY;
+        const overshoot = maxTop - finalTop;
+        finalTop = maxTop - overshoot / 3;
+      } else if (atBottom && clientY > phRect.bottom) {
+        const minTop = phRect.bottom - dragOffsetY - (dragClone.offsetHeight || 60);
+        const maxClientY = phRect.bottom;
+        const overshoot = clientY - maxClientY;
+        finalTop = maxClientY - dragOffsetY + overshoot / 3;
+      }
+      dragClone.style.top = finalTop + "px";
+    };
+    const endDragging = () => {
+      if (!draggedEl) return;
+      stopAutoScroll();
+      const parent = placeholder ? placeholder.parentNode : null;
+      let newOrder = null;
+      if (parent) {
+        const keys = [];
+        Array.from(parent.children).forEach((c) => {
+          if (c === placeholder) {
+            keys.push(blockKey);
+          } else if (c !== draggedEl && c.hasAttribute("data-block-key")) {
+            keys.push(c.getAttribute("data-block-key"));
+          }
+        });
+        newOrder = keys;
+      }
+      if (placeholder) {
+        placeholder.remove();
+        placeholder = null;
+      }
+      if (dragClone) {
+        dragClone.remove();
+        dragClone = null;
+      }
+      if (draggedEl) {
+        draggedEl.style.removeProperty("display");
+        draggedEl.style.removeProperty("visibility");
+      }
+      draggedEl = null;
+      lastBoundary = null;
+      if (boundaryToastEl) {
+        boundaryToastEl.remove();
+        boundaryToastEl = null;
+      }
+      if (boundaryToastTimer) {
+        clearTimeout(boundaryToastTimer);
+        boundaryToastTimer = null;
+      }
+      document.body.style.removeProperty("touch-action");
+      document.body.style.removeProperty("user-select");
+      document.body.style.removeProperty("-webkit-user-select");
+      document.body.removeAttribute("data-drag-active");
+      if (newOrder && onReorderRef.current) onReorderRef.current(newOrder);
+    };
+    let longPressTimer = null;
+    const onTouchStart = (e) => {
+      if (e.target.closest("input, select, textarea, button")) return;
+      const t = e.touches[0];
+      startX = t.clientX;
+      startY = t.clientY;
+      moved = false;
+      longPressTimer = setTimeout(() => {
+        longPressTimer = null;
+        startDragging(startX, startY);
+      }, 400);
+    };
+    const onTouchMove = (e) => {
+      const t = e.touches[0];
+      if (longPressTimer) {
+        if (Math.abs(t.clientX - startX) > 10 || Math.abs(t.clientY - startY) > 10) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+        return;
+      }
+      if (!draggedEl) return;
+      if (Math.abs(t.clientX - startX) > 3 || Math.abs(t.clientY - startY) > 3) moved = true;
+      moveDragging(t.clientY);
+      if (e.cancelable) e.preventDefault();
+    };
+    const onTouchEnd = () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+      if (draggedEl) endDragging();
+    };
+    const onTouchCancel = () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    };
+    let mouseLongPressTimer = null;
+    const onMouseDown = (e) => {
+      if (e.target.closest("input, select, textarea, button")) return;
+      startX = e.clientX;
+      startY = e.clientY;
+      moved = false;
+      mouseLongPressTimer = setTimeout(() => {
+        mouseLongPressTimer = null;
+        startDragging(startX, startY);
+      }, 400);
+    };
+    const onMouseMove = (e) => {
+      if (mouseLongPressTimer) {
+        if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) {
+          clearTimeout(mouseLongPressTimer);
+          mouseLongPressTimer = null;
+        }
+        return;
+      }
+      if (!draggedEl) return;
+      moveDragging(e.clientY);
+    };
+    const onMouseUp = () => {
+      if (mouseLongPressTimer) {
+        clearTimeout(mouseLongPressTimer);
+        mouseLongPressTimer = null;
+      }
+      if (draggedEl) endDragging();
+    };
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
+    document.addEventListener("touchend", onTouchEnd);
+    document.addEventListener("touchcancel", onTouchCancel);
+    el.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    return () => {
+      if (longPressTimer) clearTimeout(longPressTimer);
+      if (mouseLongPressTimer) clearTimeout(mouseLongPressTimer);
+      el.removeEventListener("touchstart", onTouchStart);
+      document.removeEventListener("touchmove", onTouchMove);
+      document.removeEventListener("touchend", onTouchEnd);
+      document.removeEventListener("touchcancel", onTouchCancel);
+      el.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      if (autoScrollRaf) cancelAnimationFrame(autoScrollRaf);
+      if (dragClone && dragClone.parentNode) {
+        dragClone.remove();
+      }
+      if (draggedEl) {
+        draggedEl.style.removeProperty("display");
+        draggedEl.style.removeProperty("visibility");
+      }
+      if (placeholder && placeholder.parentNode) {
+        placeholder.remove();
+      }
+      document.body.style.removeProperty("touch-action");
+      document.body.style.removeProperty("user-select");
+      document.body.style.removeProperty("-webkit-user-select");
+      document.body.removeAttribute("data-drag-active");
+      if (boundaryToastEl) boundaryToastEl.remove();
+      if (boundaryToastTimer) clearTimeout(boundaryToastTimer);
+    };
+  }, [editMode, blockKey]);
+  if (inline && !editMode) {
+    return /* @__PURE__ */ React.createElement("div", { style: { ...styles.blockInline, ...compactInline ? { marginBottom: 0 } : {} } }, title && /* @__PURE__ */ React.createElement("div", { style: styles.blockInlineTitle }, title), /* @__PURE__ */ React.createElement("div", { style: styles.blockInlineContent }, children), headerRight && /* @__PURE__ */ React.createElement("div", { style: styles.blockInlineRight }, headerRight));
+  }
+  const isCompactEditMode = editMode && compactInline;
+  const isCompactView = !editMode && compactInline;
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      ref: elRef,
+      "data-block-key": blockKey,
+      style: {
+        ...styles.block,
+        ...editMode ? styles.blockEdit : {},
+        ...editMode ? { cursor: "grab" } : {},
+        ...isCompactEditMode ? { padding: "3px 6px", marginBottom: 2 } : {},
+        ...isCompactView ? { padding: 0, marginBottom: 0, border: "none" } : {}
+      }
+    },
+    (title || editMode) && !isCompactEditMode && /* @__PURE__ */ React.createElement("div", { style: styles.blockHeader }, /* @__PURE__ */ React.createElement("div", { style: styles.blockTitle }, editMode && /* @__PURE__ */ React.createElement("span", { style: styles.blockHandle }, "\u2630"), /* @__PURE__ */ React.createElement("span", null, title)), editMode && !disableReorder ? /* @__PURE__ */ React.createElement("div", { style: styles.blockMoveBtns }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: { ...styles.moveBtn, opacity: isFirst ? 0.3 : 1 },
+        onClick: (e) => {
+          e.stopPropagation();
+          if (!isFirst) onMoveUp();
+        },
+        disabled: isFirst
+      },
+      "\u2191"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: { ...styles.moveBtn, opacity: isLast ? 0.3 : 1 },
+        onClick: (e) => {
+          e.stopPropagation();
+          if (!isLast) onMoveDown();
+        },
+        disabled: isLast
+      },
+      "\u2193"
+    )) : headerRight),
+    /* @__PURE__ */ React.createElement("div", { style: editMode ? { pointerEvents: "none" } : {} }, children)
+  );
+}
+function LendDetailSheet({ state, lendOut, onClose, onCollect, onEdit, onDelete, setConfirmDialog, toast, toastRich }) {
+  const swipe = useSwipeBack(onClose);
+  const [showCollectSheet, setShowCollectSheet] = useState(false);
+  const [collectMode, setCollectMode] = useState("full");
+  const [collectAccountId, setCollectAccountId] = useState(state.accounts.find((a) => !a.isSystem)?.id || "");
+  const [partialAmount, setPartialAmount] = useState("");
+  const fromAcct = state.accounts.find((a) => a.id === lendOut.accountId);
+  const remaining = lendOut.amount - (lendOut.lendMeta?.collectedAmount || 0);
+  const expDate = lendOut.lendMeta?.expectDate;
+  const debtor = lendOut.lendMeta?.debtor;
+  const isPartial = lendOut.lendMeta?.status === "partial";
+  const today = todayStr();
+  const overdue = expDate && expDate < today;
+  const collectRecords = state.transactions.filter((t) => t.lendId === lendOut.lendId && t.transferRole === "lend_collect_in").sort((a, b) => b.date.localeCompare(a.date));
+  const handleConfirmCollect = () => {
+    const amt = collectMode === "full" ? remaining : parseFloat(partialAmount);
+    if (!amt || isNaN(amt) || amt <= 0) {
+      toast && toast("\u8ACB\u8F38\u5165\u6709\u6548\u91D1\u984D");
+      return;
+    }
+    if (amt > remaining) {
+      toast && toast(`\u91D1\u984D\u8D85\u904E\u672A\u6536\u56DE\u9918\u984D(${fmt(remaining)})`);
+      return;
+    }
+    if (!collectAccountId) {
+      toast && toast("\u8ACB\u9078\u64C7\u6536\u56DE\u5230\u7684\u5E33\u6236");
+      return;
+    }
+    onCollect(lendOut, amt, collectAccountId);
+    setShowCollectSheet(false);
+    onClose();
+  };
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-sheet": "true",
+      style: {
+        ...styles.sheet,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: { width: 80 } }), /* @__PURE__ */ React.createElement("div", { style: { ...styles.sheetTitle, color: "var(--text)" } }, "\u4EE3\u588A\u8A73\u7D30"), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 80, display: "flex", justifyContent: "flex-end", paddingRight: 12 } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          background: "transparent",
+          border: "none",
+          color: "var(--text-dim)",
+          fontSize: 22,
+          cursor: "pointer",
+          padding: 4
+        },
+        onClick: onClose
+      },
+      "\xD7"
+    ))),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: {
+      margin: "8px 16px 16px",
+      padding: 20,
+      borderRadius: 16,
+      background: "rgba(126,224,192,0.08)",
+      border: "1.5px solid var(--mint)"
+    } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 4 } }, "\u672A\u6536\u56DE\u9918\u984D"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 36, fontWeight: 700, color: "var(--mint-text)", letterSpacing: "-0.5px" } }, fmt(remaining)), isPartial && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 6 } }, "\u539F\u4EE3\u588A ", fmt(lendOut.amount), ",\u5DF2\u6536\u56DE ", fmt(lendOut.lendMeta.collectedAmount))), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 16px", borderRadius: 12, background: "var(--bg-card-2, rgba(127,127,127,0.05))", overflow: "hidden" } }, debtor && /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 16px", borderBottom: "1px solid var(--border-soft)", display: "flex", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", fontSize: 13 } }, "\u5C0D\u65B9"), /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 500 } }, debtor)), /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 16px", borderBottom: "1px solid var(--border-soft)", display: "flex", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", fontSize: 13 } }, "\u4ED8\u6B3E\u5E33\u6236"), /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 500 } }, fromAcct?.name || "(\u672A\u77E5)")), /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 16px", borderBottom: "1px solid var(--border-soft)", display: "flex", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", fontSize: 13 } }, "\u4EE3\u588A\u65E5\u671F"), /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 500 } }, lendOut.date.replace(/-/g, "/"))), /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 16px", borderBottom: "1px solid var(--border-soft)", display: "flex", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", fontSize: 13 } }, "\u9810\u8A08\u6536\u56DE"), /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 500, color: overdue ? "var(--pink)" : "var(--text)" } }, expDate ? `${expDate.replace(/-/g, "/")}${overdue ? " (\u903E\u671F)" : ""}` : "\u672A\u8A2D\u5B9A")), /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", fontSize: 13, flexShrink: 0 } }, "\u5099\u8A3B"), /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 500, textAlign: "right", wordBreak: "break-word" } }, lendOut.note || "\u2014"))), collectRecords.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", padding: "0 4px 6px" } }, "\u5DF2\u6536\u56DE\u7D00\u9304"), /* @__PURE__ */ React.createElement("div", { style: { borderRadius: 12, background: "var(--bg-card-2, rgba(127,127,127,0.05))", overflow: "hidden" } }, collectRecords.map((r, i) => {
+      const acc = state.accounts.find((a) => a.id === r.accountId);
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: r.id,
+          style: {
+            padding: "10px 16px",
+            display: "flex",
+            justifyContent: "space-between",
+            borderBottom: i === collectRecords.length - 1 ? "none" : "1px solid var(--border-soft)"
+          }
+        },
+        /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13 } }, r.date.replace(/-/g, "/")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)" } }, "\u6536\u56DE\u5230 ", acc?.name || "(\u672A\u77E5)")),
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: "var(--mint-text)" } }, "+", fmt(r.amount))
+      );
+    }))), /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          padding: "14px",
+          borderRadius: 12,
+          border: "none",
+          cursor: "pointer",
+          background: "var(--mint)",
+          color: "var(--on-mint)",
+          fontSize: 15,
+          fontWeight: 600
+        },
+        onClick: () => {
+          setCollectMode("full");
+          setShowCollectSheet(true);
+        }
+      },
+      "\u5168\u984D\u6536\u56DE(",
+      fmt(remaining),
+      ")"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          padding: "14px",
+          borderRadius: 12,
+          border: "1.5px solid var(--mint)",
+          cursor: "pointer",
+          background: "transparent",
+          color: "var(--mint-text)",
+          fontSize: 15,
+          fontWeight: 600
+        },
+        onClick: () => {
+          setCollectMode("partial");
+          setPartialAmount("");
+          setShowCollectSheet(true);
+        }
+      },
+      "\u90E8\u5206\u6536\u56DE"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          padding: "12px",
+          borderRadius: 12,
+          border: "none",
+          cursor: "pointer",
+          background: "transparent",
+          color: "var(--text-dim)",
+          fontSize: 14
+        },
+        onClick: () => onEdit(lendOut)
+      },
+      "\u7DE8\u8F2F\u4EE3\u588A\u8CC7\u8A0A"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          padding: "12px",
+          borderRadius: 12,
+          border: "none",
+          cursor: "pointer",
+          background: "transparent",
+          color: "var(--pink)",
+          fontSize: 14
+        },
+        onClick: () => {
+          setConfirmDialog && setConfirmDialog({
+            title: "\u522A\u9664\u4EE3\u588A\u7D00\u9304",
+            message: "\u78BA\u5B9A\u8981\u522A\u9664\u9019\u7B46\u4EE3\u588A\u55CE?\n\u76F8\u95DC\u7684\u6536\u56DE\u7D00\u9304\u4E5F\u6703\u4E00\u4F75\u79FB\u9664\u3002",
+            confirmText: "\u522A\u9664",
+            danger: true,
+            onConfirm: () => {
+              onDelete(lendOut);
+              onClose();
+            }
+          });
+        }
+      },
+      "\u522A\u9664\u9019\u7B46\u4EE3\u588A"
+    ))),
+    showCollectSheet && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowCollectSheet(false) }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerCard, maxWidth: 360 }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, collectMode === "full" ? "\u78BA\u8A8D\u5168\u984D\u6536\u56DE" : "\u90E8\u5206\u6536\u56DE"), /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 20px 20px" } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u6536\u56DE\u91D1\u984D"), collectMode === "full" ? /* @__PURE__ */ React.createElement("div", { style: {
+      fontSize: 28,
+      fontWeight: 700,
+      color: "var(--mint-text)",
+      padding: "8px 12px",
+      borderRadius: 10,
+      background: "rgba(126,224,192,0.10)"
+    } }, fmt(remaining)) : /* @__PURE__ */ React.createElement(
+      CalcTriggerInput,
+      {
+        value: partialAmount,
+        onChange: setPartialAmount,
+        placeholder: `\u6700\u591A ${fmt(remaining)}`,
+        fontSize: 18
+      }
+    )), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u6536\u56DE\u5230"), /* @__PURE__ */ React.createElement(
+      "select",
+      {
+        value: collectAccountId,
+        onChange: (e) => setCollectAccountId(e.target.value),
+        style: {
+          width: "100%",
+          padding: "10px 12px",
+          fontSize: 14,
+          background: "var(--bg-card)",
+          color: "var(--text)",
+          border: "1.5px solid var(--border)",
+          borderRadius: 10,
+          outline: "none",
+          boxSizing: "border-box"
+        }
+      },
+      state.accounts.filter((a) => !a.isSystem).map((a) => /* @__PURE__ */ React.createElement("option", { key: a.id, value: a.id }, a.name))
+    )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          flex: 1,
+          padding: "12px",
+          borderRadius: 10,
+          border: "1.5px solid var(--border)",
+          background: "transparent",
+          color: "var(--text)",
+          cursor: "pointer",
+          fontSize: 14
+        },
+        onClick: () => setShowCollectSheet(false)
+      },
+      "\u53D6\u6D88"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          flex: 1,
+          padding: "12px",
+          borderRadius: 10,
+          border: "none",
+          background: "var(--mint)",
+          color: "var(--on-mint)",
+          cursor: "pointer",
+          fontSize: 14,
+          fontWeight: 600
+        },
+        onClick: handleConfirmCollect
+      },
+      "\u78BA\u8A8D\u6536\u56DE"
+    )))))
+  );
+}
+function SellSheet({ state, account, onClose, onConfirm, toast }) {
+  const swipe = useSwipeBack(onClose);
+  const currentBalance = calcBalance(account, state.transactions);
+  const [principal, setPrincipal] = useState(String(currentBalance > 0 ? currentBalance : 0));
+  const [received, setReceived] = useState("");
+  const [date, setDate] = useState(todayStr());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [note, setNote] = useState("");
+  const defaultToAcct = state.accounts.find((a) => a.id !== account.id && a.type !== "invest" && !a.isSystem);
+  const [toAccountId, setToAccountId] = useState(defaultToAcct?.id || "");
+  const [showToSheet, setShowToSheet] = useState(false);
+  const guessPnlSubLoss = () => {
+    if (account.name.includes("\u7F8E\u80A1")) return "\u7F8E\u80A1\u5931\u5229";
+    if (account.name.includes("\u53F0\u80A1") || account.name.includes("\u80A1\u7968")) return "\u53F0\u80A1\u5931\u5229";
+    return "";
+  };
+  const principalNum = parseFloat(principal) || 0;
+  const receivedNum = parseFloat(received) || 0;
+  const pnl = receivedNum - principalNum;
+  const toAcct = state.accounts.find((a) => a.id === toAccountId);
+  const handleSubmit = () => {
+    if (!principalNum) {
+      toast && toast("\u8ACB\u8F38\u5165\u672C\u91D1");
+      return;
+    }
+    if (principalNum > currentBalance) {
+      toast && toast(`\u672C\u91D1\u4E0D\u80FD\u8D85\u904E\u6295\u8CC7\u5E33\u6236\u9918\u984D(${fmt(currentBalance)})`);
+      return;
+    }
+    if (!received || isNaN(receivedNum)) {
+      toast && toast("\u8ACB\u8F38\u5165\u5BE6\u969B\u62FF\u56DE\u91D1\u984D");
+      return;
+    }
+    if (receivedNum < 0) {
+      toast && toast("\u62FF\u56DE\u91D1\u984D\u4E0D\u80FD\u70BA\u8CA0");
+      return;
+    }
+    if (!toAccountId) {
+      toast && toast("\u8ACB\u9078\u64C7\u6536\u6B3E\u5E33\u6236");
+      return;
+    }
+    onConfirm({
+      fromId: account.id,
+      toId: toAccountId,
+      principal: principalNum,
+      received: receivedNum,
+      date,
+      note: note.trim(),
+      pnlCategory: pnl >= 0 ? "\u80A1\u7968\u76F8\u95DC" : "\u6295\u8CC7\u5931\u5229",
+      pnlSubCategory: pnl >= 0 ? "\u7372\u5229\u4E86\u7D50" : guessPnlSubLoss()
+    });
+  };
+  if (showDatePicker) {
+    return /* @__PURE__ */ React.createElement(
+      DatePicker,
+      {
+        value: date,
+        onChange: setDate,
+        onClose: () => setShowDatePicker(false)
+      }
+    );
+  }
+  const wd = ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][new Date(date).getDay()];
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-sheet": "true",
+      style: {
+        ...styles.sheet,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          background: "transparent",
+          border: "none",
+          color: "var(--text-dim)",
+          fontSize: 22,
+          cursor: "pointer",
+          padding: "6px 12px"
+        },
+        onClick: onClose
+      },
+      "\xD7"
+    ), /* @__PURE__ */ React.createElement("div", { style: { ...styles.sheetTitle, color: "var(--text)" } }, "\u8CE3\u51FA / \u7D50\u7B97"), /* @__PURE__ */ React.createElement("div", { style: { width: 50 } })),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: {
+      margin: "8px 16px 12px",
+      padding: 14,
+      borderRadius: 12,
+      background: "rgba(126,224,192,0.08)",
+      border: "1.5px solid var(--mint)"
+    } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginBottom: 4 } }, "\u8CE3\u51FA\u4F86\u6E90"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 600 } }, account.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 4 } }, "\u76EE\u524D\u9918\u984D:", fmt(currentBalance))), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6, paddingLeft: 4 } }, "\u672C\u91D1(\u6295\u5165\u91D1\u984D)"), /* @__PURE__ */ React.createElement(
+      CalcTriggerInput,
+      {
+        value: principal,
+        onChange: setPrincipal,
+        placeholder: "0",
+        fontSize: 18,
+        style: { padding: "12px 14px", borderRadius: 12 }
+      }
+    ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 4, paddingLeft: 4 } }, "\u9810\u8A2D\u5E36\u5165\u6295\u8CC7\u5E33\u6236\u7576\u524D\u9918\u984D;\u90E8\u5206\u8CE3\u51FA\u6642\u8ACB\u624B\u52D5\u8F38\u5165")), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6, paddingLeft: 4 } }, "\u5BE6\u969B\u62FF\u56DE"), /* @__PURE__ */ React.createElement(
+      CalcTriggerInput,
+      {
+        value: received,
+        onChange: setReceived,
+        placeholder: "0",
+        fontSize: 18,
+        style: { padding: "12px 14px", borderRadius: 12 }
+      }
+    )), received !== "" && !isNaN(receivedNum) && principalNum > 0 && /* @__PURE__ */ React.createElement("div", { style: {
+      margin: "0 16px 14px",
+      padding: "12px 16px",
+      borderRadius: 12,
+      background: pnl > 0 ? "rgba(126,224,192,0.10)" : pnl < 0 ? "rgba(229,129,138,0.10)" : "var(--bg-card-2, rgba(127,127,127,0.05))",
+      border: pnl > 0 ? "1.5px solid var(--mint)" : pnl < 0 ? "1.5px solid var(--pink)" : "1.5px solid var(--border)",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-dim)" } }, pnl > 0 ? "\u7372\u5229" : pnl < 0 ? "\u8667\u640D" : "\u640D\u76CA"), /* @__PURE__ */ React.createElement("div", { style: {
+      fontSize: 22,
+      fontWeight: 700,
+      color: pnl > 0 ? "var(--mint-text)" : pnl < 0 ? "var(--pink-text)" : "var(--text-dim)"
+    } }, pnl > 0 ? "+" : pnl < 0 ? "-" : "", fmt(Math.abs(pnl)))), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6, paddingLeft: 4 } }, "\u6536\u6B3E\u5E33\u6236(\u9322\u9032\u5230\u54EA)"), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "12px 14px",
+          borderRadius: 12,
+          background: "var(--bg-card)",
+          border: "1.5px solid var(--border)",
+          cursor: "pointer"
+        },
+        onClick: () => setShowToSheet(true)
+      },
+      toAcct ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 500, flex: 1 } }, toAcct.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)" } }, fmt(calcBalance(toAcct, state.transactions)))) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "var(--text-faint)", flex: 1 } }, "\u9078\u64C7\u6536\u6B3E\u5E33\u6236"),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, color: "var(--text-faint)" } }, "\u203A")
+    )), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6, paddingLeft: 4 } }, "\u65E5\u671F"), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          padding: "12px 14px",
+          borderRadius: 12,
+          background: "var(--bg-card)",
+          border: "1.5px solid var(--border)",
+          cursor: "pointer"
+        },
+        onClick: () => setShowDatePicker(true)
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 500, flex: 1 } }, date.replace(/-/g, "/"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", marginLeft: 6, fontSize: 13 } }, "(", wd, ")")),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, color: "var(--text-faint)" } }, "\u203A")
+    )), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 14px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6, paddingLeft: 4 } }, "\u5099\u8A3B"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "text",
+        value: note,
+        onChange: (e) => setNote(e.target.value),
+        placeholder: "\u9078\u586B(\u4F8B\u5982:\u8CE3\u9D3B\u6D77)",
+        maxLength: 100,
+        style: {
+          width: "100%",
+          padding: "12px 14px",
+          fontSize: 14,
+          background: "var(--bg-card)",
+          color: "var(--text)",
+          border: "1.5px solid var(--border)",
+          borderRadius: 12,
+          outline: "none",
+          boxSizing: "border-box"
+        }
+      }
+    )), /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 16px" } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          width: "100%",
+          padding: "14px",
+          borderRadius: 12,
+          border: "none",
+          background: "var(--mint)",
+          color: "var(--on-mint)",
+          fontSize: 15,
+          fontWeight: 600,
+          cursor: "pointer",
+          letterSpacing: 0.3
+        },
+        onClick: handleSubmit
+      },
+      "\u78BA\u8A8D\u8CE3\u51FA"
+    )), /* @__PURE__ */ React.createElement("div", { style: {
+      margin: "0 16px 24px",
+      padding: "12px 14px",
+      borderRadius: 10,
+      background: "var(--bg-card-2, rgba(127,127,127,0.05))",
+      fontSize: 11,
+      color: "var(--text-dim)",
+      lineHeight: 1.6
+    } }, "\u2139\uFE0F \u7CFB\u7D71\u6703\u81EA\u52D5\u8655\u7406:", /* @__PURE__ */ React.createElement("br", null), "\xB7 \u672C\u91D1\u90E8\u5206(\u6295\u8CC7 \u2192 \u6536\u6B3E\u5E33\u6236)\u4E0D\u7B97\u9032\u6536\u652F\u7D71\u8A08", /* @__PURE__ */ React.createElement("br", null), "\xB7 \u640D\u76CA\u90E8\u5206(\u7372\u5229\u6216\u8667\u640D)\u624D\u6703\u9032\u6536\u5165/\u652F\u51FA\u7D71\u8A08")),
+    showToSheet && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowToSheet(false) }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerCard, maxWidth: 360, maxHeight: "70vh", overflow: "hidden", display: "flex", flexDirection: "column" }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, "\u9078\u64C7\u6536\u6B3E\u5E33\u6236"), /* @__PURE__ */ React.createElement("div", { style: { overflow: "auto", padding: "4px 8px 12px" } }, state.accounts.filter((a) => a.id !== account.id && !a.isSystem).map((a) => {
+      const meta = state.accountTypes.find((t) => t.value === a.type);
+      const active = a.id === toAccountId;
+      return /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: a.id,
+          style: {
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "12px 14px",
+            borderRadius: 10,
+            marginBottom: 4,
+            background: active ? "rgba(126,224,192,0.10)" : "transparent",
+            border: active ? "1.5px solid var(--mint)" : "1.5px solid transparent",
+            color: "var(--text)",
+            cursor: "pointer",
+            textAlign: "left"
+          },
+          onClick: () => {
+            setToAccountId(a.id);
+            setShowToSheet(false);
+          }
+        },
+        /* @__PURE__ */ React.createElement("div", { style: {
+          width: 32,
+          height: 32,
+          borderRadius: 8,
+          background: meta?.color || "#f5c29c",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0
+        } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: meta?.icon || "box", size: 16, color: "#fff" })),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: active ? 600 : 500 } }, a.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)" } }, "\u9918\u984D ", fmt(calcBalance(a, state.transactions))))
+      );
+    }))))
+  );
+}
+function UpdateMarketValueDialog({ holding, shares, onClose, onConfirm }) {
+  const [value, setValue] = useState(String(holding.marketValue || ""));
+  const [locked, setLocked] = useState(true);
+  const handleSubmit = () => {
+    const mv = parseFloat(value) || 0;
+    onConfirm(mv);
+  };
+  return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: onClose }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: {
+    padding: "14px 18px",
+    borderBottom: "1px solid var(--border)",
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 8
+  } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600 } }, "\u66F4\u65B0 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontWeight: 700 } }, " ", holding.symbol, " "), " \u76EE\u524D\u5E02\u503C"), holding.name && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2 } }, holding.name)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: {
+    ...styles.lockLabel,
+    color: locked ? "var(--text-dim)" : "var(--pink)",
+    display: "flex",
+    alignItems: "center",
+    gap: 4
+  } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: locked ? "lock" : "unlock", size: 12, color: locked ? "var(--text-dim)" : "var(--pink)" }), locked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: { ...styles.toggleTrack, background: locked ? "var(--bg-card)" : "var(--pink)" },
+      onClick: () => setLocked((v) => !v)
+    },
+    /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: locked ? "translateX(0)" : "translateX(18px)" } })
+  ))), /* @__PURE__ */ React.createElement("div", { style: { padding: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 8 } }, "\u6301\u6709 ", shares.toLocaleString(), " \u80A1 \xB7 \u76EE\u524D\u5E02\u503C\u7E3D\u984D(NT$)"), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      type: "number",
+      inputMode: "decimal",
+      value,
+      onChange: (e) => setValue(e.target.value),
+      disabled: locked,
+      placeholder: "0",
+      style: {
+        width: "100%",
+        padding: "12px 14px",
+        fontSize: 18,
+        fontWeight: 600,
+        background: "var(--bg-card)",
+        color: locked ? "var(--text-dim)" : "var(--text)",
+        border: "1.5px solid var(--border)",
+        borderRadius: 12,
+        outline: "none",
+        boxSizing: "border-box",
+        opacity: locked ? 0.6 : 1,
+        fontFamily: "var(--num-font)"
+      },
+      onKeyDown: (e) => {
+        if (e.key === "Enter" && !locked) handleSubmit();
+      }
+    }
+  ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 6, lineHeight: 1.6 } }, "\u7CFB\u7D71\u6703\u6839\u64DA\u6B64\u91D1\u984D\u986F\u793A\u6D6E\u52D5\u640D\u76CA,\u4E26\u5F71\u97FF\u5E33\u6236\u7E3D\u5E02\u503C")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "0 14px 14px" } }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: onClose,
+      style: {
+        flex: 1,
+        padding: "12px",
+        background: "transparent",
+        color: "var(--pink-text)",
+        border: "1.5px solid var(--pink)",
+        borderRadius: 12,
+        fontSize: 14,
+        fontWeight: 600,
+        cursor: "pointer"
+      }
+    },
+    "\u53D6\u6D88"
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: handleSubmit,
+      disabled: locked,
+      style: {
+        flex: 1,
+        padding: "12px",
+        background: locked ? "var(--bg-card)" : "var(--mint)",
+        color: locked ? "var(--text-faint)" : "#fff",
+        border: "none",
+        borderRadius: 12,
+        fontSize: 14,
+        fontWeight: 600,
+        cursor: locked ? "not-allowed" : "pointer",
+        opacity: locked ? 0.6 : 1
+      }
+    },
+    "\u78BA\u8A8D"
+  ))));
+}
+function EditHoldingFieldDialog({ holding, field, relTxnCount, toast, onClose, onSubmitSymbol, onSubmitName }) {
+  const isSymbolMode = field === "symbol";
+  const currentValue = isSymbolMode ? holding.symbol || "" : holding.name || "";
+  const [value, setValue] = useState(currentValue);
+  const [locked, setLocked] = useState(true);
+  const titleText = isSymbolMode ? "\u7DE8\u8F2F\u80A1\u7968\u4EE3\u865F" : "\u7DE8\u8F2F\u80A1\u7968\u540D\u7A31";
+  const placeholderText = isSymbolMode ? "\u4F8B:RKLB\u30012330" : "\u4F8B:\u53F0\u7A4D\u96FB\u3001Rocket Lab";
+  const labelText = isSymbolMode ? "\u4EE3\u865F" : "\u80A1\u7968\u540D\u7A31";
+  const handleSubmit = () => {
+    const raw = value.trim();
+    if (isSymbolMode) {
+      const newSym = raw.toUpperCase();
+      if (!newSym) {
+        toast && toast("\u4EE3\u865F\u4E0D\u80FD\u7A7A\u767D");
+        return;
+      }
+      if (newSym === holding.symbol) {
+        onClose();
+        return;
+      }
+      onSubmitSymbol(newSym);
+    } else {
+      const newName = raw;
+      if (newName === (holding.name || "")) {
+        onClose();
+        return;
+      }
+      onSubmitName(newName);
+    }
+  };
+  return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: onClose }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: {
+    padding: "14px 18px",
+    borderBottom: "1px solid var(--border)",
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 8
+  } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600 } }, titleText), isSymbolMode && relTxnCount > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 4, lineHeight: 1.5 } }, "\u4EE3\u865F\u8B8A\u66F4\u6703\u540C\u6B65\u66F4\u65B0", " ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontWeight: 700 } }, " ", relTxnCount, " \u7B46", " "), " ", "\u76F8\u95DC\u7D00\u9304")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: {
+    ...styles.lockLabel,
+    color: locked ? "var(--text-dim)" : "var(--pink)",
+    display: "flex",
+    alignItems: "center",
+    gap: 4
+  } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: locked ? "lock" : "unlock", size: 12, color: locked ? "var(--text-dim)" : "var(--pink)" }), locked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: { ...styles.toggleTrack, background: locked ? "var(--bg-card)" : "var(--pink)" },
+      onClick: () => setLocked((v) => !v)
+    },
+    /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: locked ? "translateX(0)" : "translateX(18px)" } })
+  ))), /* @__PURE__ */ React.createElement("div", { style: { padding: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, labelText), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      type: "text",
+      value,
+      onChange: (e) => {
+        const v = e.target.value;
+        setValue(isSymbolMode ? v.toUpperCase() : v);
+      },
+      disabled: locked,
+      placeholder: placeholderText,
+      maxLength: isSymbolMode ? 20 : 40,
+      style: {
+        width: "100%",
+        padding: "12px 14px",
+        fontSize: isSymbolMode ? 16 : 15,
+        fontWeight: isSymbolMode ? 600 : 400,
+        background: "var(--bg-card)",
+        color: locked ? "var(--text-dim)" : "var(--text)",
+        border: "1.5px solid var(--border)",
+        borderRadius: 12,
+        outline: "none",
+        boxSizing: "border-box",
+        opacity: locked ? 0.6 : 1
+      }
+    }
+  )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "0 14px 14px" } }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: onClose,
+      style: {
+        flex: 1,
+        padding: "12px",
+        background: "transparent",
+        color: "var(--pink-text)",
+        border: "1.5px solid var(--pink)",
+        borderRadius: 12,
+        fontSize: 14,
+        fontWeight: 600,
+        cursor: "pointer"
+      }
+    },
+    "\u53D6\u6D88"
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: handleSubmit,
+      disabled: locked,
+      style: {
+        flex: 1,
+        padding: "12px",
+        background: locked ? "var(--bg-card)" : "var(--mint)",
+        color: locked ? "var(--text-faint)" : "#fff",
+        border: "none",
+        borderRadius: 12,
+        fontSize: 14,
+        fontWeight: 600,
+        cursor: locked ? "not-allowed" : "pointer",
+        opacity: locked ? 0.6 : 1
+      }
+    },
+    "\u78BA\u8A8D"
+  ))));
+}
+function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setConfirmDialog }) {
+  const [date, setDate] = useState(trade.date || "");
+  const [shares, setShares] = useState(String(trade.shares || ""));
+  const [totalCost, setTotalCost] = useState(String(trade.totalCost || ""));
+  const [locked, setLocked] = useState(true);
+  const handleSubmit = () => {
+    const newShares = Number(shares) || 0;
+    const newCost = Number(totalCost) || 0;
+    if (newShares <= 0) {
+      return;
+    }
+    if (newShares < consumed) {
+      setConfirmDialog && setConfirmDialog({
+        title: "\u7121\u6CD5\u8B8A\u66F4",
+        messageList: {
+          before: `\u6B64\u7B46\u5DF2\u6709 ${consumed.toLocaleString()} \u80A1\u88AB\u8CE3\u51FA`,
+          items: [`\u8B8A\u66F4\u5F8C\u80A1\u6578\u4E0D\u80FD\u5C0F\u65BC ${consumed.toLocaleString()} \u80A1`]
+        },
+        confirmText: "\u4E86\u89E3",
+        hideCancel: true
+      });
+      return;
+    }
+    const dateChanged = date !== trade.date;
+    const sharesChanged = newShares !== trade.shares;
+    const costChanged = newCost !== trade.totalCost;
+    if (!dateChanged && !sharesChanged && !costChanged) {
+      onClose();
+      return;
+    }
+    const changes = [
+      {
+        icon: "calendar",
+        label: "\u65E5\u671F",
+        from: (trade.date || "").replace(/-/g, "/"),
+        to: (date || "").replace(/-/g, "/"),
+        changed: dateChanged
+      },
+      {
+        icon: "chart",
+        label: "\u80A1\u6578",
+        from: (trade.shares || 0).toLocaleString(),
+        to: newShares.toLocaleString(),
+        changed: sharesChanged
+      },
+      {
+        icon: "wallet",
+        label: "\u7E3D\u6210\u672C",
+        from: (trade.totalCost || 0).toLocaleString(),
+        to: newCost.toLocaleString(),
+        changed: costChanged
+      }
+    ];
+    setConfirmDialog && setConfirmDialog({
+      title: "\u78BA\u8A8D\u8B8A\u66F4\u8CB7\u9032\u7D00\u9304",
+      changesHint: "\u6B64\u7B46\u8B8A\u66F4\u6703\u540C\u6B65\u66F4\u65B0\u4E3B\u5E33\u672C\u5C0D\u61C9\u7684\u6263\u6B3E\u7D00\u9304\u3002",
+      changes,
+      confirmText: "\u78BA\u5B9A\u8B8A\u66F4",
+      danger: true,
+      onConfirm: () => {
+        onConfirm({ date, shares: newShares, totalCost: newCost });
+      }
+    });
+  };
+  return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: onClose }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: {
+    padding: "14px 18px",
+    borderBottom: "1px solid var(--border)",
+    display: "flex",
+    alignItems: "center",
+    gap: 8
+  } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600 } }, "\u7DE8\u8F2F\u8CB7\u9032\u7D00\u9304"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2 } }, holding.symbol, holding.name ? ` \xB7 ${holding.name}` : "")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: {
+    ...styles.lockLabel,
+    color: locked ? "var(--text-dim)" : "var(--pink)",
+    display: "flex",
+    alignItems: "center",
+    gap: 4
+  } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: locked ? "lock" : "unlock", size: 12, color: locked ? "var(--text-dim)" : "var(--pink)" }), locked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: { ...styles.toggleTrack, background: locked ? "var(--bg-card)" : "var(--pink)" },
+      onClick: () => setLocked((v) => !v)
+    },
+    /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: locked ? "translateX(0)" : "translateX(18px)" } })
+  ))), /* @__PURE__ */ React.createElement("div", { style: { padding: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u65E5\u671F"), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      type: "date",
+      value: date,
+      onChange: (e) => setDate(e.target.value),
+      disabled: locked,
+      style: {
+        width: "100%",
+        padding: "12px 14px",
+        fontSize: 15,
+        background: "var(--bg-card)",
+        color: locked ? "var(--text-dim)" : "var(--text)",
+        border: "1.5px solid var(--border)",
+        borderRadius: 12,
+        outline: "none",
+        boxSizing: "border-box",
+        marginBottom: 14,
+        opacity: locked ? 0.6 : 1,
+        fontFamily: "var(--num-font)"
+      }
+    }
+  ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u80A1\u6578 ", consumed > 0 && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 11 } }, "(\u5DF2\u8CE3 ", consumed.toLocaleString(), " \u80A1)")), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      type: "number",
+      inputMode: "decimal",
+      value: shares,
+      onChange: (e) => setShares(e.target.value),
+      disabled: locked,
+      placeholder: "0",
+      style: {
+        width: "100%",
+        padding: "12px 14px",
+        fontSize: 15,
+        background: "var(--bg-card)",
+        color: locked ? "var(--text-dim)" : "var(--text)",
+        border: "1.5px solid var(--border)",
+        borderRadius: 12,
+        outline: "none",
+        boxSizing: "border-box",
+        marginBottom: 14,
+        opacity: locked ? 0.6 : 1,
+        fontFamily: "var(--num-font)"
+      }
+    }
+  ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u7E3D\u6210\u672C ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 11 } }, "(\u542B\u624B\u7E8C\u8CBB)")), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      type: "number",
+      inputMode: "decimal",
+      value: totalCost,
+      onChange: (e) => setTotalCost(e.target.value),
+      disabled: locked,
+      placeholder: "0",
+      style: {
+        width: "100%",
+        padding: "12px 14px",
+        fontSize: 16,
+        fontWeight: 600,
+        background: "var(--bg-card)",
+        color: locked ? "var(--text-dim)" : "var(--text)",
+        border: "1.5px solid var(--border)",
+        borderRadius: 12,
+        outline: "none",
+        boxSizing: "border-box",
+        opacity: locked ? 0.6 : 1,
+        fontFamily: "var(--num-font)"
+      }
+    }
+  )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "0 14px 14px" } }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: onClose,
+      style: {
+        flex: 1,
+        padding: "12px",
+        background: "transparent",
+        color: "var(--pink-text)",
+        border: "1.5px solid var(--pink)",
+        borderRadius: 12,
+        fontSize: 14,
+        fontWeight: 600,
+        cursor: "pointer"
+      }
+    },
+    "\u53D6\u6D88"
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: handleSubmit,
+      disabled: locked,
+      style: {
+        flex: 1,
+        padding: "12px",
+        background: locked ? "var(--bg-card)" : "var(--mint)",
+        color: locked ? "var(--text-faint)" : "#fff",
+        border: "none",
+        borderRadius: 12,
+        fontSize: 14,
+        fontWeight: 600,
+        cursor: locked ? "not-allowed" : "pointer",
+        opacity: locked ? 0.6 : 1
+      }
+    },
+    "\u78BA\u8A8D"
+  ))));
+}
+function BuyHoldingSheet({ state, account, prefillSymbol, onClose, onConfirm, toast, toastRich }) {
+  const swipe = useSwipeBack(onClose);
+  const [symbol, setSymbol] = useState(prefillSymbol || "");
+  const [name, setName] = useState("");
+  const [shares, setShares] = useState("");
+  const [totalAmount, setTotalAmount] = useState("");
+  const [marketValue, setMarketValue] = useState("");
+  const [date, setDate] = useState(todayStr());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [note, setNote] = useState("");
+  const [defaultBuyAccountId, setDefaultBuyAccountId] = useState(() => {
+    try {
+      return localStorage.getItem(DEFAULT_BUY_ACCOUNT_KEY) || "";
+    } catch {
+      return "";
+    }
+  });
+  const initialFromId = (() => {
+    if (defaultBuyAccountId) {
+      const a = state.accounts.find((x) => x.id === defaultBuyAccountId);
+      if (a && a.type !== "invest" && a.type !== "debt" && !a.isSystem) return a.id;
+    }
+    const fallback = state.accounts.find((a) => a.type !== "invest" && a.type !== "debt" && !a.isSystem);
+    return fallback?.id || "";
+  })();
+  const [fromAccountId, setFromAccountId] = useState(initialFromId);
+  const [showFromSheet, setShowFromSheet] = useState(false);
+  const sharesNum = parseFloat(shares) || 0;
+  const totalCost = parseFloat(totalAmount) || 0;
+  const marketValueNum = parseFloat(marketValue) || 0;
+  const fromAcct = state.accounts.find((a) => a.id === fromAccountId);
+  const symbolUpper = symbol.trim().toUpperCase();
+  const existingHolding = state.holdings.find((h) => h.accountId === account.id && h.symbol === symbolUpper);
+  React.useEffect(() => {
+    if (existingHolding && existingHolding.name) {
+      setName(existingHolding.name);
+    }
+  }, [existingHolding?.id]);
+  const handleSubmit = () => {
+    if (!symbolUpper) {
+      toast && toast("\u8ACB\u8F38\u5165\u4EE3\u865F");
+      return;
+    }
+    if (!sharesNum || sharesNum <= 0) {
+      toast && toast("\u8ACB\u8F38\u5165\u80A1\u6578");
+      return;
+    }
+    if (!totalCost || totalCost <= 0) {
+      toast && toast("\u8ACB\u8F38\u5165\u91D1\u984D");
+      return;
+    }
+    if (!fromAccountId) {
+      toast && toast("\u8ACB\u9078\u64C7\u6263\u6B3E\u5E33\u6236");
+      return;
+    }
+    onConfirm({
+      accountId: account.id,
+      symbol: symbolUpper,
+      name: name.trim(),
+      currency: "TWD",
+      shares: sharesNum,
+      totalCost,
+      fee: 0,
+      // 已併入金額
+      fromAccountId,
+      date,
+      note: note.trim(),
+      marketValue: marketValueNum > 0 ? marketValueNum : null
+      // 有填才傳;沒填讓 saveBuyHolding 用買進金額
+    });
+  };
+  if (showDatePicker) {
+    return /* @__PURE__ */ React.createElement(DatePicker, { value: date, onChange: setDate, onClose: () => setShowDatePicker(false) });
+  }
+  if (showFromSheet) {
+    return /* @__PURE__ */ React.createElement(
+      AccountPickerSheet,
+      {
+        state,
+        currentId: fromAccountId,
+        excludeIds: [account.id],
+        onPick: (id) => {
+          setFromAccountId(id);
+          setShowFromSheet(false);
+        },
+        onClose: () => setShowFromSheet(false),
+        title: "\u9078\u64C7\u6263\u6B3E\u5E33\u6236"
+      }
+    );
+  }
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-sheet": "true",
+      style: {
+        ...styles.sheet,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          background: "transparent",
+          border: "none",
+          color: "var(--text-dim)",
+          fontSize: 22,
+          cursor: "pointer",
+          padding: "6px 12px"
+        },
+        onClick: onClose
+      },
+      "\xD7"
+    ), /* @__PURE__ */ React.createElement("div", { style: { ...styles.sheetTitle, color: "var(--text)" } }, existingHolding ? `\u52A0\u8CB7 ${symbolUpper}` : "\u8CB7\u9032\u80A1\u7968"), /* @__PURE__ */ React.createElement("div", { style: { width: 50 } })),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: { margin: "12px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6, paddingLeft: 4 } }, "\u4EE3\u865F"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "text",
+        value: symbol,
+        onChange: (e) => setSymbol(e.target.value.toUpperCase()),
+        placeholder: "\u4F8B:RKLB\u30012330",
+        maxLength: 20,
+        disabled: !!prefillSymbol,
+        style: {
+          width: "100%",
+          padding: "12px 14px",
+          fontSize: 16,
+          fontWeight: 600,
+          background: "var(--bg-card)",
+          color: "var(--text)",
+          border: "1.5px solid var(--border)",
+          borderRadius: 12,
+          outline: "none",
+          boxSizing: "border-box",
+          textTransform: "uppercase",
+          opacity: prefillSymbol ? 0.7 : 1
+        }
+      }
+    ), existingHolding && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--mint-text)", marginTop: 4, paddingLeft: 4 } }, "\u5DF2\u6301\u6709 \xB7 \u6B64\u7B46\u8996\u70BA\u52A0\u8CB7")), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6, paddingLeft: 4 } }, "\u80A1\u7968\u540D\u7A31 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "(\u9078\u586B)")), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "text",
+        value: name,
+        onChange: (e) => setName(e.target.value),
+        placeholder: "\u4F8B:\u53F0\u7A4D\u96FB\u3001Rocket Lab",
+        maxLength: 40,
+        disabled: !!existingHolding,
+        style: {
+          width: "100%",
+          padding: "12px 14px",
+          fontSize: 15,
+          background: "var(--bg-card)",
+          color: "var(--text)",
+          border: "1.5px solid var(--border)",
+          borderRadius: 12,
+          outline: "none",
+          boxSizing: "border-box",
+          opacity: existingHolding ? 0.7 : 1
+        }
+      }
+    ), existingHolding && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 4, paddingLeft: 4 } }, "\u6CBF\u7528\u65E2\u6709\u6301\u80A1\u540D\u7A31")), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6, paddingLeft: 4 } }, "\u80A1\u6578"), /* @__PURE__ */ React.createElement(
+      CalcTriggerInput,
+      {
+        value: shares,
+        onChange: setShares,
+        placeholder: "0",
+        fontSize: 18,
+        style: { padding: "12px 14px", borderRadius: 12 }
+      }
+    )), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6, paddingLeft: 4 } }, "\u91D1\u984D"), /* @__PURE__ */ React.createElement(
+      CalcTriggerInput,
+      {
+        value: totalAmount,
+        onChange: setTotalAmount,
+        placeholder: "0",
+        fontSize: 18,
+        style: { padding: "12px 14px", borderRadius: 12 }
+      }
+    )), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6, paddingLeft: 4 } }, "\u76EE\u524D\u5E02\u503C ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "(\u9078\u586B,\u7A7A\u767D = \u7528\u8CB7\u9032\u91D1\u984D)")), /* @__PURE__ */ React.createElement(
+      CalcTriggerInput,
+      {
+        value: marketValue,
+        onChange: setMarketValue,
+        placeholder: totalCost > 0 ? totalCost.toString() : "0",
+        fontSize: 16,
+        fontWeight: 500,
+        style: { padding: "12px 14px", borderRadius: 12 }
+      }
+    )), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 6,
+      paddingLeft: 4,
+      paddingRight: 4
+    } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)" } }, "\u6263\u6B3E\u5E33\u6236"), /* @__PURE__ */ React.createElement(
+      "span",
+      {
+        onClick: (e) => {
+          e.stopPropagation();
+          if (!fromAccountId) {
+            toast && toast("\u8ACB\u5148\u9078\u64C7\u6263\u6B3E\u5E33\u6236");
+            return;
+          }
+          const curName = state.accounts.find((a) => a.id === fromAccountId)?.name || "";
+          if (fromAccountId === defaultBuyAccountId) {
+            if (toastRich) {
+              toastRich({
+                title: "\u5DF2\u662F\u9810\u8A2D\u6263\u6B3E\u5E33\u6236",
+                amount: "\u2713",
+                icon: "info",
+                amountColor: "var(--text-faint)",
+                lines: [`\u300C${curName}\u300D`]
+              }, 1500);
+            } else {
+              toast && toast(`\u300C${curName}\u300D\u5DF2\u662F\u9810\u8A2D`);
+            }
+            return;
+          }
+          const oldId = defaultBuyAccountId;
+          const oldName = oldId ? state.accounts.find((a) => a.id === oldId)?.name : "";
+          try {
+            localStorage.setItem(DEFAULT_BUY_ACCOUNT_KEY, fromAccountId);
+          } catch {
+          }
+          setDefaultBuyAccountId(fromAccountId);
+          if (toastRich) {
+            if (oldName) {
+              toastRich({
+                title: "\u5DF2\u66F4\u65B0\u9810\u8A2D\u6263\u6B3E\u5E33\u6236",
+                amount: "\u2713",
+                amountColor: "var(--mint)",
+                lines: [`\u539F\u300C${oldName}\u300D \u2192 \u300C${curName}\u300D`]
+              }, 1800);
+            } else {
+              toastRich({
+                title: "\u5DF2\u8A2D\u70BA\u9810\u8A2D\u6263\u6B3E\u5E33\u6236",
+                amount: "\u2713",
+                amountColor: "var(--mint)",
+                lines: [`\u300C${curName}\u300D`]
+              }, 1800);
+            }
+          } else {
+            toast && toast(`\u5DF2\u8A2D\u300C${curName}\u300D\u70BA\u9810\u8A2D`);
+          }
+        },
+        style: {
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 28,
+          height: 28,
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent"
+        },
+        title: fromAccountId === defaultBuyAccountId ? "\u76EE\u524D\u662F\u9810\u8A2D\u6263\u6B3E\u5E33\u6236" : "\u8A2D\u70BA\u9810\u8A2D\u6263\u6B3E\u5E33\u6236"
+      },
+      fromAccountId && fromAccountId === defaultBuyAccountId ? /* @__PURE__ */ React.createElement(TypeIcon, { name: "star-filled", size: 18, color: "var(--mint)" }) : /* @__PURE__ */ React.createElement(TypeIcon, { name: "star", size: 18, color: "var(--text-faint)" })
+    )), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick: () => setShowFromSheet(true),
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "12px 14px",
+          borderRadius: 12,
+          background: "var(--bg-card)",
+          border: "1.5px solid var(--border)",
+          cursor: "pointer"
+        }
+      },
+      fromAcct ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 500, flex: 1 } }, fromAcct.name) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "var(--text-faint)", flex: 1 } }, "\u9078\u64C7\u5E33\u6236"),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, color: "var(--text-faint)" } }, "\u203A")
+    )), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6, paddingLeft: 4 } }, "\u65E5\u671F"), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick: () => setShowDatePicker(true),
+        style: {
+          padding: "12px 14px",
+          borderRadius: 12,
+          background: "var(--bg-card)",
+          border: "1.5px solid var(--border)",
+          cursor: "pointer",
+          fontSize: 14
+        }
+      },
+      date,
+      " (",
+      ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][new Date(date).getDay()],
+      ")"
+    )), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6, paddingLeft: 4 } }, "\u5099\u8A3B ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "(\u9078\u586B)")), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "text",
+        value: note,
+        onChange: (e) => setNote(e.target.value),
+        maxLength: 100,
+        placeholder: "",
+        style: {
+          width: "100%",
+          padding: "12px 14px",
+          fontSize: 14,
+          background: "var(--bg-card)",
+          color: "var(--text)",
+          border: "1.5px solid var(--border)",
+          borderRadius: 12,
+          outline: "none",
+          boxSizing: "border-box"
+        }
+      }
+    )), /* @__PURE__ */ React.createElement("div", { style: { margin: "16px 16px 24px" } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: handleSubmit,
+        disabled: !symbolUpper || !sharesNum || !totalCost || !fromAccountId,
+        style: {
+          width: "100%",
+          padding: "14px",
+          background: !symbolUpper || !sharesNum || !totalCost || !fromAccountId ? "var(--bg-card)" : "var(--mint)",
+          color: !symbolUpper || !sharesNum || !totalCost || !fromAccountId ? "var(--text-faint)" : "#fff",
+          border: "none",
+          borderRadius: 12,
+          fontSize: 16,
+          fontWeight: 600,
+          cursor: !symbolUpper || !sharesNum || !totalCost || !fromAccountId ? "not-allowed" : "pointer"
+        }
+      },
+      "\u78BA\u8A8D\u8CB7\u9032"
+    )))
+  );
+}
+function CustomSlider({ currentShares, sharesNum, onChange }) {
+  const trackRef = React.useRef(null);
+  const [dragging, setDragging] = React.useState(false);
+  const pctRaw = currentShares > 0 ? sharesNum / currentShares * 100 : 0;
+  const pctClamp = Math.max(0, Math.min(100, pctRaw));
+  const pctSnapped = Math.round(pctClamp / 5) * 5;
+  const isOver = sharesNum > currentShares;
+  const accent = isOver ? "var(--pink)" : "var(--mint)";
+  const handleMove = (clientX) => {
+    const rect = trackRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const ratio = (clientX - rect.left) / rect.width;
+    let pct = Math.max(0, Math.min(100, ratio * 100));
+    pct = Math.round(pct / 5) * 5;
+    const newShares = Math.round(currentShares * pct / 100);
+    onChange(newShares);
+  };
+  const onPointerDown = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragging(true);
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    handleMove(x);
+    try {
+      if (navigator.vibrate) navigator.vibrate(8);
+    } catch {
+    }
+  };
+  React.useEffect(() => {
+    if (!dragging) return;
+    let lastSnapped = pctSnapped;
+    const onMove = (e) => {
+      if (e.cancelable) e.preventDefault();
+      const x = e.touches ? e.touches[0].clientX : e.clientX;
+      const rect = trackRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const ratio = (x - rect.left) / rect.width;
+      let pct = Math.max(0, Math.min(100, ratio * 100));
+      pct = Math.round(pct / 5) * 5;
+      if (pct !== lastSnapped) {
+        try {
+          if (navigator.vibrate) navigator.vibrate(8);
+        } catch {
+        }
+        lastSnapped = pct;
+      }
+      const newShares = Math.round(currentShares * pct / 100);
+      onChange(newShares);
+    };
+    const onUp = () => setDragging(false);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("touchend", onUp);
+    window.addEventListener("touchcancel", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onUp);
+      window.removeEventListener("touchcancel", onUp);
+    };
+  }, [dragging, currentShares]);
+  const fillWidth = `${pctClamp}%`;
+  const labelText = isOver ? "\u8D85\u51FA" : pctSnapped === 0 ? "0%" : pctSnapped === 100 ? "\u5168\u90E8" : `${pctSnapped}%`;
+  const knobPos = pctClamp / 100;
+  return /* @__PURE__ */ React.createElement("div", { "data-slider": "true", style: { marginTop: 16, padding: "0 2px", userSelect: "none", touchAction: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: 56, padding: "0 12px" } }, /* @__PURE__ */ React.createElement("div", { style: {
+    position: "absolute",
+    top: 0,
+    left: `calc(12px + (100% - 24px) * ${knobPos})`,
+    transform: knobPos < 0.08 ? "translateX(0)" : knobPos > 0.92 ? "translateX(-100%)" : "translateX(-50%)",
+    minWidth: 38,
+    // 固定最小寬,避免「40%」「100%」「全部」切換時跳動
+    textAlign: "center",
+    padding: "3px 9px",
+    borderRadius: 999,
+    background: accent,
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: 700,
+    lineHeight: 1.3,
+    whiteSpace: "nowrap",
+    pointerEvents: "none",
+    transition: dragging ? "none" : "left 0.15s ease-out",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.12)"
+  } }, labelText), /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      ref: trackRef,
+      onMouseDown: onPointerDown,
+      onTouchStart: onPointerDown,
+      style: {
+        position: "absolute",
+        top: 34,
+        left: 12,
+        right: 12,
+        height: 22,
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center"
+      }
+    },
+    /* @__PURE__ */ React.createElement("div", { style: {
+      position: "relative",
+      width: "100%",
+      height: 3,
+      background: "var(--border)",
+      borderRadius: 999
+    } }, /* @__PURE__ */ React.createElement("div", { style: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      height: "100%",
+      width: fillWidth,
+      background: accent,
+      borderRadius: 999,
+      transition: dragging ? "none" : "width 0.15s ease-out"
+    } }), /* @__PURE__ */ React.createElement("div", { style: {
+      position: "absolute",
+      top: "50%",
+      left: fillWidth,
+      transform: "translate(-50%, -50%)",
+      width: 18,
+      height: 18,
+      borderRadius: "50%",
+      background: "#fff",
+      border: `2px solid ${accent}`,
+      boxShadow: "0 1px 3px rgba(0,0,0,0.18)",
+      transition: dragging ? "none" : "left 0.15s ease-out",
+      pointerEvents: "none"
+    } }))
+  )), /* @__PURE__ */ React.createElement("div", { style: {
+    display: "flex",
+    justifyContent: "space-between",
+    fontSize: 10,
+    color: "var(--text-faint)",
+    padding: "0 14px",
+    marginTop: 6
+  } }, /* @__PURE__ */ React.createElement("span", null, "0"), /* @__PURE__ */ React.createElement("span", null, "\u5168\u90E8")));
+}
+function SellHoldingSheet({ state, holding, onClose, onConfirm, toast, toastRich }) {
+  const swipe = useSwipeBack(onClose);
+  const account = state.accounts.find((a) => a.id === holding.accountId);
+  const currentShares = holdingShares(holding, state.trades);
+  const investedCost = holdingCost(holding, state.trades);
+  const avgCostPerShare = currentShares > 0 ? investedCost / currentShares : 0;
+  const [shares, setShares] = useState(String(currentShares));
+  const [totalReceived, setTotalReceived] = useState("");
+  const [date, setDate] = useState(todayStr());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [note, setNote] = useState("");
+  const [defaultSellAccountId, setDefaultSellAccountId] = useState(() => {
+    try {
+      return localStorage.getItem(DEFAULT_SELL_ACCOUNT_KEY) || "";
+    } catch {
+      return "";
+    }
+  });
+  const initialToId = (() => {
+    if (defaultSellAccountId) {
+      const a = state.accounts.find((x) => x.id === defaultSellAccountId);
+      if (a && a.type !== "invest" && a.type !== "debt" && !a.isSystem) return a.id;
+    }
+    const fallback = state.accounts.find((a) => a.type !== "invest" && a.type !== "debt" && !a.isSystem);
+    return fallback?.id || "";
+  })();
+  const [toAccountId, setToAccountId] = useState(initialToId);
+  const [showToSheet, setShowToSheet] = useState(false);
+  const sharesNum = parseFloat(shares) || 0;
+  const receivedNum = parseFloat(totalReceived) || 0;
+  const toAcct = state.accounts.find((a) => a.id === toAccountId);
+  const handleSubmit = () => {
+    if (!sharesNum || sharesNum <= 0) {
+      toast && toast("\u8ACB\u8F38\u5165\u80A1\u6578");
+      return;
+    }
+    if (sharesNum > currentShares) {
+      toast && toast(`\u80A1\u6578\u4E0D\u80FD\u8D85\u904E\u6301\u6709(${currentShares})`);
+      return;
+    }
+    if (!receivedNum || receivedNum <= 0) {
+      toast && toast("\u8ACB\u8F38\u5165\u552E\u51FA\u91D1\u984D");
+      return;
+    }
+    if (!toAccountId) {
+      toast && toast("\u8ACB\u9078\u64C7\u6536\u6B3E\u5E33\u6236");
+      return;
+    }
+    onConfirm({
+      holdingId: holding.id,
+      shares: sharesNum,
+      totalReceived: receivedNum,
+      fee: 0,
+      tax: 0,
+      // 已併入金額
+      toAccountId,
+      date,
+      note: note.trim()
+    });
+  };
+  if (showDatePicker) {
+    return /* @__PURE__ */ React.createElement(DatePicker, { value: date, onChange: setDate, onClose: () => setShowDatePicker(false) });
+  }
+  if (showToSheet) {
+    return /* @__PURE__ */ React.createElement(
+      AccountPickerSheet,
+      {
+        state,
+        currentId: toAccountId,
+        excludeIds: [holding.accountId],
+        onPick: (id) => {
+          setToAccountId(id);
+          setShowToSheet(false);
+        },
+        onClose: () => setShowToSheet(false),
+        title: "\u9078\u64C7\u6536\u6B3E\u5E33\u6236"
+      }
+    );
+  }
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-sheet": "true",
+      style: {
+        ...styles.sheet,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          background: "transparent",
+          border: "none",
+          color: "var(--text-dim)",
+          fontSize: 22,
+          cursor: "pointer",
+          padding: "6px 12px"
+        },
+        onClick: onClose
+      },
+      "\xD7"
+    ), /* @__PURE__ */ React.createElement("div", { style: { ...styles.sheetTitle, color: "var(--text)" } }, "\u8CE3\u51FA ", holding.symbol), /* @__PURE__ */ React.createElement("div", { style: { width: 50 } })),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: {
+      margin: "8px 16px 12px",
+      padding: 14,
+      borderRadius: 12,
+      background: "rgba(126,224,192,0.08)",
+      border: "1.5px solid var(--mint)"
+    } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 600 } }, holding.symbol), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 4 } }, "\u6301\u6709 ", currentShares.toLocaleString(), " \u80A1", investedCost > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, " \xB7 \u6295\u5165 ", fmt(investedCost)))), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: {
+      fontSize: 12,
+      marginBottom: 6,
+      paddingLeft: 4,
+      display: "flex",
+      justifyContent: "space-between"
+    } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)" } }, "\u8CE3\u51FA\u80A1\u6578"), sharesNum > currentShares && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontSize: 11, fontWeight: 600 } }, "\u8D85\u904E\u6301\u6709 ", currentShares, " \u80A1")), /* @__PURE__ */ React.createElement(
+      CalcTriggerInput,
+      {
+        value: shares,
+        onChange: setShares,
+        placeholder: "0",
+        fontSize: 18,
+        style: {
+          padding: "12px 14px",
+          borderRadius: 12,
+          color: sharesNum > currentShares ? "var(--pink-text)" : "var(--text)",
+          border: `1.5px solid ${sharesNum > currentShares ? "var(--pink)" : "var(--border)"}`
+        }
+      }
+    ), sharesNum > currentShares && /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick: () => setShares(String(currentShares)),
+        style: {
+          marginTop: 6,
+          padding: "8px 12px",
+          background: "rgba(217,104,119,0.08)",
+          border: "1px solid var(--pink)",
+          borderRadius: 8,
+          fontSize: 12,
+          color: "var(--pink-text)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          cursor: "pointer"
+        }
+      },
+      /* @__PURE__ */ React.createElement("span", null, "\u6700\u591A\u53EA\u80FD\u8CE3 ", currentShares.toLocaleString(), " \u80A1"),
+      /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600 } }, "\u9EDE\u6B64\u4FEE\u6B63")
+    ), currentShares > 0 && /* @__PURE__ */ React.createElement(
+      CustomSlider,
+      {
+        currentShares,
+        sharesNum,
+        onChange: (newShares) => setShares(String(newShares))
+      }
+    )), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6, paddingLeft: 4 } }, "\u552E\u51FA\u91D1\u984D(\u5BE6\u6536)"), /* @__PURE__ */ React.createElement(
+      CalcTriggerInput,
+      {
+        value: totalReceived,
+        onChange: setTotalReceived,
+        placeholder: "0",
+        fontSize: 18,
+        style: { padding: "12px 14px", borderRadius: 12 }
+      }
+    ), sharesNum > 0 && sharesNum <= currentShares && investedCost > 0 && (() => {
+      const matchedCost = sharesNum * avgCostPerShare;
+      if (receivedNum <= 0) {
+        return /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 6, paddingLeft: 4 } }, "\u4FDD\u672C\u50F9 ", fmt(matchedCost), " \xB7 \u9AD8\u65BC\u6B64\u50F9\u6709\u7372\u5229");
+      }
+      const pnl = receivedNum - matchedCost;
+      const isProfit = pnl >= 0;
+      return /* @__PURE__ */ React.createElement("div", { style: {
+        marginTop: 6,
+        paddingLeft: 4,
+        fontSize: 11,
+        color: isProfit ? "var(--mint-text)" : "var(--pink-text)",
+        fontWeight: 500
+      } }, isProfit ? "\u9810\u4F30\u7372\u5229" : "\u9810\u4F30\u8667\u640D", " ", isProfit ? "+" : "", fmt(pnl), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", marginLeft: 6, fontWeight: 400 } }, "(\u5C0D\u61C9\u6210\u672C ", fmt(matchedCost), ")"));
+    })()), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 6,
+      paddingLeft: 4,
+      paddingRight: 4
+    } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)" } }, "\u6536\u6B3E\u5E33\u6236"), /* @__PURE__ */ React.createElement(
+      "span",
+      {
+        onClick: (e) => {
+          e.stopPropagation();
+          if (!toAccountId) {
+            toast && toast("\u8ACB\u5148\u9078\u64C7\u6536\u6B3E\u5E33\u6236");
+            return;
+          }
+          const curName = state.accounts.find((a) => a.id === toAccountId)?.name || "";
+          if (toAccountId === defaultSellAccountId) {
+            if (toastRich) {
+              toastRich({
+                title: "\u5DF2\u662F\u9810\u8A2D\u6536\u6B3E\u5E33\u6236",
+                amount: "\u2713",
+                icon: "info",
+                amountColor: "var(--text-faint)",
+                lines: [`\u300C${curName}\u300D`]
+              }, 1500);
+            } else {
+              toast && toast(`\u300C${curName}\u300D\u5DF2\u662F\u9810\u8A2D`);
+            }
+            return;
+          }
+          const oldId = defaultSellAccountId;
+          const oldName = oldId ? state.accounts.find((a) => a.id === oldId)?.name : "";
+          try {
+            localStorage.setItem(DEFAULT_SELL_ACCOUNT_KEY, toAccountId);
+          } catch {
+          }
+          setDefaultSellAccountId(toAccountId);
+          if (toastRich) {
+            if (oldName) {
+              toastRich({
+                title: "\u5DF2\u66F4\u65B0\u9810\u8A2D\u6536\u6B3E\u5E33\u6236",
+                amount: "\u2713",
+                amountColor: "var(--mint)",
+                lines: [`\u539F\u300C${oldName}\u300D \u2192 \u300C${curName}\u300D`]
+              }, 1800);
+            } else {
+              toastRich({
+                title: "\u5DF2\u8A2D\u70BA\u9810\u8A2D\u6536\u6B3E\u5E33\u6236",
+                amount: "\u2713",
+                amountColor: "var(--mint)",
+                lines: [`\u300C${curName}\u300D`]
+              }, 1800);
+            }
+          } else {
+            toast && toast(`\u5DF2\u8A2D\u300C${curName}\u300D\u70BA\u9810\u8A2D`);
+          }
+        },
+        style: {
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 28,
+          height: 28,
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent"
+        },
+        title: toAccountId === defaultSellAccountId ? "\u76EE\u524D\u662F\u9810\u8A2D\u6536\u6B3E\u5E33\u6236" : "\u8A2D\u70BA\u9810\u8A2D\u6536\u6B3E\u5E33\u6236"
+      },
+      toAccountId && toAccountId === defaultSellAccountId ? /* @__PURE__ */ React.createElement(TypeIcon, { name: "star-filled", size: 18, color: "var(--mint)" }) : /* @__PURE__ */ React.createElement(TypeIcon, { name: "star", size: 18, color: "var(--text-faint)" })
+    )), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick: () => setShowToSheet(true),
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "12px 14px",
+          borderRadius: 12,
+          background: "var(--bg-card)",
+          border: "1.5px solid var(--border)",
+          cursor: "pointer"
+        }
+      },
+      toAcct ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 500, flex: 1 } }, toAcct.name)) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "var(--text-faint)", flex: 1 } }, "\u9078\u64C7\u5E33\u6236"),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, color: "var(--text-faint)" } }, "\u203A")
+    )), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6, paddingLeft: 4 } }, "\u65E5\u671F"), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick: () => setShowDatePicker(true),
+        style: {
+          padding: "12px 14px",
+          borderRadius: 12,
+          background: "var(--bg-card)",
+          border: "1.5px solid var(--border)",
+          cursor: "pointer",
+          fontSize: 14
+        }
+      },
+      date,
+      " (",
+      ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][new Date(date).getDay()],
+      ")"
+    )), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6, paddingLeft: 4 } }, "\u5099\u8A3B ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "(\u9078\u586B)")), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "text",
+        value: note,
+        onChange: (e) => setNote(e.target.value),
+        maxLength: 100,
+        style: {
+          width: "100%",
+          padding: "12px 14px",
+          fontSize: 14,
+          background: "var(--bg-card)",
+          color: "var(--text)",
+          border: "1.5px solid var(--border)",
+          borderRadius: 12,
+          outline: "none",
+          boxSizing: "border-box"
+        }
+      }
+    )), /* @__PURE__ */ React.createElement("div", { style: { margin: "8px 16px 24px" } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: handleSubmit,
+        disabled: !sharesNum || !receivedNum || !toAccountId || sharesNum > currentShares,
+        style: {
+          width: "100%",
+          padding: "14px",
+          background: !sharesNum || !receivedNum || !toAccountId || sharesNum > currentShares ? "var(--bg-card)" : "var(--pink)",
+          color: !sharesNum || !receivedNum || !toAccountId || sharesNum > currentShares ? "var(--text-faint)" : "#fff",
+          border: "none",
+          borderRadius: 12,
+          fontSize: 16,
+          fontWeight: 600,
+          cursor: !sharesNum || !receivedNum || !toAccountId || sharesNum > currentShares ? "not-allowed" : "pointer"
+        }
+      },
+      "\u78BA\u8A8D\u8CE3\u51FA"
+    )))
+  );
+}
+function ClosedHoldingsSection({ holdings, trades }) {
+  const [expanded, setExpanded] = useState(false);
+  return /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10 } }, /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      onClick: () => setExpanded(!expanded),
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "10px 12px",
+        background: "var(--bg-card)",
+        border: "1px solid var(--border)",
+        borderRadius: 10,
+        cursor: "pointer",
+        fontSize: 12,
+        color: "var(--text-dim)"
+      }
+    },
+    /* @__PURE__ */ React.createElement("span", null, "\u5DF2\u6E05\u5009 (", holdings.length, ")"),
+    /* @__PURE__ */ React.createElement("span", null, expanded ? "\u25BE" : "\u25B8")
+  ), expanded && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginTop: 6 } }, holdings.map((h) => {
+    const sells = trades.filter((t) => t.holdingId === h.id && t.type === "sell");
+    const totalPnl = sells.reduce((s, t) => s + (t.realizedPnl || 0), 0);
+    return /* @__PURE__ */ React.createElement("div", { key: h.id, style: {
+      padding: "10px 12px",
+      background: "var(--bg-card-2, rgba(127,127,127,0.04))",
+      border: "1px solid var(--border)",
+      borderRadius: 10,
+      opacity: 0.8
+    } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, fontWeight: 600 } }, h.symbol), /* @__PURE__ */ React.createElement("span", { style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: totalPnl >= 0 ? "var(--mint-text)" : "var(--pink-text)"
+    } }, "\u7D2F\u8A08 ", totalPnl >= 0 ? "+" : "", fmt(totalPnl))), h.name && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2 } }, h.name));
+  })));
+}
+function SettleDetailSheet({ state, settleGroup, onClose, onDeleteGroup }) {
+  const swipe = useSwipeBack(onClose);
+  const tradeId = settleGroup[0]?.tradeId;
+  const trade = state.trades.find((tr) => tr.id === tradeId);
+  const holding = trade ? state.holdings.find((h) => h.id === trade.holdingId) : null;
+  const settleOut = settleGroup.find((t) => t.transferRole === "settle_out");
+  const settleIn = settleGroup.find((t) => t.transferRole === "settle_in");
+  const pnlIn = settleGroup.find((t) => t.transferRole === "settle_pnl_in");
+  const pnlOut = settleGroup.find((t) => t.transferRole === "settle_pnl_out");
+  const investAcct = settleOut ? state.accounts.find((a) => a.id === settleOut.accountId) : null;
+  const recvAcct = settleIn ? state.accounts.find((a) => a.id === settleIn.accountId) : null;
+  const date = settleGroup[0]?.date || trade?.date || "";
+  const principal = settleOut?.amount || trade?.matchedCost || 0;
+  const realizedPnl = pnlIn ? pnlIn.amount : pnlOut ? -pnlOut.amount : trade?.realizedPnl || 0;
+  const totalReceived = principal + (pnlIn ? pnlIn.amount : 0) - (pnlOut ? pnlOut.amount : 0);
+  const fee = trade?.fee || 0;
+  const tax = trade?.tax || 0;
+  const shares = trade?.shares || 0;
+  const userNote = (() => {
+    const n = settleGroup[0]?.note || "";
+    const m = n.match(/^\[賣出 [^\]]+\]\s*(.*)$/);
+    return m ? m[1] : n;
+  })();
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-sheet": "true",
+      style: {
+        ...styles.sheet,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          background: "transparent",
+          border: "none",
+          color: "var(--text-dim)",
+          fontSize: 22,
+          cursor: "pointer",
+          padding: "6px 12px"
+        },
+        onClick: onClose
+      },
+      "\u2039"
+    ), /* @__PURE__ */ React.createElement("div", { style: { ...styles.sheetTitle, color: "var(--text)" } }, "\u80A1\u7968\u7D50\u7B97\u8A73\u60C5"), /* @__PURE__ */ React.createElement("div", { style: { width: 50 } })),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: {
+      margin: "12px 16px",
+      padding: "20px 16px",
+      borderRadius: 14,
+      background: "var(--bg-card)",
+      border: "1px solid var(--border)",
+      textAlign: "center"
+    } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-dim)", marginBottom: 4 } }, "\u8CE3\u51FA ", /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700, color: "var(--text)" } }, holding?.symbol || "(\u5DF2\u522A\u9664)")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginBottom: 12 } }, shares.toLocaleString(), " \u80A1 \xB7 ", date), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)" } }, "\u5BE6\u73FE\u640D\u76CA"), /* @__PURE__ */ React.createElement("div", { style: {
+      fontSize: 28,
+      fontWeight: 700,
+      marginTop: 4,
+      color: realizedPnl > 0 ? "var(--mint-text)" : realizedPnl < 0 ? "var(--pink-text)" : "var(--text)"
+    } }, realizedPnl > 0 ? "+" : "", fmt(realizedPnl))), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6, paddingLeft: 4 } }, "\u660E\u7D30"), /* @__PURE__ */ React.createElement("div", { style: {
+      background: "var(--bg-card)",
+      border: "1px solid var(--border)",
+      borderRadius: 12,
+      overflow: "hidden"
+    } }, [
+      { label: "\u552E\u51FA\u91D1\u984D", value: fmt(totalReceived) },
+      { label: "\u914D\u5C0D\u6210\u672C", value: fmt(principal) },
+      ...fee > 0 ? [{ label: "\u624B\u7E8C\u8CBB", value: fmt(fee) }] : [],
+      ...tax > 0 ? [{ label: "\u8B49\u4EA4\u7A05", value: fmt(tax) }] : [],
+      { label: "\u6295\u8CC7\u5E33\u6236", value: investAcct?.name || "(\u5DF2\u522A\u9664)" },
+      { label: "\u6536\u6B3E\u5E33\u6236", value: recvAcct?.name || "(\u5DF2\u522A\u9664)" },
+      ...userNote ? [{ label: "\u5099\u8A3B", value: userNote }] : []
+    ].map((row, i, arr) => /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        key: i,
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "12px 14px",
+          borderBottom: i < arr.length - 1 ? "1px solid var(--border)" : "none",
+          fontSize: 14
+        }
+      },
+      /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)" } }, row.label),
+      /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text)", fontWeight: 500 } }, row.value)
+    )))), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6, paddingLeft: 4 } }, "\u4E3B\u5E33\u672C\u95DC\u806F\u7D00\u9304(", settleGroup.length, " \u7B46)"), /* @__PURE__ */ React.createElement("div", { style: {
+      background: "var(--bg-card)",
+      border: "1px solid var(--border)",
+      borderRadius: 12,
+      overflow: "hidden"
+    } }, settleGroup.map((t, i) => {
+      const acct = state.accounts.find((a) => a.id === t.accountId);
+      const roleLabel = t.transferRole === "settle_out" ? "\u672C\u91D1\u6B78\u9084(\u652F\u51FA)" : t.transferRole === "settle_in" ? "\u672C\u91D1\u6B78\u9084(\u6536\u6B3E)" : t.transferRole === "settle_pnl_in" ? "\u7372\u5229\u4E86\u7D50" : t.transferRole === "settle_pnl_out" ? "\u6295\u8CC7\u5931\u5229" : "";
+      const isInc = t.type === "income";
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: t.id,
+          style: {
+            padding: "10px 14px",
+            borderBottom: i < settleGroup.length - 1 ? "1px solid var(--border)" : "none"
+          }
+        },
+        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "var(--text)", fontWeight: 500 } }, roleLabel), /* @__PURE__ */ React.createElement("span", { style: {
+          fontSize: 14,
+          fontWeight: 600,
+          color: isInc ? "var(--mint-text)" : "var(--pink-text)"
+        } }, isInc ? "+" : "-", fmt(t.amount))),
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, acct?.name || "(\u5DF2\u522A\u9664)")
+      );
+    }))), /* @__PURE__ */ React.createElement("div", { style: {
+      margin: "8px 16px 12px",
+      padding: "10px 12px",
+      background: "var(--bg-card)",
+      border: "1px solid var(--border)",
+      borderRadius: 10,
+      fontSize: 12,
+      color: "var(--text-dim)",
+      lineHeight: 1.5
+    } }, "\u80A1\u7968\u7D50\u7B97\u7D00\u9304\u5305\u542B\u672C\u91D1\u6B78\u9084\u8207\u640D\u76CA,\u5F7C\u6B64\u95DC\u806F\u3002\u5982\u9700\u4FEE\u6539,\u8ACB\u522A\u9664\u6574\u7D44\u5F8C\u91CD\u65B0\u5EFA\u7ACB\u3002"), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 24px" } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => onDeleteGroup && onDeleteGroup(settleGroup),
+        style: {
+          width: "100%",
+          padding: "12px",
+          background: "transparent",
+          color: "var(--pink-text)",
+          border: "1.5px solid var(--pink)",
+          borderRadius: 12,
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: "pointer"
+        }
+      },
+      "\u522A\u9664\u6574\u7D44\u7D50\u7B97\u7D00\u9304"
+    )))
+  );
+}
+function HoldingDetailSheet({ state, holding, onClose, onUpdateMarketValue, onBuyMore, onSell, onDeleteTrade, onEditHolding, onEditTrade, setConfirmDialog }) {
+  const swipe = useSwipeBack(onClose);
+  const longPressTimerRef = React.useRef(null);
+  const longPressTriggeredRef = React.useRef(false);
+  if (!holding) return null;
+  const shares = holdingShares(holding, state.trades);
+  const cost = holdingCost(holding, state.trades);
+  const market = holding.marketValue || 0;
+  const pnl = market - cost;
+  const trades = state.trades.filter((t) => t.holdingId === holding.id).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const account = state.accounts.find((a) => a.id === holding.accountId);
+  const handleLongPress = (trade) => {
+    longPressTriggeredRef.current = true;
+    if (!setConfirmDialog || !onDeleteTrade) return;
+    const isBuy = trade.type === "buy";
+    const amt = isBuy ? trade.totalCost : trade.totalReceived;
+    setConfirmDialog({
+      title: "\u522A\u9664\u7D00\u9304",
+      messageList: {
+        before: `\u5C07\u6C38\u4E45\u522A\u9664\u9019\u7B46${isBuy ? "\u8CB7\u9032" : "\u8CE3\u51FA"}\u7D00\u9304:`,
+        items: [
+          `${(trade.date || "").replace(/-/g, "/")}  ${isBuy ? "\u8CB7\u9032" : "\u8CE3\u51FA"} ${trade.shares.toLocaleString()} \u80A1  ${isBuy ? "-" : "+"}${fmt(amt)}`,
+          ...isBuy ? ["\u540C\u6642\u6703\u522A\u9664\u4E3B\u5E33\u672C\u4E0A\u7684\u6263\u6B3E\u7D00\u9304"] : ["\u540C\u6642\u6703\u522A\u9664\u4E3B\u5E33\u672C\u4E0A\u7684\u6536\u6B3E + \u640D\u76CA\u7D00\u9304"]
+        ],
+        after: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F"
+      },
+      confirmText: "\u522A\u9664",
+      danger: true,
+      onConfirm: () => {
+        onDeleteTrade(trade.id);
+      }
+    });
+  };
+  const startLongPress = (trade) => {
+    longPressTriggeredRef.current = false;
+    longPressTimerRef.current = setTimeout(() => handleLongPress(trade), 500);
+  };
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-sheet": "true",
+      style: {
+        ...styles.sheet,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          background: "transparent",
+          border: "none",
+          color: "var(--text-dim)",
+          fontSize: 22,
+          cursor: "pointer",
+          padding: "6px 12px"
+        },
+        onClick: onClose
+      },
+      "\u2039"
+    ), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          ...styles.sheetTitle,
+          color: "var(--text)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 2
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: {
+        fontSize: 22,
+        fontWeight: 800,
+        letterSpacing: 0.5,
+        lineHeight: 1.1
+      } }, holding.symbol),
+      holding.name && /* @__PURE__ */ React.createElement("div", { style: {
+        fontSize: 13,
+        fontWeight: 500,
+        color: "var(--text-dim)",
+        lineHeight: 1.1,
+        maxWidth: 220,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      } }, holding.name)
+    ), /* @__PURE__ */ React.createElement("div", { style: { width: 50 } })),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: {
+      margin: "12px 16px",
+      padding: "20px 16px",
+      borderRadius: 14,
+      background: "var(--bg-card)",
+      border: "1px solid var(--border)",
+      textAlign: "center"
+    } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 4 } }, shares.toLocaleString(), " \u80A1 \xB7 \u6295\u5165 ", fmt(cost)), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 14, fontSize: 12, color: "var(--text-faint)", letterSpacing: 1 } }, "\u76EE\u524D\u5E02\u503C"), /* @__PURE__ */ React.createElement("div", { style: {
+      fontSize: 42,
+      fontWeight: 800,
+      marginTop: 4,
+      fontFamily: "var(--num-font)",
+      lineHeight: 1.05,
+      letterSpacing: 0.5
+    } }, market > 0 ? fmt(market) : "\u2014"), market > 0 && cost > 0 && /* @__PURE__ */ React.createElement("div", { style: {
+      marginTop: 8,
+      display: "inline-flex",
+      alignItems: "baseline",
+      gap: 8,
+      color: pnl >= 0 ? "var(--mint-text)" : "var(--pink-text)",
+      fontWeight: 700
+    } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, fontFamily: "var(--num-font)" } }, pnl >= 0 ? "+" : "", fmt(pnl)), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, fontFamily: "var(--num-font)" } }, "(", pnl >= 0 ? "+" : "", (cost > 0 ? pnl / cost * 100 : 0).toFixed(2), "%)"))), /* @__PURE__ */ React.createElement("div", { style: {
+      margin: "0 16px 16px",
+      borderRadius: 14,
+      background: "var(--bg-card)",
+      border: "1px solid var(--border)",
+      overflow: "hidden"
+    } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => onEditHolding && onEditHolding(holding, "symbol"),
+        style: {
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          padding: "14px 16px",
+          background: "transparent",
+          border: "none",
+          borderBottom: "1px solid var(--border)",
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent",
+          textAlign: "left"
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-dim)", width: 56, flexShrink: 0 } }, "\u4EE3\u865F"),
+      /* @__PURE__ */ React.createElement("div", { style: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: 600,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      } }, holding.symbol),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, color: "var(--text-faint)", marginLeft: 8 } }, "\u203A")
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => onEditHolding && onEditHolding(holding, "name"),
+        style: {
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          padding: "14px 16px",
+          background: "transparent",
+          border: "none",
+          borderBottom: "1px solid var(--border)",
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent",
+          textAlign: "left"
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-dim)", width: 56, flexShrink: 0 } }, "\u540D\u7A31"),
+      /* @__PURE__ */ React.createElement("div", { style: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: 500,
+        color: holding.name ? "var(--text)" : "var(--text-faint)",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      } }, holding.name || "(\u672A\u8A2D\u5B9A)"),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, color: "var(--text-faint)", marginLeft: 8 } }, "\u203A")
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => onUpdateMarketValue && onUpdateMarketValue(holding),
+        style: {
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          padding: "14px 16px",
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent",
+          textAlign: "left"
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-dim)", width: 56, flexShrink: 0 } }, "\u5E02\u503C"),
+      /* @__PURE__ */ React.createElement("div", { style: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: 600,
+        color: market > 0 ? "var(--text)" : "var(--mint-text)",
+        fontFamily: "var(--num-font)",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      } }, market > 0 ? fmt(market) : "\u9EDE\u6B64\u8A2D\u5B9A"),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, color: "var(--text-faint)", marginLeft: 8 } }, "\u203A")
+    )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, margin: "0 16px 16px" } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => onBuyMore && onBuyMore(holding),
+        style: {
+          flex: 1,
+          padding: "12px",
+          background: "var(--mint)",
+          color: "#fff",
+          border: "none",
+          borderRadius: 12,
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: "pointer"
+        }
+      },
+      "+ \u52A0\u8CB7"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => onSell && onSell(holding),
+        disabled: shares === 0,
+        style: {
+          flex: 1,
+          padding: "12px",
+          background: shares === 0 ? "var(--bg-card)" : "var(--pink)",
+          color: shares === 0 ? "var(--text-faint)" : "#fff",
+          border: "none",
+          borderRadius: 12,
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: shares === 0 ? "not-allowed" : "pointer"
+        }
+      },
+      "\u8CE3\u51FA"
+    )), /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 8, paddingLeft: 4, display: "flex", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", null, "\u8CB7\u8CE3\u7D00\u9304(", trades.length, ")"), trades.length > 0 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, color: "var(--text-faint)" } }, onEditTrade ? "\u9EDE\u6B64\u7DE8\u8F2F \xB7 \u9577\u6309\u53EF\u522A\u9664" : "\u9577\u6309\u53EF\u522A\u9664")), trades.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", padding: 16, textAlign: "center" } }, "\u5C1A\u7121\u7D00\u9304") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, trades.map((t) => {
+      const isBuy = t.type === "buy";
+      const amt = isBuy ? t.totalCost : t.totalReceived;
+      const pnlPart = !isBuy && t.realizedPnl !== void 0 ? t.realizedPnl : null;
+      const canEdit = isBuy && onEditTrade;
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: t.id,
+          onClick: canEdit ? () => onEditTrade(t, holding) : void 0,
+          onTouchStart: () => startLongPress(t),
+          onTouchEnd: cancelLongPress,
+          onTouchMove: cancelLongPress,
+          onTouchCancel: cancelLongPress,
+          onMouseDown: () => startLongPress(t),
+          onMouseUp: cancelLongPress,
+          onMouseLeave: cancelLongPress,
+          onContextMenu: (e) => {
+            e.preventDefault();
+            handleLongPress(t);
+          },
+          style: {
+            padding: "10px 12px",
+            borderRadius: 10,
+            background: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            userSelect: "none",
+            WebkitUserSelect: "none",
+            cursor: canEdit ? "pointer" : "default",
+            WebkitTapHighlightColor: "transparent"
+          }
+        },
+        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline" } }, /* @__PURE__ */ React.createElement("span", { style: {
+          fontSize: 12,
+          fontWeight: 600,
+          color: isBuy ? "var(--mint-text)" : "var(--pink-text)"
+        } }, isBuy ? "\u8CB7\u9032" : "\u8CE3\u51FA", " ", t.shares.toLocaleString(), " \u80A1"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, fontWeight: 600 } }, isBuy ? "-" : "+", fmt(amt))),
+        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginTop: 4 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "var(--text-faint)" } }, (t.date || "").replace(/-/g, "/")), pnlPart !== null && /* @__PURE__ */ React.createElement("span", { style: {
+          fontSize: 11,
+          fontWeight: 500,
+          color: pnlPart >= 0 ? "var(--mint-text)" : "var(--pink-text)"
+        } }, "\u640D\u76CA ", pnlPart >= 0 ? "+" : "", fmt(pnlPart))),
+        t.note && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 4 } }, t.note)
+      );
+    }))))
+  );
+}
+function AccountPickerSheet({ state, currentId, excludeIds, onPick, onClose, title }) {
+  const swipe = useSwipeBack(onClose);
+  const filtered = state.accounts.filter(
+    (a) => !excludeIds?.includes(a.id) && !a.isSystem
+  );
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-sheet": "true",
+      style: {
+        ...styles.sheet,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          background: "transparent",
+          border: "none",
+          color: "var(--text-dim)",
+          fontSize: 22,
+          cursor: "pointer",
+          padding: "6px 12px"
+        },
+        onClick: onClose
+      },
+      "\xD7"
+    ), /* @__PURE__ */ React.createElement("div", { style: { ...styles.sheetTitle, color: "var(--text)" } }, title || "\u9078\u64C7\u5E33\u6236"), /* @__PURE__ */ React.createElement("div", { style: { width: 50 } })),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, padding: 12 } }, filtered.map((a) => {
+      const typeMeta = state.accountTypes.find((t) => t.value === a.type);
+      const bal = calcBalance(a, state.transactions);
+      const isSelected = a.id === currentId;
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: a.id,
+          onClick: () => onPick(a.id),
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "12px 14px",
+            borderRadius: 12,
+            background: "var(--bg-card)",
+            border: isSelected ? "2px solid var(--mint)" : "1.5px solid var(--border)",
+            cursor: "pointer"
+          }
+        },
+        /* @__PURE__ */ React.createElement("div", { style: {
+          width: 30,
+          height: 30,
+          borderRadius: 8,
+          background: typeMeta?.color || "#f5c29c",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: typeMeta?.icon || "box", size: 16, color: "#fff" })),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 500 } }, a.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)" } }, typeMeta?.label || "\u5176\u4ED6")),
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-dim)" } }, bal.toLocaleString())
+      );
+    })))
+  );
+}
+function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, selectedDate, setSelectedDate, onAdd, onClickTxn, onViewAll, onOpenPeriod, onOpenAccount, onOpenDate, onOpenLend, editMode, setEditMode, blockOrder, moveBlock, setPageOrder, setConfirmDialog, toastRich, toast, onSelectModeChange }) {
+  const [recentFilter, setRecentFilter] = useState(() => {
+    try {
+      return localStorage.getItem("ledger_recent_filter") || "all";
+    } catch {
+      return "all";
+    }
+  });
+  const [sortMode, setSortMode] = useListSort();
+  const recentContentRef = React.useRef(null);
+  const [recentMinHeight, setRecentMinHeight] = useState(0);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => /* @__PURE__ */ new Set());
+  React.useEffect(() => {
+    if (onSelectModeChange) onSelectModeChange(selectMode);
+  }, [selectMode]);
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(/* @__PURE__ */ new Set());
+  };
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const enterSelectModeWith = (id) => {
+    setSelectMode(true);
+    setSelectedIds(/* @__PURE__ */ new Set([id]));
+  };
+  const changeRecentFilter = (v) => {
+    if (v === recentFilter) return;
+    setRecentFilter(v);
+    try {
+      localStorage.setItem("ledger_recent_filter", v);
+    } catch {
+    }
+  };
+  const shiftMonth = (delta) => {
+    const [y, m] = currentMonth.split("-").map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  };
+  React.useLayoutEffect(() => {
+    if (recentFilter === "all" && recentContentRef.current) {
+      const h = recentContentRef.current.offsetHeight;
+      if (h > 0 && h !== recentMinHeight) setRecentMinHeight(h);
+    }
+  }, [recentFilter, state.transactions]);
+  let monthInc = 0, monthExp = 0;
+  for (const t of state.transactions) {
+    if (!t.date.startsWith(currentMonth)) continue;
+    if (!isRealFlow(t)) continue;
+    if (t.type === "income") monthInc += t.amount;
+    else if (t.type === "expense") monthExp += t.amount;
+  }
+  const today = todayStr();
+  const now = /* @__PURE__ */ new Date();
+  const dayOfWeek = now.getDay();
+  const weekStartDate = new Date(now);
+  weekStartDate.setDate(now.getDate() - dayOfWeek);
+  const weekEndDate = new Date(weekStartDate);
+  weekEndDate.setDate(weekStartDate.getDate() + 6);
+  const toIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const weekStart = toIso(weekStartDate);
+  const weekEnd = toIso(weekEndDate);
+  const thisMonth = today.slice(0, 7);
+  const thisYear = today.slice(0, 4);
+  const totals = React.useMemo(() => {
+    const t = { todayInc: 0, todayExp: 0, weekInc: 0, weekExp: 0, monthIncP: 0, monthExpP: 0, yearInc: 0, yearExp: 0 };
+    for (const tx of state.transactions) {
+      if (!isRealFlow(tx)) continue;
+      const d = tx.date;
+      const isToday = d === today;
+      const isThisWeek = d >= weekStart && d <= weekEnd;
+      const isThisMonth = d.startsWith(thisMonth);
+      const isThisYear = d.startsWith(thisYear);
+      if (tx.type === "income") {
+        if (isToday) t.todayInc += tx.amount;
+        if (isThisWeek) t.weekInc += tx.amount;
+        if (isThisMonth) t.monthIncP += tx.amount;
+        if (isThisYear) t.yearInc += tx.amount;
+      } else if (tx.type === "expense") {
+        if (isToday) t.todayExp += tx.amount;
+        if (isThisWeek) t.weekExp += tx.amount;
+        if (isThisMonth) t.monthExpP += tx.amount;
+        if (isThisYear) t.yearExp += tx.amount;
+      }
+    }
+    return t;
+  }, [state.transactions, today, weekStart, weekEnd, thisMonth, thisYear]);
+  const { todayInc, todayExp, weekInc, weekExp, monthIncP, monthExpP, yearInc, yearExp } = totals;
+  const thisYearStart = `${thisYear}/01/01`;
+  const thisYearEnd = `${thisYear}/12/31`;
+  const monthEndDay = new Date(parseInt(thisMonth.slice(0, 4)), parseInt(thisMonth.slice(5, 7)), 0).getDate();
+  const monthStartStr = `${thisMonth.replace("-", "/")}/01`;
+  const monthEndStr = `${thisMonth.replace("-", "/")}/${String(monthEndDay).padStart(2, "0")}`;
+  const roleOrder = { in: 0, out: 1, fee: 2 };
+  const { recent, recentGroups, recentGroupKeys } = React.useMemo(() => {
+    const isTrueTransfer = (t) => t.transferRole === "out" || t.transferRole === "in" || t.transferRole === "fee";
+    const filtered = state.transactions.filter((t) => {
+      if (recentFilter === "all") return true;
+      if (recentFilter === "transfer") return isTrueTransfer(t);
+      if (recentFilter === "expense") return t.type === "expense" && !isTrueTransfer(t);
+      if (recentFilter === "income") return t.type === "income" && !isTrueTransfer(t);
+      return true;
+    });
+    let result;
+    if (isAmountSort(sortMode)) {
+      result = sortTxnList(filtered, sortMode).slice(0, 15);
+    } else {
+      result = [...filtered].sort((a, b) => {
+        const cmp = sortMode === "date_asc" ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date);
+        if (cmp !== 0) return cmp;
+        const cmp2 = sortMode === "date_asc" ? (a.createdAt || 0) - (b.createdAt || 0) : (b.createdAt || 0) - (a.createdAt || 0);
+        if (cmp2 !== 0) return cmp2;
+        const ra = roleOrder[a.transferRole] ?? 99;
+        const rb = roleOrder[b.transferRole] ?? 99;
+        return ra - rb;
+      }).slice(0, 15);
+    }
+    const groups = {};
+    const keys = [];
+    for (const t of result) {
+      if (!groups[t.date]) {
+        groups[t.date] = [];
+        keys.push(t.date);
+      }
+      groups[t.date].push(t);
+    }
+    return { recent: result, recentGroups: groups, recentGroupKeys: keys };
+  }, [state.transactions, recentFilter, sortMode]);
+  const selectableCount = recent.length;
+  const allSelected = selectableCount > 0 && selectedIds.size === selectableCount;
+  const exitSwipe = useSwipeToClose(selectMode ? exitSelectMode : null);
+  const toggleAll = () => {
+    if (allSelected) setSelectedIds(/* @__PURE__ */ new Set());
+    else setSelectedIds(new Set(recent.map((t) => t.id)));
+  };
+  const doBatchDelete = () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const sel = state.transactions.filter((t) => ids.includes(t.id));
+    const transferIds = /* @__PURE__ */ new Set();
+    const settleIds = /* @__PURE__ */ new Set();
+    sel.forEach((t) => {
+      if (t.transferId) transferIds.add(t.transferId);
+      if (t.settleId) settleIds.add(t.settleId);
+    });
+    const actuallyDeleteIds = new Set(ids);
+    state.transactions.forEach((t) => {
+      if (t.transferId && transferIds.has(t.transferId)) actuallyDeleteIds.add(t.id);
+      if (t.settleId && settleIds.has(t.settleId)) actuallyDeleteIds.add(t.id);
+    });
+    const cascadeIds = expandStockBuyCascade(state, actuallyDeleteIds);
+    if (cascadeIds.size > 0) {
+      for (const id of cascadeIds) actuallyDeleteIds.add(id);
+    }
+    const delCount = actuallyDeleteIds.size;
+    const includesTransfer = transferIds.size > 0;
+    const includesSettle = settleIds.size > 0;
+    const expandedCount = delCount - ids.length;
+    const listText = buildBatchDeletePreview(state.transactions, selectedIds, actuallyDeleteIds);
+    if (!setConfirmDialog) return;
+    let linkMsg;
+    if (expandedCount > 0) {
+      if (includesTransfer && includesSettle) {
+        linkMsg = "\u540C\u7D44\u8F49\u5E33\u8207\u80A1\u7968\u7D50\u7B97\u5C07\u4E00\u4F75\u522A\u9664\u3002";
+      } else if (includesSettle) {
+        linkMsg = "\u672C\u91D1\u6B78\u9084\u8207\u640D\u76CA\u5C6C\u540C\u4E00\u7D44,\u5C07\u4E00\u4F75\u522A\u9664\u3002";
+      } else if (includesTransfer) {
+        linkMsg = "\u8F49\u5E33\u5169\u7AEF\u7D00\u9304\u5C6C\u540C\u4E00\u7D44,\u5C07\u4E00\u4F75\u522A\u9664\u3002";
+      }
+    }
+    const stockImpact = detectStockBuyImpact(state, actuallyDeleteIds);
+    if (stockImpact.msg) {
+      linkMsg = (linkMsg ? linkMsg + "\n\n" : "") + stockImpact.msg;
+    }
+    setConfirmDialog({
+      title: stockImpact.anyHoldingDestroyed ? "\u522A\u9664\u80A1\u7968\u8CB7\u9032" : includesSettle && includesTransfer ? "\u522A\u9664\u591A\u7B46\u7D00\u9304" : includesSettle ? "\u522A\u9664\u80A1\u7968\u7D50\u7B97" : includesTransfer ? "\u522A\u9664\u8F49\u5E33" : `\u522A\u9664 ${ids.length} \u7B46\u4EA4\u6613`,
+      target: { label: "\u5C07\u522A\u9664", name: listText, multiline: true },
+      message: linkMsg,
+      warning: "\u6B64\u64CD\u4F5C\u7121\u6CD5\u5FA9\u539F",
+      confirmText: stockImpact.anyHoldingDestroyed ? "\u4ECD\u8981\u522A\u9664\u6301\u80A1" : "\u522A\u9664",
+      highlightWords: stockImpact.highlightWords,
+      danger: true,
+      onConfirm: () => {
+        setState && setState((s) => ({
+          ...s,
+          transactions: s.transactions.filter((t) => !actuallyDeleteIds.has(t.id))
+        }));
+        if (toastRich) {
+          toastRich({ title: `\u5DF2\u522A\u9664 ${delCount} \u7B46`, amount: "\u2713", amountColor: "var(--pink-text)" }, 1200);
+        } else if (toast) {
+          toast(`\u5DF2\u522A\u9664 ${delCount} \u7B46`);
+        }
+        exitSelectMode();
+      }
+    });
+  };
+  return /* @__PURE__ */ React.createElement("div", { style: styles.page, ...selectMode ? exitSwipe : {} }, /* @__PURE__ */ React.createElement("div", { style: styles.topBar }, selectMode ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: styles.topBarMain }, /* @__PURE__ */ React.createElement("div", { style: styles.appName }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)" } }, "\u5DF2\u9078"), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 6, fontVariantNumeric: "tabular-nums" } }, selectedIds.size), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 4, fontSize: 14, fontWeight: 500, color: "var(--text-dim)" } }, "/", selectableCount))), /* @__PURE__ */ React.createElement(
+    "span",
+    {
+      style: {
+        fontSize: 14,
+        fontWeight: 600,
+        color: "var(--pink-text)",
+        cursor: "pointer",
+        padding: "6px 14px",
+        borderRadius: 16,
+        border: "1.5px solid var(--pink)",
+        background: "rgba(245, 181, 192, 0.08)",
+        userSelect: "none",
+        WebkitTapHighlightColor: "transparent"
+      },
+      onClick: exitSelectMode
+    },
+    "\u53D6\u6D88"
+  )) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: styles.topBarMain }, /* @__PURE__ */ React.createElement("div", { style: styles.appName }, "\u8A18\u5E33\u8EDF\u9AD4")), /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode }))), /* @__PURE__ */ React.createElement(EditModeBanner, { editMode, setEditMode }), /* @__PURE__ */ React.createElement("div", { style: styles.pageScroll }, /* @__PURE__ */ React.createElement("div", { style: {
+    ...styles.stickySummary,
+    ...editMode ? { position: "static" } : {}
+  } }, /* @__PURE__ */ React.createElement(
+    Block,
+    {
+      editMode: false,
+      blockKey: "summary",
+      isFirst: true,
+      isLast: false,
+      title: "\u672C\u6708\u6536\u652F"
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.summaryRow }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u6536\u5165"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: "var(--mint-text)", fontSize: autoFitFontSize(fmt(monthInc)) } }, fmt(monthInc))), /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u652F\u51FA"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: "var(--pink-text)", fontSize: autoFitFontSize(fmt(monthExp)) } }, fmt(monthExp))), /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u7D50\u9918"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: monthInc - monthExp < 0 ? "var(--pink)" : monthInc - monthExp > 0 ? "var(--mint)" : "var(--text)", fontSize: autoFitFontSize(fmtSigned(monthInc - monthExp)) } }, fmtSigned(monthInc - monthExp))))
+  )), blockOrder.filter((k) => k !== "summary").map((blockKey, idx, arr) => {
+    const blockProps = {
+      onReorder: setPageOrder,
+      key: blockKey,
+      blockKey,
+      editMode,
+      isFirst: idx === 0,
+      isLast: idx === arr.length - 1,
+      onMoveUp: () => moveBlock(blockKey, -1),
+      onMoveDown: () => moveBlock(blockKey, 1)
+    };
+    if (blockKey === "summary") {
+      return null;
+    }
+    if (blockKey === "dateStrip") {
+      return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: "\u65E5\u671F" }, /* @__PURE__ */ React.createElement(
+        Calendar,
+        {
+          state,
+          currentMonth,
+          selectedDate,
+          setSelectedDate,
+          onOpenDate,
+          editMode
+        }
+      ));
+    }
+    if (blockKey === "actions") {
+      return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: "\u5FEB\u901F\u52D5\u4F5C" }, /* @__PURE__ */ React.createElement("div", { style: styles.addRow }, /* @__PURE__ */ React.createElement("button", { style: styles.recordBtn, onClick: () => !editMode && onAdd("expense") }, /* @__PURE__ */ React.createElement("span", { style: styles.recordBtnIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cash", size: 20, color: "#1a1a1a" })), /* @__PURE__ */ React.createElement("span", null, "\u8A18\u4E00\u7B46")), /* @__PURE__ */ React.createElement("button", { style: styles.addAcctBtn, onClick: () => !editMode && onOpenAccount() }, /* @__PURE__ */ React.createElement("span", { style: styles.recordBtnIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "bank", size: 18, color: "var(--text-dim)" })), /* @__PURE__ */ React.createElement("span", null, "\u5E33\u6236"))));
+    }
+    if (blockKey === "lendReminder") {
+      const lendOuts = state.transactions.filter((t) => t.transferRole === "lend_out" && (t.lendMeta?.status === "pending" || t.lendMeta?.status === "partial")).sort((a, b) => {
+        const ad = a.lendMeta?.expectDate || "9999-12-31";
+        const bd = b.lendMeta?.expectDate || "9999-12-31";
+        return ad.localeCompare(bd);
+      });
+      if (lendOuts.length === 0) return null;
+      const today2 = todayStr();
+      const totalRemaining = lendOuts.reduce((s, t) => s + (t.amount - (t.lendMeta?.collectedAmount || 0)), 0);
+      return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: `\u4EE3\u588A\u63D0\u9192 \xB7 ${lendOuts.length} \u7B46\u672A\u6536\u56DE` }, /* @__PURE__ */ React.createElement("div", { style: {
+        background: "var(--bg-card-2, rgba(127,127,127,0.05))",
+        borderRadius: 12,
+        padding: 4
+      } }, /* @__PURE__ */ React.createElement("div", { style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "8px 12px",
+        borderBottom: "1px solid var(--border-soft)",
+        fontSize: 13,
+        color: "var(--text-dim)"
+      } }, /* @__PURE__ */ React.createElement("span", null, "\u672A\u6536\u56DE\u7E3D\u984D"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", fontWeight: 700, fontSize: 15 } }, fmt(totalRemaining))), lendOuts.map((t, i) => {
+        const remaining = t.amount - (t.lendMeta?.collectedAmount || 0);
+        const isPartial = t.lendMeta?.status === "partial";
+        const expDate = t.lendMeta?.expectDate;
+        const overdue = expDate && expDate < today2;
+        const debtor = t.lendMeta?.debtor;
+        return /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            key: t.id,
+            onClick: () => !editMode && onOpenLend && onOpenLend(t),
+            style: {
+              padding: "10px 12px",
+              cursor: "pointer",
+              borderBottom: i === lendOuts.length - 1 ? "none" : "1px solid var(--border-soft)",
+              display: "flex",
+              alignItems: "center",
+              gap: 10
+            }
+          },
+          /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 500, color: "var(--text)", display: "flex", alignItems: "center", gap: 6 } }, debtor && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", fontWeight: 600 } }, debtor), /* @__PURE__ */ React.createElement("span", { style: {
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            color: debtor ? "var(--text-dim)" : "var(--text)"
+          } }, t.note || "[\u4EE3\u588A]")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 3, display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", null, t.date.replace(/-/g, "/")), expDate && /* @__PURE__ */ React.createElement("span", { style: { color: overdue ? "var(--pink)" : "var(--text-faint)" } }, "\u9810\u8A08 ", expDate.slice(5).replace("-", "/"), overdue ? " (\u903E\u671F)" : ""), isPartial && /* @__PURE__ */ React.createElement("span", { style: {
+            fontSize: 10,
+            padding: "1px 6px",
+            borderRadius: 8,
+            background: "rgba(245,216,74,0.18)",
+            color: "var(--highlight)"
+          } }, "\u5DF2\u6536\u56DE ", fmt(t.lendMeta.collectedAmount)))),
+          /* @__PURE__ */ React.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: "var(--mint-text)" } }, fmt(remaining))),
+          /* @__PURE__ */ React.createElement("div", { style: { color: "var(--text-faint)", fontSize: 18 } }, "\u203A")
+        );
+      })));
+    }
+    if (blockKey === "periods") {
+      return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: "\u671F\u9593\u82B1\u8CBB" }, /* @__PURE__ */ React.createElement("div", { style: styles.periodCard }, [
+        { key: "today", label: "\u672C\u65E5\u82B1\u8CBB", range: today.replace(/-/g, "/"), inc: todayInc, exp: todayExp },
+        { key: "week", label: "\u672C\u9031\u82B1\u8CBB", range: `${weekStart.replace(/-/g, "/")} ~ ${weekEnd.replace(/-/g, "/")}`, inc: weekInc, exp: weekExp },
+        { key: "month", label: "\u672C\u6708\u82B1\u8CBB", range: `${monthStartStr} ~ ${monthEndStr}`, inc: monthIncP, exp: monthExpP },
+        { key: "year", label: "\u672C\u5E74\u82B1\u8CBB", range: `${thisYearStart} ~ ${thisYearEnd}`, inc: yearInc, exp: yearExp }
+      ].map((p, i, arr2) => /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: p.key,
+          style: { ...styles.periodRow, borderBottom: i === arr2.length - 1 ? "none" : "1px solid var(--border-soft)" },
+          onClick: () => !editMode && onOpenPeriod(p.key)
+        },
+        /* @__PURE__ */ React.createElement("div", { style: styles.periodLeft }, /* @__PURE__ */ React.createElement("div", { style: styles.periodLabel }, p.label), /* @__PURE__ */ React.createElement("div", { style: styles.periodRange }, p.range)),
+        /* @__PURE__ */ React.createElement("div", { style: styles.periodRight }, /* @__PURE__ */ React.createElement("div", { style: styles.periodIncAmt }, "+", fmt(p.inc)), /* @__PURE__ */ React.createElement("div", { style: styles.periodExpAmt }, "-", fmt(p.exp))),
+        /* @__PURE__ */ React.createElement("div", { style: styles.periodArrow }, "\u203A")
+      ))));
+    }
+    if (blockKey === "recent") {
+      const filterOpts = [
+        { key: "transfer", label: "\u8F49\u5E33" },
+        { key: "income", label: "\u6536\u5165" },
+        { key: "expense", label: "\u652F\u51FA" },
+        { key: "all", label: "\u5168\u90E8" }
+      ];
+      const contentStyle = recentFilter !== "all" && recentMinHeight > 0 ? { minHeight: recentMinHeight } : {};
+      return /* @__PURE__ */ React.createElement(Block, { key: blockKey, ...blockProps, title: "\u6700\u8FD1\u7D00\u9304", headerRight: !editMode ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 6 } }, /* @__PURE__ */ React.createElement("div", { style: styles.recentFilterBar }, filterOpts.map((opt) => /* @__PURE__ */ React.createElement(
+        "span",
+        {
+          key: opt.key,
+          style: {
+            ...styles.recentFilterChip,
+            ...recentFilter === opt.key ? styles.recentFilterChipActive : {}
+          },
+          onClick: () => changeRecentFilter(opt.key)
+        },
+        opt.label
+      )), /* @__PURE__ */ React.createElement(ListSortControl, { sortMode, setSortMode }))) : null }, /* @__PURE__ */ React.createElement("div", { ref: recentContentRef, style: contentStyle }, recent.length ? /* @__PURE__ */ React.createElement("div", { style: styles.txnList }, isAmountSort(sortMode) ? (
+        // 金額排序:不分組,扁平輸出
+        recent.map((t) => /* @__PURE__ */ React.createElement(
+          TxnRow,
+          {
+            key: t.id,
+            txn: t,
+            state,
+            catIcon,
+            selectMode,
+            selected: selectedIds.has(t.id),
+            onClick: () => {
+              if (editMode) return;
+              if (selectMode) toggleSelect(t.id);
+              else onClickTxn(t);
+            },
+            onLongPress: () => {
+              if (editMode || selectMode) return;
+              enterSelectModeWith(t.id);
+            }
+          }
+        ))
+      ) : recentGroupKeys.map((date) => {
+        const days = recentGroups[date];
+        const wd = ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][new Date(date).getDay()];
+        return /* @__PURE__ */ React.createElement(React.Fragment, { key: date }, /* @__PURE__ */ React.createElement("div", { style: styles.groupDate }, /* @__PURE__ */ React.createElement("span", null, date.replace(/-/g, "/"), " \xB7 \u9031", wd)), days.map((t) => /* @__PURE__ */ React.createElement(
+          TxnRow,
+          {
+            key: t.id,
+            txn: t,
+            state,
+            catIcon,
+            selectMode,
+            selected: selectedIds.has(t.id),
+            onClick: () => {
+              if (editMode) return;
+              if (selectMode) toggleSelect(t.id);
+              else onClickTxn(t);
+            },
+            onLongPress: () => {
+              if (editMode || selectMode) return;
+              enterSelectModeWith(t.id);
+            }
+          }
+        )));
+      })) : /* @__PURE__ */ React.createElement("div", { style: styles.empty }, recentFilter === "all" ? "\u9084\u6C92\u6709\u7D00\u9304" : `\u6C92\u6709\u7B26\u5408\u300C${filterOpts.find((o) => o.key === recentFilter)?.label}\u300D\u7684\u7D00\u9304`, /* @__PURE__ */ React.createElement("br", null), recentFilter === "all" ? "\u9EDE\u4E0A\u65B9\u6309\u9215\u958B\u59CB\u8A18\u4E00\u7B46" : "\u8A66\u8A66\u5207\u63DB\u5176\u4ED6\u7BE9\u9078")));
+    }
+    return null;
+  }), /* @__PURE__ */ React.createElement("div", { style: styles.versionFooter }, "\u7248\u672C", APP_VERSION)), selectMode && /* @__PURE__ */ React.createElement("div", { style: {
+    position: "fixed",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    maxWidth: 480,
+    margin: "0 auto",
+    padding: "10px 14px calc(12px + env(safe-area-inset-bottom, 0px))",
+    background: "rgba(20, 22, 25, 0.96)",
+    backdropFilter: "blur(20px)",
+    WebkitBackdropFilter: "blur(20px)",
+    borderTop: "1px solid var(--border)",
+    display: "flex",
+    gap: 8,
+    zIndex: 60,
+    boxShadow: "0 -12px 24px rgba(0,0,0,0.3)"
+  } }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      style: {
+        flex: "0 0 auto",
+        padding: "10px 16px",
+        background: "var(--bg-card)",
+        color: "var(--text)",
+        border: "1px solid var(--border)",
+        borderRadius: 10,
+        fontSize: 13,
+        fontWeight: 600,
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: 6
+      },
+      onClick: toggleAll,
+      disabled: selectableCount === 0
+    },
+    /* @__PURE__ */ React.createElement("div", { style: {
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      border: `1.5px solid ${allSelected ? "var(--mint)" : "var(--text-faint)"}`,
+      background: allSelected ? "var(--mint)" : "transparent",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    } }, allSelected && /* @__PURE__ */ React.createElement("svg", { width: "10", height: "10", viewBox: "0 0 24 24", fill: "none", stroke: "#1a1a1a", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "20 6 9 17 4 12" }))),
+    /* @__PURE__ */ React.createElement("span", null, allSelected ? "\u53D6\u6D88\u5168\u9078" : "\u5168\u9078")
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      style: {
+        flex: 1,
+        padding: "10px 16px",
+        background: selectedIds.size > 0 ? "var(--pink)" : "rgba(245, 181, 192, 0.25)",
+        color: selectedIds.size > 0 ? "#1a1a1a" : "var(--text-faint)",
+        border: "none",
+        borderRadius: 10,
+        fontSize: 14,
+        fontWeight: 700,
+        cursor: selectedIds.size > 0 ? "pointer" : "default",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        transition: "background 0.15s, color 0.15s"
+      },
+      onClick: () => selectedIds.size > 0 && doBatchDelete(),
+      disabled: selectedIds.size === 0
+    },
+    /* @__PURE__ */ React.createElement(TypeIcon, { name: "trash", size: 14, color: selectedIds.size > 0 ? "#1a1a1a" : "var(--text-faint)" }),
+    /* @__PURE__ */ React.createElement("span", null, "\u522A\u9664 ", selectedIds.size > 0 ? `(${selectedIds.size})` : "")
+  )));
+}
+function Calendar({ state, currentMonth, selectedDate, setSelectedDate, onOpenDate, editMode }) {
+  const today = todayStr();
+  const todayDate = new Date(today);
+  const cells = [];
+  for (let offset = -3; offset <= 3; offset++) {
+    const d = new Date(todayDate);
+    d.setDate(todayDate.getDate() + offset);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    cells.push({
+      iso,
+      day: d.getDate(),
+      weekday: ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][d.getDay()],
+      isToday: iso === today
+    });
+  }
+  const dayFlags = {};
+  for (const t of state.transactions) {
+    if (!isRealFlow(t)) continue;
+    if (!dayFlags[t.date]) dayFlags[t.date] = { inc: false, exp: false };
+    if (t.type === "income") dayFlags[t.date].inc = true;
+    else if (t.type === "expense") dayFlags[t.date].exp = true;
+  }
+  const handleClick = (iso) => {
+    if (editMode) return;
+    setSelectedDate(iso);
+    if (onOpenDate) onOpenDate(iso);
+  };
+  return /* @__PURE__ */ React.createElement("div", { style: styles.dateStripCard }, /* @__PURE__ */ React.createElement("div", { style: styles.dateStripRow }, cells.map((c) => {
+    const flags = dayFlags[c.iso];
+    const isSelected = c.iso === selectedDate;
+    return /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        key: c.iso,
+        style: {
+          ...styles.dateCell,
+          ...c.isToday ? styles.dateCellToday : {},
+          ...isSelected && !c.isToday ? styles.dateCellSelected : {},
+          ...isSelected && c.isToday ? styles.dateCellTodaySelected : {}
+        },
+        onClick: () => handleClick(c.iso)
+      },
+      /* @__PURE__ */ React.createElement("div", { style: {
+        ...styles.dateCellWeekday,
+        color: c.isToday ? "var(--mint)" : "var(--text-faint)"
+      } }, c.weekday),
+      /* @__PURE__ */ React.createElement("div", { style: {
+        ...styles.dateCellDay,
+        color: c.isToday ? "var(--mint)" : "var(--text)",
+        fontWeight: c.isToday ? 700 : 500
+      } }, c.day),
+      flags ? /* @__PURE__ */ React.createElement("div", { style: styles.dateCellDots }, flags.inc && /* @__PURE__ */ React.createElement("div", { style: { ...styles.dot, background: "var(--mint)" } }), flags.exp && /* @__PURE__ */ React.createElement("div", { style: { ...styles.dot, background: "var(--pink)" } })) : /* @__PURE__ */ React.createElement("div", { style: styles.dateCellDotsPlaceholder })
+    );
+  })));
+}
+function TxnListPage({ state, setState, setConfirmDialog, toastRich, toast, catIcon, currentMonth, setCurrentMonth, onClickTxn, editMode, setEditMode, onSelectModeChange, blockOrder, moveBlock, setPageOrder }) {
+  const [scope, setScope] = useState("month");
+  const [currentDate, setCurrentDate] = useState(todayStr());
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => /* @__PURE__ */ new Set());
+  const [filterMode, setFilterMode] = useState(false);
+  const [showFilter, setShowFilter] = useState(false);
+  const [fStart, setFStart] = useState(todayStr().slice(0, 7) + "-01");
+  const [fEnd, setFEnd] = useState(todayStr());
+  const [fType, setFType] = useState("all");
+  const [fAccount, setFAccount] = useState("all");
+  const [fCategory, setFCategory2] = useState("all");
+  const [fSubCategory, setFSubCategory2] = useState("all");
+  const [fKeyword, setFKeyword] = useState("");
+  const [fPickerOpen, setFPickerOpen] = useState(null);
+  const [fEditField, setFEditField] = useState(null);
+  const filterSwipe = useSwipeToClose(() => setShowFilter(false));
+  const [listFilter, setListFilter] = useState("all");
+  const [sortMode, setSortMode] = useListSort();
+  const PAGE_SIZE = 150;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  React.useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [filterMode, fStart, fEnd, fType, fAccount, fCategory, fSubCategory, fKeyword, sortMode, listFilter, currentMonth]);
+  const applyFilter = () => {
+    if (fStart > fEnd) {
+      if (toast) toast("\u8D77\u59CB\u65E5\u671F\u4E0D\u80FD\u665A\u65BC\u7D50\u675F\u65E5\u671F");
+      return;
+    }
+    setFilterMode(true);
+    setShowFilter(false);
+  };
+  const clearFilter = () => {
+    setFilterMode(false);
+    setShowFilter(false);
+    setFKeyword("");
+    setFType("all");
+    setFAccount("all");
+    setFCategory2("all");
+    setFSubCategory2("all");
+  };
+  useEffect(() => {
+    if (onSelectModeChange) onSelectModeChange(selectMode);
+  }, [selectMode, onSelectModeChange]);
+  useEffect(() => {
+    return () => {
+      if (onSelectModeChange) onSelectModeChange(false);
+    };
+  }, [onSelectModeChange]);
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(/* @__PURE__ */ new Set());
+  };
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const enterSelectModeWith = (id) => {
+    setSelectMode(true);
+    setSelectedIds(/* @__PURE__ */ new Set([id]));
+  };
+  const shiftDay = (delta) => {
+    const d = /* @__PURE__ */ new Date(currentDate + "T00:00:00");
+    d.setDate(d.getDate() + delta);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    setCurrentDate(iso);
+  };
+  const shiftMonth = (delta) => {
+    const [y, m] = currentMonth.split("-").map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  };
+  const shiftYear = (delta) => {
+    const [y, m] = currentMonth.split("-").map(Number);
+    setCurrentMonth(`${y + delta}-${String(m).padStart(2, "0")}`);
+  };
+  const prefix = scope === "day" ? currentDate : scope === "month" ? currentMonth : currentMonth.slice(0, 4);
+  const { monthTxns, inc, exp, sorted, groups, groupKeys } = React.useMemo(() => {
+    const _monthTxns = filterMode ? state.transactions.filter((t) => t.date >= fStart && t.date <= fEnd).filter((t) => {
+      if (fType === "all") return true;
+      if (fType === "stock") return !!(t.tradeId || t.settleId);
+      return t.type === fType;
+    }).filter((t) => fAccount === "all" ? true : t.accountId === fAccount).filter((t) => fCategory === "all" ? true : t.category === fCategory).filter((t) => fSubCategory === "all" ? true : t.subCategory === fSubCategory).filter((t) => {
+      if (!fKeyword.trim()) return true;
+      const kw = fKeyword.trim().toLowerCase();
+      return (t.category || "").toLowerCase().includes(kw) || (t.subCategory || "").toLowerCase().includes(kw) || (t.note || "").toLowerCase().includes(kw);
+    }) : state.transactions.filter((t) => t.date.startsWith(prefix));
+    let _inc = 0, _exp = 0;
+    for (const t of _monthTxns) {
+      if (!isRealFlow(t)) continue;
+      if (t.type === "income") _inc += t.amount;
+      else if (t.type === "expense") _exp += t.amount;
+    }
+    const sortedAll = sortTxnList(_monthTxns, sortMode);
+    const _sorted = filterMode ? sortedAll : sortedAll.filter((t) => {
+      if (listFilter === "all") return true;
+      const isTrueTransfer = t.transferRole === "out" || t.transferRole === "in" || t.transferRole === "fee";
+      if (listFilter === "transfer") return isTrueTransfer;
+      return t.type === listFilter && !isTrueTransfer;
+    });
+    const _groups = {};
+    _sorted.forEach((t) => {
+      var _a;
+      (_groups[_a = t.date] || (_groups[_a] = [])).push(t);
+    });
+    const _groupKeys = isAmountSort(sortMode) ? [] : Object.keys(_groups).sort((a, b) => sortMode === "date_asc" ? a.localeCompare(b) : b.localeCompare(a));
+    return { monthTxns: _monthTxns, inc: _inc, exp: _exp, sorted: _sorted, groups: _groups, groupKeys: _groupKeys };
+  }, [state.transactions, filterMode, fStart, fEnd, fType, fAccount, fCategory, fSubCategory, fKeyword, prefix, sortMode, listFilter]);
+  const baseOrder = blockOrder || ["summary", "period", "list"];
+  const order = filterMode ? baseOrder.filter((k) => k !== "period") : baseOrder;
+  const doBatchDelete = () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const txns = state.transactions.filter((t) => ids.includes(t.id));
+    const transferIds = /* @__PURE__ */ new Set();
+    const settleIds = /* @__PURE__ */ new Set();
+    txns.forEach((t) => {
+      if (t.transferId) transferIds.add(t.transferId);
+      if (t.settleId) settleIds.add(t.settleId);
+    });
+    const actuallyDeleteIds = new Set(ids);
+    state.transactions.forEach((t) => {
+      if (t.transferId && transferIds.has(t.transferId)) actuallyDeleteIds.add(t.id);
+      if (t.settleId && settleIds.has(t.settleId)) actuallyDeleteIds.add(t.id);
+    });
+    const cascadeIds = expandStockBuyCascade(state, actuallyDeleteIds);
+    if (cascadeIds.size > 0) {
+      for (const id of cascadeIds) actuallyDeleteIds.add(id);
+    }
+    const delCount = actuallyDeleteIds.size;
+    const includesTransfer = transferIds.size > 0;
+    const includesSettle = settleIds.size > 0;
+    const expandedCount = delCount - ids.length;
+    const listText = buildBatchDeletePreview(state.transactions, selectedIds, actuallyDeleteIds);
+    let linkMsg;
+    if (expandedCount > 0) {
+      if (includesTransfer && includesSettle) {
+        linkMsg = "\u540C\u7D44\u8F49\u5E33\u8207\u80A1\u7968\u7D50\u7B97\u5C07\u4E00\u4F75\u522A\u9664\u3002";
+      } else if (includesSettle) {
+        linkMsg = "\u672C\u91D1\u6B78\u9084\u8207\u640D\u76CA\u5C6C\u540C\u4E00\u7D44,\u5C07\u4E00\u4F75\u522A\u9664\u3002";
+      } else if (includesTransfer) {
+        linkMsg = "\u8F49\u5E33\u5169\u7AEF\u7D00\u9304\u5C6C\u540C\u4E00\u7D44,\u5C07\u4E00\u4F75\u522A\u9664\u3002";
+      }
+    }
+    const stockImpact = detectStockBuyImpact(state, actuallyDeleteIds);
+    if (stockImpact.msg) {
+      linkMsg = (linkMsg ? linkMsg + "\n\n" : "") + stockImpact.msg;
+    }
+    setConfirmDialog({
+      title: stockImpact.anyHoldingDestroyed ? "\u522A\u9664\u80A1\u7968\u8CB7\u9032" : includesSettle && includesTransfer ? "\u522A\u9664\u591A\u7B46\u7D00\u9304" : includesSettle ? "\u522A\u9664\u80A1\u7968\u7D50\u7B97" : includesTransfer ? "\u522A\u9664\u8F49\u5E33" : `\u522A\u9664 ${ids.length} \u7B46\u4EA4\u6613`,
+      target: {
+        label: "\u5C07\u522A\u9664",
+        name: listText,
+        multiline: true
+      },
+      message: linkMsg,
+      warning: "\u6B64\u64CD\u4F5C\u7121\u6CD5\u5FA9\u539F",
+      confirmText: stockImpact.anyHoldingDestroyed ? "\u4ECD\u8981\u522A\u9664\u6301\u80A1" : "\u522A\u9664",
+      highlightWords: stockImpact.highlightWords,
+      danger: true,
+      onConfirm: () => {
+        setState((s) => ({
+          ...s,
+          transactions: s.transactions.filter((t) => !actuallyDeleteIds.has(t.id))
+        }));
+        if (toastRich) {
+          toastRich({
+            title: `\u5DF2\u522A\u9664 ${delCount} \u7B46`,
+            amount: "\u2713",
+            amountColor: "var(--pink-text)"
+          }, 1200);
+        } else if (toast) {
+          toast(`\u5DF2\u522A\u9664 ${delCount} \u7B46`);
+        }
+        exitSelectMode();
+      }
+    });
+  };
+  const selectableCount = sorted.length;
+  const allSelected = selectableCount > 0 && selectedIds.size === selectableCount;
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelectedIds(/* @__PURE__ */ new Set());
+    } else {
+      setSelectedIds(new Set(sorted.map((t) => t.id)));
+    }
+  };
+  const exitSwipe = useSwipeToClose(selectMode ? exitSelectMode : null);
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: styles.page,
+      ...selectMode ? exitSwipe : {}
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.pageHeader }, /* @__PURE__ */ React.createElement("h1", { style: styles.pageTitle }, selectMode ? /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)" } }, "\u5DF2\u9078"), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 6, fontVariantNumeric: "tabular-nums" } }, selectedIds.size), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 4, fontSize: 16, fontWeight: 500, color: "var(--text-dim)" } }, "/", selectableCount)) : /* @__PURE__ */ React.createElement("span", null, "\u660E\u7D30")), selectMode ? /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          fontSize: 14,
+          fontWeight: 600,
+          color: "var(--pink-text)",
+          cursor: "pointer",
+          padding: "6px 14px",
+          borderRadius: 16,
+          border: "1.5px solid var(--pink)",
+          background: "rgba(245, 181, 192, 0.08)",
+          userSelect: "none",
+          WebkitTapHighlightColor: "transparent"
+        },
+        onClick: exitSelectMode
+      },
+      "\u53D6\u6D88"
+    ) : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center" } }, !editMode && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          background: filterMode ? "var(--mint)" : "var(--bg-card)",
+          border: `1px solid ${filterMode ? "var(--mint)" : "var(--border)"}`,
+          borderRadius: 10,
+          padding: "6px 8px",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: filterMode ? "#1a1a1a" : "var(--text-dim)"
+        },
+        onClick: () => setShowFilter(true),
+        "aria-label": "\u641C\u5C0B"
+      },
+      /* @__PURE__ */ React.createElement(TypeIcon, { name: "search", size: 16, color: filterMode ? "#1a1a1a" : "var(--text-dim)" })
+    ), /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode }))),
+    /* @__PURE__ */ React.createElement(EditModeBanner, { editMode, setEditMode }),
+    /* @__PURE__ */ React.createElement("div", { style: styles.pageScroll }, order.map((blockKey, idx) => {
+      const blockProps = {
+        onReorder: setPageOrder,
+        blockKey,
+        editMode,
+        isFirst: idx === 0,
+        isLast: idx === order.length - 1,
+        onMoveUp: () => moveBlock && moveBlock(blockKey, -1),
+        onMoveDown: () => moveBlock && moveBlock(blockKey, 1)
+      };
+      if (blockKey === "period") {
+        const navTitle = scope === "day" ? (() => {
+          const [y, m, d] = currentDate.split("-");
+          const wd = ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][(/* @__PURE__ */ new Date(currentDate + "T00:00:00")).getDay()];
+          return `${y}/${m}/${d} (${wd})`;
+        })() : scope === "month" ? `${currentMonth.slice(0, 4)}\u5E74 ${parseInt(currentMonth.slice(5, 7))}\u6708` : `${currentMonth.slice(0, 4)}\u5E74`;
+        const onNavPrev = () => {
+          if (editMode) return;
+          setSelectedIds(/* @__PURE__ */ new Set());
+          if (scope === "day") shiftDay(-1);
+          else if (scope === "month") shiftMonth(-1);
+          else shiftYear(-1);
+        };
+        const onNavNext = () => {
+          if (editMode) return;
+          setSelectedIds(/* @__PURE__ */ new Set());
+          if (scope === "day") shiftDay(1);
+          else if (scope === "month") shiftMonth(1);
+          else shiftYear(1);
+        };
+        return /* @__PURE__ */ React.createElement(Block, { key: "period", ...blockProps, title: "\u6642\u9593\u7BC4\u570D" }, /* @__PURE__ */ React.createElement("div", { style: styles.scopeToggle }, /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            style: { ...styles.scopeBtn, ...scope === "day" ? styles.scopeBtnActive : {} },
+            onClick: () => {
+              if (editMode) return;
+              setScope("day");
+              setSelectedIds(/* @__PURE__ */ new Set());
+            }
+          },
+          "\u65E5"
+        ), /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            style: { ...styles.scopeBtn, ...scope === "month" ? styles.scopeBtnActive : {} },
+            onClick: () => {
+              if (editMode) return;
+              setScope("month");
+              setSelectedIds(/* @__PURE__ */ new Set());
+            }
+          },
+          "\u6708"
+        ), /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            style: { ...styles.scopeBtn, ...scope === "year" ? styles.scopeBtnActive : {} },
+            onClick: () => {
+              if (editMode) return;
+              setScope("year");
+              setSelectedIds(/* @__PURE__ */ new Set());
+            }
+          },
+          "\u5E74"
+        )), /* @__PURE__ */ React.createElement("div", { style: styles.monthHeader }, /* @__PURE__ */ React.createElement("div", { style: styles.monthNav, onClick: onNavPrev }, "\u2039"), /* @__PURE__ */ React.createElement("div", { style: styles.monthTitle }, navTitle), /* @__PURE__ */ React.createElement("div", { style: styles.monthNav, onClick: onNavNext }, "\u203A")));
+      }
+      if (blockKey === "summary") {
+        const scopeChar = scope === "day" ? "\u65E5" : scope === "month" ? "\u6708" : "\u5E74";
+        const scopeLabel = scope === "day" ? "" : scope === "month" ? "\u4EFD" : "\u5EA6";
+        return /* @__PURE__ */ React.createElement(Block, { key: "summary", ...blockProps, title: filterMode ? /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--accent-text)", fontWeight: 700 } }, "\u7BE9\u9078"), "\u7E3D\u89BD") : /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", fontWeight: 700 } }, scopeChar), scopeLabel, "\u7E3D\u89BD") }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryRow }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u6536\u5165"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: "var(--mint-text)", fontSize: autoFitFontSize(fmt(inc)) } }, fmt(inc))), /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u652F\u51FA"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: "var(--pink-text)", fontSize: autoFitFontSize(fmt(exp)) } }, fmt(exp))), /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u7D50\u9918"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: inc - exp < 0 ? "var(--pink)" : inc - exp > 0 ? "var(--mint)" : "var(--text)", fontSize: autoFitFontSize(fmtSigned(inc - exp)) } }, fmtSigned(inc - exp)))));
+      }
+      if (blockKey === "list") {
+        const scopeChar = scope === "day" ? "\u65E5" : scope === "month" ? "\u6708" : "\u5E74";
+        return /* @__PURE__ */ React.createElement(
+          Block,
+          {
+            key: "list",
+            ...blockProps,
+            title: filterMode ? /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--accent-text)", fontWeight: 700 } }, "\u7BE9\u9078\u7D50\u679C"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", marginLeft: 8, fontSize: 12, fontWeight: 500 } }, sorted.length, " \u7B46")) : /* @__PURE__ */ React.createElement("span", null, "\u5168", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", fontWeight: 700 } }, scopeChar), "\u4EA4\u6613\u5217\u8868"),
+            headerRight: filterMode ? /* @__PURE__ */ React.createElement(
+              "div",
+              {
+                style: {
+                  fontSize: 11,
+                  color: "var(--text-dim)",
+                  cursor: "pointer",
+                  padding: "4px 9px",
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  marginTop: 6
+                },
+                onClick: (e) => {
+                  e.stopPropagation();
+                  clearFilter();
+                }
+              },
+              "\u6E05\u9664"
+            ) : !editMode ? /* @__PURE__ */ React.createElement("div", { style: { ...styles.recentFilterBar, marginTop: 6 }, onClick: (e) => e.stopPropagation() }, [
+              { key: "transfer", label: "\u8F49\u5E33" },
+              { key: "income", label: "\u6536\u5165" },
+              { key: "expense", label: "\u652F\u51FA" },
+              { key: "all", label: "\u5168\u90E8" }
+            ].map((opt) => /* @__PURE__ */ React.createElement(
+              "span",
+              {
+                key: opt.key,
+                style: {
+                  ...styles.recentFilterChip,
+                  ...listFilter === opt.key ? styles.recentFilterChipActive : {}
+                },
+                onClick: () => {
+                  setSelectedIds(/* @__PURE__ */ new Set());
+                  setListFilter(opt.key);
+                }
+              },
+              opt.label
+            )), /* @__PURE__ */ React.createElement(ListSortControl, { sortMode, setSortMode })) : null
+          },
+          filterMode && /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: {
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 6,
+                padding: "4px 8px 10px",
+                fontSize: 11
+              },
+              onClick: () => setShowFilter(true)
+            },
+            /* @__PURE__ */ React.createElement("span", { style: {
+              padding: "3px 8px",
+              borderRadius: 6,
+              background: "rgba(143, 127, 240, 0.15)",
+              color: "var(--accent-text)",
+              fontWeight: 500
+            } }, fStart.replace(/-/g, "/"), " ~ ", fEnd.replace(/-/g, "/")),
+            fType !== "all" && /* @__PURE__ */ React.createElement("span", { style: {
+              padding: "3px 8px",
+              borderRadius: 6,
+              background: fType === "income" ? "rgba(126, 224, 192, 0.15)" : fType === "expense" ? "rgba(245, 181, 192, 0.15)" : "rgba(168, 200, 245, 0.15)",
+              color: fType === "income" ? "var(--mint)" : fType === "expense" ? "var(--pink)" : "var(--accent-text)",
+              fontWeight: 500
+            } }, fType === "income" ? "\u6536\u5165" : fType === "expense" ? "\u652F\u51FA" : "\u80A1\u7968"),
+            fAccount !== "all" && (() => {
+              const acct = state.accounts.find((a) => a.id === fAccount);
+              if (!acct) return null;
+              return /* @__PURE__ */ React.createElement("span", { style: {
+                padding: "3px 8px",
+                borderRadius: 6,
+                background: "rgba(168, 200, 245, 0.15)",
+                color: "var(--accent-text)",
+                fontWeight: 500
+              } }, acct.name);
+            })(),
+            fCategory !== "all" && /* @__PURE__ */ React.createElement("span", { style: {
+              padding: "3px 8px",
+              borderRadius: 6,
+              background: "rgba(168, 200, 245, 0.15)",
+              color: "var(--accent-text)",
+              fontWeight: 500
+            } }, fCategory, fSubCategory !== "all" ? ` \u203A ${fSubCategory}` : ""),
+            fKeyword.trim() && /* @__PURE__ */ React.createElement("span", { style: {
+              padding: "3px 8px",
+              borderRadius: 6,
+              background: "var(--bg-card)",
+              color: "var(--text-dim)",
+              fontWeight: 500
+            } }, "\u300C", fKeyword.trim(), "\u300D")
+          ),
+          sorted.length ? /* @__PURE__ */ React.createElement("div", { style: styles.txnList }, isAmountSort(sortMode) ? (
+            // 金額排序:扁平列表(不分組)
+            sorted.slice(0, visibleCount).map((t) => /* @__PURE__ */ React.createElement(
+              TxnRow,
+              {
+                key: t.id,
+                txn: t,
+                state,
+                catIcon,
+                selectMode,
+                selected: selectedIds.has(t.id),
+                onClick: () => {
+                  if (editMode) return;
+                  if (selectMode) {
+                    toggleSelect(t.id);
+                  } else {
+                    onClickTxn(t);
+                  }
+                },
+                onLongPress: () => {
+                  if (editMode || selectMode) return;
+                  enterSelectModeWith(t.id);
+                }
+              }
+            ))
+          ) : (() => {
+            let counted = 0;
+            const visibleGroups = [];
+            for (const date of groupKeys) {
+              if (counted >= visibleCount) break;
+              const remain = visibleCount - counted;
+              const all = groups[date];
+              const shown = all.length <= remain ? all : all.slice(0, remain);
+              visibleGroups.push({ date, items: shown });
+              counted += shown.length;
+            }
+            return visibleGroups.map(({ date, items }) => {
+              const wd = ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][new Date(date).getDay()];
+              return /* @__PURE__ */ React.createElement(React.Fragment, { key: date }, /* @__PURE__ */ React.createElement("div", { style: styles.groupDate }, /* @__PURE__ */ React.createElement("span", null, date.replace(/-/g, "/"), " \xB7 \u9031", wd)), items.map((t) => /* @__PURE__ */ React.createElement(
+                TxnRow,
+                {
+                  key: t.id,
+                  txn: t,
+                  state,
+                  catIcon,
+                  selectMode,
+                  selected: selectedIds.has(t.id),
+                  onClick: () => {
+                    if (editMode) return;
+                    if (selectMode) {
+                      toggleSelect(t.id);
+                    } else {
+                      onClickTxn(t);
+                    }
+                  },
+                  onLongPress: () => {
+                    if (editMode || selectMode) return;
+                    enterSelectModeWith(t.id);
+                  }
+                }
+              )));
+            });
+          })(), visibleCount < sorted.length && /* @__PURE__ */ React.createElement(
+            LoadMoreSentinel,
+            {
+              remain: sorted.length - visibleCount,
+              onLoadMore: () => setVisibleCount((v) => Math.min(v + PAGE_SIZE, sorted.length))
+            }
+          )) : /* @__PURE__ */ React.createElement("div", { style: styles.empty }, "\u9019\u500B\u6708\u9084\u6C92\u6709\u7D00\u9304")
+        );
+      }
+      return null;
+    })),
+    selectMode && /* @__PURE__ */ React.createElement("div", { style: {
+      position: "fixed",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      maxWidth: 480,
+      margin: "0 auto",
+      padding: "10px 14px calc(12px + env(safe-area-inset-bottom, 0px))",
+      background: "rgba(20, 22, 25, 0.96)",
+      backdropFilter: "blur(20px)",
+      WebkitBackdropFilter: "blur(20px)",
+      borderTop: "1px solid var(--border)",
+      display: "flex",
+      gap: 8,
+      zIndex: 60,
+      boxShadow: "0 -12px 24px rgba(0,0,0,0.3)"
+    } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          flex: "0 0 auto",
+          padding: "10px 16px",
+          background: "var(--bg-card)",
+          color: "var(--text)",
+          border: "1px solid var(--border)",
+          borderRadius: 10,
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: 6
+        },
+        onClick: toggleAll,
+        disabled: selectableCount === 0
+      },
+      /* @__PURE__ */ React.createElement("div", { style: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        border: `1.5px solid ${allSelected ? "var(--mint)" : "var(--text-faint)"}`,
+        background: allSelected ? "var(--mint)" : "transparent",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      } }, allSelected && /* @__PURE__ */ React.createElement("svg", { width: "10", height: "10", viewBox: "0 0 24 24", fill: "none", stroke: "#1a1a1a", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "20 6 9 17 4 12" }))),
+      /* @__PURE__ */ React.createElement("span", null, allSelected ? "\u53D6\u6D88\u5168\u9078" : "\u5168\u9078")
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          flex: 1,
+          padding: "10px 16px",
+          background: selectedIds.size > 0 ? "var(--pink)" : "rgba(245, 181, 192, 0.25)",
+          color: selectedIds.size > 0 ? "#1a1a1a" : "var(--text-faint)",
+          border: "none",
+          borderRadius: 10,
+          fontSize: 14,
+          fontWeight: 700,
+          cursor: selectedIds.size > 0 ? "pointer" : "default",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          transition: "background 0.15s, color 0.15s"
+        },
+        onClick: () => selectedIds.size > 0 && doBatchDelete(),
+        disabled: selectedIds.size === 0
+      },
+      /* @__PURE__ */ React.createElement(TypeIcon, { name: "trash", size: 14, color: selectedIds.size > 0 ? "#1a1a1a" : "var(--text-faint)" }),
+      /* @__PURE__ */ React.createElement("span", null, "\u522A\u9664 ", selectedIds.size > 0 ? `(${selectedIds.size})` : "")
+    )),
+    showFilter && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.actionMenuBackdrop, onClick: () => setShowFilter(false), ...filterSwipe }, /* @__PURE__ */ React.createElement("div", { style: styles.filterCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.actionMenuTitle }, /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "search", size: 18, color: "var(--accent-text)" }), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--accent-text)" } }, "\u641C\u5C0B"), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 2 } }, "\u4EA4\u6613"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 16, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, marginTop: 0, marginBottom: 6 } }, "\u8D77\u59CB\u65E5\u671F"), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: { ...styles.field, textAlign: "left", cursor: "pointer", width: "100%", boxSizing: "border-box" },
+        onClick: () => setFEditField("start")
+      },
+      fStart.replace(/-/g, "/")
+    )), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, marginTop: 0, marginBottom: 6 } }, "\u7D50\u675F\u65E5\u671F"), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: { ...styles.field, textAlign: "left", cursor: "pointer", width: "100%", boxSizing: "border-box" },
+        onClick: () => setFEditField("end")
+      },
+      fEnd.replace(/-/g, "/")
+    ))), /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u985E\u578B"), /* @__PURE__ */ React.createElement("div", { style: styles.typeToggle }, [
+      { v: "expense", l: "\u652F\u51FA" },
+      { v: "income", l: "\u6536\u5165" },
+      { v: "stock", l: "\u80A1\u7968" },
+      { v: "all", l: "\u5168\u90E8" }
+    ].map((opt) => /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: opt.v,
+        onClick: () => {
+          setFType(opt.v);
+          if (opt.v === "stock") {
+            setFCategory2("all");
+            setFSubCategory2("all");
+          }
+        },
+        style: {
+          ...styles.typeBtn,
+          ...fType === opt.v ? opt.v === "income" ? { background: "var(--mint)", color: "var(--on-mint)" } : opt.v === "expense" ? { background: "var(--pink)", color: "var(--on-pink)" } : opt.v === "stock" ? { background: "var(--accent)", color: "#fff" } : { background: "var(--text-dim)", color: "#fff" } : {}
+        }
+      },
+      opt.l
+    ))), state.accounts.filter((a) => !a.isSystem).length > 0 && (() => {
+      const acct = state.accounts.find((a) => a.id === fAccount);
+      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u5E33\u6236"), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          style: { ...styles.field, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center" },
+          onClick: () => setFPickerOpen("account")
+        },
+        /* @__PURE__ */ React.createElement("span", { style: { flex: 1, color: fAccount === "all" ? "var(--text-dim)" : "var(--text)" } }, fAccount === "all" ? "\u5168\u90E8\u5E33\u6236" : acct ? acct.name : "\u5168\u90E8\u5E33\u6236"),
+        /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 16 } }, "\u203A")
+      ));
+    })(), fType !== "stock" && (() => {
+      const cats = fType === "all" ? [...state.categories?.expense || [], ...state.categories?.income || []] : state.categories?.[fType] || [];
+      if (cats.length === 0) return null;
+      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u5927\u5206\u985E"), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          style: { ...styles.field, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center" },
+          onClick: () => setFPickerOpen("category")
+        },
+        /* @__PURE__ */ React.createElement("span", { style: { flex: 1, color: fCategory === "all" ? "var(--text-dim)" : "var(--text)" } }, fCategory === "all" ? "\u5168\u90E8\u5927\u5206\u985E" : fCategory),
+        /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 16 } }, "\u203A")
+      ));
+    })(), fType !== "stock" && fCategory !== "all" && (() => {
+      const cats = fType === "all" ? [...state.categories?.expense || [], ...state.categories?.income || []] : state.categories?.[fType] || [];
+      const matched = cats.find((c) => c.label === fCategory);
+      const subs = matched?.subs || [];
+      if (subs.length === 0) return null;
+      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u5B50\u5206\u985E"), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          style: { ...styles.field, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center" },
+          onClick: () => setFPickerOpen("subCategory")
+        },
+        /* @__PURE__ */ React.createElement("span", { style: { flex: 1, color: fSubCategory === "all" ? "var(--text-dim)" : "var(--text)" } }, fSubCategory === "all" ? "\u5168\u90E8\u5B50\u5206\u985E" : fSubCategory),
+        /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 16 } }, "\u203A")
+      ));
+    })(), /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u95DC\u9375\u5B57\uFF08\u975E\u5FC5\u586B\uFF09"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "text",
+        style: styles.field,
+        value: fKeyword,
+        onChange: (e) => setFKeyword(e.target.value),
+        placeholder: "\u641C\u5C0B\u5206\u985E\u6216\u5099\u8A3B"
+      }
+    ), /* @__PURE__ */ React.createElement("button", { style: { ...styles.saveBtn, background: "var(--mint)", color: "var(--on-mint)", marginTop: 20 }, onClick: applyFilter }, "\u5957\u7528"), filterMode && /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, marginTop: 6 }, onClick: clearFilter }, "\u6E05\u9664\u7BE9\u9078"), /* @__PURE__ */ React.createElement("button", { style: { ...styles.cancelBtn || styles.deleteBtn, marginTop: 6, background: "transparent", border: "1px solid var(--border)", color: "var(--text-dim)" }, onClick: () => setShowFilter(false) }, "\u53D6\u6D88"))),
+    fEditField && /* @__PURE__ */ React.createElement(
+      DatePicker,
+      {
+        value: fEditField === "start" ? fStart : fEnd,
+        onChange: (d) => {
+          if (fEditField === "start") setFStart(d);
+          else setFEnd(d);
+        },
+        onClose: () => setFEditField(null)
+      }
+    ),
+    fPickerOpen && (() => {
+      let title = "";
+      let options = [{ id: "all", label: "\u5168\u90E8" }];
+      let currentValue = "all";
+      let onSelect = () => {
+      };
+      if (fPickerOpen === "account") {
+        title = "\u9078\u64C7\u5E33\u6236";
+        const accts = state.accounts.filter((a) => !a.isSystem);
+        options = [{ id: "all", label: "\u5168\u90E8\u5E33\u6236" }, ...accts.map((a) => ({
+          id: a.id,
+          label: a.name,
+          tm: state.accountTypes.find((t) => t.value === a.type) || { icon: "box", color: "#f5c29c" }
+        }))];
+        currentValue = fAccount;
+        onSelect = (v) => {
+          setFAccount(v);
+          setFPickerOpen(null);
+        };
+      } else if (fPickerOpen === "category") {
+        title = "\u9078\u64C7\u5927\u5206\u985E";
+        const cats = fType === "all" ? [...state.categories?.expense || [], ...state.categories?.income || []] : state.categories?.[fType] || [];
+        const uniqCats = Array.from(new Map(cats.map((c) => [c.label, c])).values());
+        options = [{ id: "all", label: "\u5168\u90E8\u5927\u5206\u985E" }, ...uniqCats.map((c) => ({
+          id: c.label,
+          label: c.label,
+          icon: c.icon
+        }))];
+        currentValue = fCategory;
+        onSelect = (v) => {
+          setFCategory2(v);
+          setFSubCategory2("all");
+          setFPickerOpen(null);
+        };
+      } else if (fPickerOpen === "subCategory") {
+        title = "\u9078\u64C7\u5B50\u5206\u985E";
+        const cats = fType === "all" ? [...state.categories?.expense || [], ...state.categories?.income || []] : state.categories?.[fType] || [];
+        const matched = cats.find((c) => c.label === fCategory);
+        const subs = matched?.subs || [];
+        options = [{ id: "all", label: "\u5168\u90E8\u5B50\u5206\u985E" }, ...subs.map((s) => ({ id: s, label: s }))];
+        currentValue = fSubCategory;
+        onSelect = (v) => {
+          setFSubCategory2(v);
+          setFPickerOpen(null);
+        };
+      }
+      return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setFPickerOpen(null) }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, title), /* @__PURE__ */ React.createElement("div", { style: styles.pickerList }, options.map((opt) => {
+        const active = currentValue === opt.id;
+        return /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            key: opt.id,
+            style: {
+              ...styles.pickerItem,
+              ...active ? { background: "rgba(168, 200, 245, 0.12)" } : {}
+            },
+            onClick: () => onSelect(opt.id)
+          },
+          opt.tm ? /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerItemIcon, background: opt.tm.color || "#f5c29c" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: opt.tm.icon || "box", size: 16, color: "#fff" })) : opt.icon ? /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerItemIcon, background: "var(--bg-card)" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: opt.icon, size: 16, color: "var(--text)" })) : /* @__PURE__ */ React.createElement("div", { style: { width: 28, height: 28, flexShrink: 0 } }),
+          /* @__PURE__ */ React.createElement("div", { style: {
+            flex: 1,
+            fontSize: 14,
+            color: opt.id === "all" ? "var(--text-dim)" : "var(--text)",
+            fontWeight: active ? 600 : 400
+          } }, opt.label),
+          active && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--accent)", fontSize: 16, fontWeight: 700 } }, "\u2713")
+        );
+      }))));
+    })()
+  );
+}
+function StatsPage({ state, catIcon, currentMonth, setCurrentMonth, editMode, setEditMode, blockOrder, moveBlock, setPageOrder, onClickTxn }) {
+  const [scope, setScope] = useState("month");
+  const [chartType, setChartType] = useState("expense");
+  const [selectedCat, setSelectedCat] = useState(null);
+  const [drillCat, setDrillCat] = useState(null);
+  const [drillSub, setDrillSub] = useState(null);
+  const drillSubSwipe = useSwipeBack(() => setDrillSub(null), { noDrag: true });
+  const drillCatSwipe = useSwipeBack(() => {
+    if (drillCat && !drillSub) {
+      setDrillCat(null);
+      setSelectedCat(null);
+    }
+  }, { noDrag: true });
+  const scrollContainerRef = React.useRef(null);
+  const savedScrollTopRef = React.useRef(0);
+  const prevDrillSubRef = React.useRef(null);
+  React.useEffect(() => {
+    const was = prevDrillSubRef.current;
+    if (was && !drillSub && scrollContainerRef.current) {
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = savedScrollTopRef.current;
+        }
+      });
+    }
+    prevDrillSubRef.current = drillSub;
+  }, [drillSub]);
+  const [currentDate, setCurrentDate] = useState(todayStr());
+  const shiftDay = (delta) => {
+    const d = /* @__PURE__ */ new Date(currentDate + "T00:00:00");
+    d.setDate(d.getDate() + delta);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    setCurrentDate(iso);
+  };
+  const shiftMonth = (delta) => {
+    const [y, m] = currentMonth.split("-").map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  };
+  const shiftYear = (delta) => {
+    const [y, m] = currentMonth.split("-").map(Number);
+    setCurrentMonth(`${y + delta}-${String(m).padStart(2, "0")}`);
+  };
+  const prefix = scope === "day" ? currentDate : scope === "month" ? currentMonth : currentMonth.slice(0, 4);
+  const { txns, inc, exp, incData, expData, incTotal, expTotal } = React.useMemo(() => {
+    const _txns = state.transactions.filter((t) => t.date.startsWith(prefix));
+    let _inc = 0, _exp = 0;
+    const incByCat = {};
+    const expByCat = {};
+    for (const t of _txns) {
+      if (!isRealFlow(t)) continue;
+      const cat = t.category || "\u672A\u5206\u985E";
+      if (t.type === "income") {
+        _inc += t.amount;
+        incByCat[cat] = (incByCat[cat] || 0) + t.amount;
+      } else if (t.type === "expense") {
+        _exp += t.amount;
+        expByCat[cat] = (expByCat[cat] || 0) + t.amount;
+      }
+    }
+    const _incData = Object.entries(incByCat).sort((a, b) => b[1] - a[1]);
+    const _expData = Object.entries(expByCat).sort((a, b) => b[1] - a[1]);
+    return {
+      txns: _txns,
+      inc: _inc,
+      exp: _exp,
+      incData: _incData,
+      expData: _expData,
+      incTotal: _inc,
+      expTotal: _exp
+    };
+  }, [state.transactions, prefix]);
+  const mainData = chartType === "expense" ? expData : incData;
+  const mainTotal = chartType === "expense" ? expTotal : incTotal;
+  const prevPrefix = (() => {
+    if (scope === "day") {
+      const d = /* @__PURE__ */ new Date(currentDate + "T00:00:00");
+      d.setDate(d.getDate() - 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+    if (scope === "month") {
+      const [y, m] = currentMonth.split("-").map(Number);
+      const d = new Date(y, m - 2, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    } else {
+      const y = parseInt(currentMonth.slice(0, 4));
+      return String(y - 1);
+    }
+  })();
+  let prevInc = 0, prevExp = 0;
+  for (const t of state.transactions) {
+    if (!t.date.startsWith(prevPrefix)) continue;
+    if (!isRealFlow(t)) continue;
+    if (t.type === "income") prevInc += t.amount;
+    else if (t.type === "expense") prevExp += t.amount;
+  }
+  const expDiffPct = prevExp > 0 ? (exp - prevExp) / prevExp * 100 : null;
+  const incDiffPct = prevInc > 0 ? (inc - prevInc) / prevInc * 100 : null;
+  const top5Txns = [...txns].filter((t) => {
+    if (t.type !== chartType) return false;
+    if (!isRealFlow(t)) return false;
+    if (drillCat && (t.category || "\u672A\u5206\u985E") !== drillCat) return false;
+    return true;
+  }).sort((a, b) => b.amount - a.amount).slice(0, 5);
+  const trendData = (() => {
+    if (scope === "month") {
+      const [y, m] = currentMonth.split("-").map(Number);
+      const daysInMonth = new Date(y, m, 0).getDate();
+      const arr = Array.from({ length: daysInMonth }, (_, i) => ({ label: i + 1, exp: 0, inc: 0 }));
+      txns.forEach((t) => {
+        if (!isRealFlow(t)) return;
+        const d = parseInt(t.date.slice(8, 10));
+        if (t.type === "expense") arr[d - 1].exp += t.amount;
+        else if (t.type === "income") arr[d - 1].inc += t.amount;
+      });
+      return arr;
+    } else {
+      const arr = Array.from({ length: 12 }, (_, i) => ({ label: i + 1, exp: 0, inc: 0 }));
+      txns.forEach((t) => {
+        if (!isRealFlow(t)) return;
+        const mo = parseInt(t.date.slice(5, 7));
+        if (t.type === "expense") arr[mo - 1].exp += t.amount;
+        else if (t.type === "income") arr[mo - 1].inc += t.amount;
+      });
+      return arr;
+    }
+  })();
+  const trendMax = Math.max(...trendData.map((d) => chartType === "expense" ? d.exp : d.inc), 1);
+  const subcatData = drillCat ? (() => {
+    const bySub = {};
+    txns.filter((t) => t.type === chartType && isRealFlow(t) && (t.category || "\u672A\u5206\u985E") === drillCat).forEach((t) => {
+      const k = t.subCategory || "\uFF08\u7121\u5B50\u985E\uFF09";
+      bySub[k] = (bySub[k] || 0) + t.amount;
+    });
+    return Object.entries(bySub).sort((a, b) => b[1] - a[1]);
+  })() : null;
+  const subcatTotal = subcatData ? subcatData.reduce((s, [, v]) => s + v, 0) : 0;
+  let transferTotal = 0, feeTotal = 0, transferCount = 0;
+  for (const t of txns) {
+    if (t.transferRole === "out") {
+      transferTotal += t.amount;
+      transferCount++;
+    } else if (t.transferRole === "fee") {
+      feeTotal += t.amount;
+    }
+  }
+  const subTxns = drillCat && drillSub ? (() => {
+    const subKey = drillSub === "\uFF08\u7121\u5B50\u985E\uFF09" ? "" : drillSub;
+    const list = txns.filter((t) => {
+      if (t.type !== chartType) return false;
+      if (!isRealFlow(t)) return false;
+      if ((t.category || "\u672A\u5206\u985E") !== drillCat) return false;
+      if ((t.subCategory || "") !== subKey) return false;
+      return true;
+    });
+    list.sort((a, b) => {
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+      return b.amount - a.amount;
+    });
+    return list;
+  })() : null;
+  const subTxnsTotal = subTxns ? subTxns.reduce((s, t) => s + t.amount, 0) : 0;
+  const renderDonut = (data, total, opts = {}) => {
+    const { onSliceClick, highlighted, centerLabel, centerValue } = opts;
+    if (total === 0) {
+      return /* @__PURE__ */ React.createElement("svg", { style: { width: 240, height: 240 }, viewBox: "0 0 100 100" }, /* @__PURE__ */ React.createElement("circle", { cx: "50", cy: "50", r: "30.5", fill: "none", stroke: "var(--border)", strokeWidth: "7" }), /* @__PURE__ */ React.createElement("text", { x: "50", y: "54", textAnchor: "middle", fontSize: "5", fill: "var(--text-faint)", style: { letterSpacing: "0.3px" } }, "\u6C92\u6709\u8CC7\u6599"));
+    }
+    const cx = 50, cy = 50;
+    const ringR = 30.5;
+    const ringW = 7;
+    const r = ringR + ringW / 2;
+    const innerR = ringR - ringW / 2;
+    let maxIdx = 0;
+    data.forEach(([, v], i) => {
+      if (v > data[maxIdx][1]) maxIdx = i;
+    });
+    const useRoundCap = data.length <= 4;
+    const gapDeg = data.length > 1 ? useRoundCap ? 18 : 3 : 0;
+    const totalGap = gapDeg * data.length;
+    const availableDeg = 360 - totalGap;
+    let startDeg = -90;
+    const slices = [];
+    data.forEach(([cat, val], i) => {
+      const sweepDeg = val / total * availableDeg;
+      const endDeg = startDeg + sweepDeg;
+      slices.push({ cat, val, startDeg, endDeg, sweepDeg, idx: i });
+      startDeg = endDeg + gapDeg;
+    });
+    const polar = (cxv, cyv, rv, deg) => {
+      const rad = deg * Math.PI / 180;
+      return [cxv + rv * Math.cos(rad), cyv + rv * Math.sin(rad)];
+    };
+    const arcStroke = (sd, ed) => {
+      const [x1, y1] = polar(cx, cy, ringR, sd);
+      const [x2, y2] = polar(cx, cy, ringR, ed);
+      const large = ed - sd > 180 ? 1 : 0;
+      return `M ${x1} ${y1} A ${ringR} ${ringR} 0 ${large} 1 ${x2} ${y2}`;
+    };
+    return /* @__PURE__ */ React.createElement("svg", { style: { width: 240, height: 240, overflow: "visible" }, viewBox: "0 0 100 100" }, /* @__PURE__ */ React.createElement("defs", null, /* @__PURE__ */ React.createElement("filter", { id: "donutGlow", x: "-30%", y: "-30%", width: "160%", height: "160%" }, /* @__PURE__ */ React.createElement("feGaussianBlur", { stdDeviation: "0.8", result: "blur" }), /* @__PURE__ */ React.createElement("feMerge", null, /* @__PURE__ */ React.createElement("feMergeNode", { in: "blur" }), /* @__PURE__ */ React.createElement("feMergeNode", { in: "SourceGraphic" }))), /* @__PURE__ */ React.createElement("filter", { id: "centerTextShadow", x: "-20%", y: "-20%", width: "140%", height: "140%" }, /* @__PURE__ */ React.createElement("feGaussianBlur", { in: "SourceAlpha", stdDeviation: "0.4" }), /* @__PURE__ */ React.createElement("feOffset", { dx: "0", dy: "0.3", result: "offsetblur" }), /* @__PURE__ */ React.createElement("feComponentTransfer", null, /* @__PURE__ */ React.createElement("feFuncA", { type: "linear", slope: "0.18" })), /* @__PURE__ */ React.createElement("feMerge", null, /* @__PURE__ */ React.createElement("feMergeNode", null), /* @__PURE__ */ React.createElement("feMergeNode", { in: "SourceGraphic" })))), slices.map((s) => {
+      const color = CHART_COLORS[s.idx % CHART_COLORS.length];
+      const isHi = highlighted != null && highlighted === s.cat;
+      const isDim = highlighted != null && highlighted !== s.cat;
+      const isOut = isHi || highlighted == null && s.idx === maxIdx;
+      const midDeg = (s.startDeg + s.endDeg) / 2;
+      const offset = isOut ? 2.5 : 0;
+      const [tx, ty] = polar(0, 0, offset, midDeg);
+      const isFullCircle = s.sweepDeg >= 360 - 0.01;
+      const labelR = ringR;
+      const [lx, ly] = polar(cx + tx, cy + ty, labelR, midDeg);
+      const pct = s.val / total * 100;
+      const showLabel = pct >= 6;
+      return /* @__PURE__ */ React.createElement(
+        "g",
+        {
+          key: s.cat,
+          transform: `translate(${tx}, ${ty})`,
+          opacity: isDim ? 0.3 : 1,
+          filter: isOut ? "url(#donutGlow)" : void 0,
+          style: { cursor: onSliceClick ? "pointer" : "default", transition: "opacity 0.2s, transform 0.2s" },
+          onClick: onSliceClick ? () => onSliceClick(s.cat) : void 0
+        },
+        isFullCircle ? /* @__PURE__ */ React.createElement("circle", { cx, cy, r: ringR, fill: "none", stroke: color, strokeWidth: ringW }) : /* @__PURE__ */ React.createElement(
+          "path",
+          {
+            d: arcStroke(s.startDeg, s.endDeg),
+            fill: "none",
+            stroke: color,
+            strokeWidth: ringW,
+            strokeLinecap: useRoundCap ? "round" : "butt"
+          }
+        ),
+        showLabel && /* @__PURE__ */ React.createElement(
+          "text",
+          {
+            x: lx - tx,
+            y: ly - ty + 1.2,
+            textAnchor: "middle",
+            fontSize: "3.4",
+            fontWeight: "700",
+            fill: "#ffffff",
+            style: { pointerEvents: "none", letterSpacing: "0.2px" }
+          },
+          pct.toFixed(0),
+          "%"
+        )
+      );
+    }), /* @__PURE__ */ React.createElement(
+      "text",
+      {
+        x: "50",
+        y: "46",
+        textAnchor: "middle",
+        fontSize: "4.2",
+        fill: "var(--text-faint)",
+        style: { letterSpacing: "0.6px" }
+      },
+      centerLabel || (chartType === "expense" ? "\u7E3D\u652F\u51FA" : "\u7E3D\u6536\u5165")
+    ), /* @__PURE__ */ React.createElement(
+      "text",
+      {
+        x: "50",
+        y: "58",
+        textAnchor: "middle",
+        fontSize: "10",
+        fontWeight: "700",
+        fill: "var(--text)",
+        filter: "url(#centerTextShadow)",
+        style: { letterSpacing: "-0.3px", fontFamily: "var(--num-font)" }
+      },
+      centerValue != null ? fmt(centerValue) : fmt(total)
+    ));
+  };
+  const renderTrendChart = (data, max, type) => {
+    const W = 320, H = 120, padL = 10, padR = 10, padT = 12, padB = 18;
+    const chartW = W - padL - padR;
+    const chartH = H - padT - padB;
+    const barW = chartW / data.length;
+    const color = type === "expense" ? "var(--pink)" : "var(--mint)";
+    return /* @__PURE__ */ React.createElement("svg", { viewBox: `0 0 ${W} ${H}`, style: { width: "100%", height: 120 } }, data.map((d, i) => {
+      const val = type === "expense" ? d.exp : d.inc;
+      const h = val > 0 ? val / max * chartH : 0;
+      const x = padL + i * barW;
+      const y = padT + chartH - h;
+      return /* @__PURE__ */ React.createElement("g", { key: i }, h > 0 && /* @__PURE__ */ React.createElement(
+        "rect",
+        {
+          x: x + 1,
+          y,
+          width: barW - 2,
+          height: h,
+          fill: color,
+          opacity: 0.8,
+          rx: 2
+        }
+      ), (data.length <= 12 || i === 0 || i === data.length - 1 || (i + 1) % 5 === 0) && /* @__PURE__ */ React.createElement(
+        "text",
+        {
+          x: x + barW / 2,
+          y: H - 4,
+          textAnchor: "middle",
+          fontSize: "9",
+          fill: "var(--text-faint)"
+        },
+        d.label
+      ));
+    }));
+  };
+  const order = blockOrder || ["summary", "period", "chart", "compare", "top5", "transfer"];
+  const periodLabel = scope === "day" ? (() => {
+    const [y, m, d] = currentDate.split("-");
+    const wd = ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][(/* @__PURE__ */ new Date(currentDate + "T00:00:00")).getDay()];
+    return `${y}/${m}/${d} (${wd})`;
+  })() : scope === "month" ? `${currentMonth.slice(0, 4)}\u5E74 ${parseInt(currentMonth.slice(5, 7))}\u6708` : `${currentMonth.slice(0, 4)}\u5E74`;
+  if (drillSub) {
+    const isExp = chartType === "expense";
+    const amtColor = isExp ? "var(--pink-text)" : "var(--mint-text)";
+    const sign = isExp ? "-" : "+";
+    const subLabel = drillSub === "\uFF08\u7121\u5B50\u985E\uFF09" ? "\uFF08\u7121\u5B50\u985E\uFF09" : drillSub;
+    return /* @__PURE__ */ React.createElement("div", { style: styles.page, ref: drillSubSwipe.ref }, /* @__PURE__ */ React.createElement("div", { style: styles.pageHeader }, /* @__PURE__ */ React.createElement("h1", { style: styles.pageTitle }, "\u7D71\u8A08"), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setDrillSub(null),
+        style: {
+          background: "var(--bg-card)",
+          color: "var(--mint-text)",
+          border: "1px solid var(--border)",
+          borderRadius: 16,
+          padding: "6px 12px 6px 10px",
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: "pointer",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 4,
+          WebkitTapHighlightColor: "transparent",
+          outline: "none"
+        }
+      },
+      /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, lineHeight: 1 } }, "\u2039"),
+      /* @__PURE__ */ React.createElement("span", null, "\u8FD4\u56DE")
+    )), /* @__PURE__ */ React.createElement("div", { style: styles.pageScroll }, /* @__PURE__ */ React.createElement(
+      Block,
+      {
+        title: /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", fontWeight: 700 } }, drillCat), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", margin: "0 6px" } }, "\u203A"), /* @__PURE__ */ React.createElement("span", null, subLabel))
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px 10px", fontSize: 12, color: "var(--text-dim)" } }, /* @__PURE__ */ React.createElement("span", null, periodLabel, " \xB7 ", subTxns.length, " \u7B46"), /* @__PURE__ */ React.createElement("span", { style: { color: amtColor, fontWeight: 700, fontSize: 14 } }, sign, fmt(subTxnsTotal))),
+      subTxns.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: styles.empty }, "\u6C92\u6709\u8CC7\u6599") : /* @__PURE__ */ React.createElement("div", { style: styles.txnList }, subTxns.map((t) => {
+        const acct = state.accounts.find((a) => a.id === t.accountId);
+        const dateStr = t.date.replace(/-/g, "/");
+        const primary = t.note || dateStr;
+        const secondary = t.note ? `${dateStr}${acct?.name ? ` \xB7 ${acct.name}` : ""}` : acct?.name || "";
+        return /* @__PURE__ */ React.createElement("div", { key: t.id, style: styles.txn, onClick: () => onClickTxn && onClickTxn(t) }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.txnIcon, background: isExp ? "rgba(245, 181, 192, 0.1)" : "rgba(126, 224, 192, 0.12)" } }, catIcon(chartType, drillCat)), /* @__PURE__ */ React.createElement("div", { style: styles.txnInfo }, /* @__PURE__ */ React.createElement("div", { style: styles.txnCat }, primary), secondary && /* @__PURE__ */ React.createElement("div", { style: styles.txnMeta }, secondary)), /* @__PURE__ */ React.createElement("div", { style: { ...styles.txnAmt, color: amtColor } }, sign, fmt(t.amount)));
+      }))
+    )));
+  }
+  return /* @__PURE__ */ React.createElement("div", { style: styles.page, ref: drillCatSwipe.ref }, /* @__PURE__ */ React.createElement("div", { style: styles.pageHeader }, /* @__PURE__ */ React.createElement("h1", { style: styles.pageTitle }, "\u7D71\u8A08"), /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode })), /* @__PURE__ */ React.createElement(EditModeBanner, { editMode, setEditMode }), /* @__PURE__ */ React.createElement("div", { style: styles.pageScroll, ref: scrollContainerRef }, order.map((blockKey, idx) => {
+    const blockProps = {
+      onReorder: setPageOrder,
+      blockKey,
+      editMode,
+      isFirst: idx === 0,
+      isLast: idx === order.length - 1,
+      onMoveUp: () => moveBlock && moveBlock(blockKey, -1),
+      onMoveDown: () => moveBlock && moveBlock(blockKey, 1)
+    };
+    if (blockKey === "period") {
+      const navTitle = scope === "day" ? (() => {
+        const [y, m, d] = currentDate.split("-");
+        const wd = ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][(/* @__PURE__ */ new Date(currentDate + "T00:00:00")).getDay()];
+        return `${y}/${m}/${d} (${wd})`;
+      })() : scope === "month" ? `${currentMonth.slice(0, 4)}\u5E74 ${parseInt(currentMonth.slice(5, 7))}\u6708` : `${currentMonth.slice(0, 4)}\u5E74`;
+      const onNavPrev = () => {
+        if (editMode) return;
+        if (scope === "day") shiftDay(-1);
+        else if (scope === "month") shiftMonth(-1);
+        else shiftYear(-1);
+      };
+      const onNavNext = () => {
+        if (editMode) return;
+        if (scope === "day") shiftDay(1);
+        else if (scope === "month") shiftMonth(1);
+        else shiftYear(1);
+      };
+      return /* @__PURE__ */ React.createElement(Block, { key: "period", ...blockProps, title: "\u6642\u9593\u7BC4\u570D" }, /* @__PURE__ */ React.createElement("div", { style: styles.scopeToggle }, /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          style: { ...styles.scopeBtn, ...scope === "day" ? styles.scopeBtnActive : {} },
+          onClick: () => !editMode && setScope("day")
+        },
+        "\u65E5"
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          style: { ...styles.scopeBtn, ...scope === "month" ? styles.scopeBtnActive : {} },
+          onClick: () => !editMode && setScope("month")
+        },
+        "\u6708"
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          style: { ...styles.scopeBtn, ...scope === "year" ? styles.scopeBtnActive : {} },
+          onClick: () => !editMode && setScope("year")
+        },
+        "\u5E74"
+      )), /* @__PURE__ */ React.createElement("div", { style: styles.monthHeader }, /* @__PURE__ */ React.createElement("div", { style: styles.monthNav, onClick: onNavPrev }, "\u2039"), /* @__PURE__ */ React.createElement("div", { style: styles.monthTitle }, navTitle), /* @__PURE__ */ React.createElement("div", { style: styles.monthNav, onClick: onNavNext }, "\u203A")));
+    }
+    if (blockKey === "summary") {
+      return /* @__PURE__ */ React.createElement(Block, { key: "summary", ...blockProps, title: "\u6536\u652F\u7E3D\u89BD" }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryRow }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u6536\u5165"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: "var(--mint-text)", fontSize: autoFitFontSize(fmt(inc)) } }, fmt(inc))), /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u652F\u51FA"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: "var(--pink-text)", fontSize: autoFitFontSize(fmt(exp)) } }, fmt(exp))), /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u7D50\u9918"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: inc - exp < 0 ? "var(--pink)" : inc - exp > 0 ? "var(--mint)" : "var(--text)", fontSize: autoFitFontSize(fmtSigned(inc - exp)) } }, fmtSigned(inc - exp)))));
+    }
+    if (blockKey === "chart") {
+      const displayData = drillCat ? subcatData : mainData;
+      const displayTotal = drillCat ? subcatTotal : mainTotal;
+      const selectedData = selectedCat ? displayData.find(([c]) => c === selectedCat) : null;
+      const centerLabel = drillCat ? drillCat : selectedCat || (chartType === "expense" ? "\u7E3D\u652F\u51FA" : "\u7E3D\u6536\u5165");
+      const centerValue = selectedData ? selectedData[1] : displayTotal;
+      return /* @__PURE__ */ React.createElement(
+        Block,
+        {
+          key: "chart",
+          ...blockProps,
+          title: drillCat ? `${drillCat} \xB7 \u5B50\u985E\u4F54\u6BD4` : chartType === "expense" ? "\u652F\u51FA\u5206\u985E\u4F54\u6BD4" : "\u6536\u5165\u5206\u985E\u4F54\u6BD4",
+          headerRight: drillCat ? /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              onClick: () => {
+                setDrillCat(null);
+                setSelectedCat(null);
+                setDrillSub(null);
+              },
+              style: {
+                background: "var(--bg-card)",
+                color: "var(--mint-text)",
+                border: "1px solid var(--border)",
+                borderRadius: 16,
+                padding: "6px 12px 6px 10px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                WebkitTapHighlightColor: "transparent",
+                outline: "none"
+              }
+            },
+            /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, lineHeight: 1 } }, "\u2039"),
+            /* @__PURE__ */ React.createElement("span", null, "\u8FD4\u56DE")
+          ) : null
+        },
+        !drillCat && /* @__PURE__ */ React.createElement("div", { style: styles.recentFilterBar }, /* @__PURE__ */ React.createElement(
+          "span",
+          {
+            style: { ...styles.recentFilterChip, ...chartType === "expense" ? styles.recentFilterChipActive : {} },
+            onClick: () => {
+              setChartType("expense");
+              setSelectedCat(null);
+            }
+          },
+          "\u652F\u51FA"
+        ), /* @__PURE__ */ React.createElement(
+          "span",
+          {
+            style: { ...styles.recentFilterChip, ...chartType === "income" ? styles.recentFilterChipActive : {} },
+            onClick: () => {
+              setChartType("income");
+              setSelectedCat(null);
+            }
+          },
+          "\u6536\u5165"
+        )),
+        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "center", padding: "12px 0 20px" } }, renderDonut(displayData, displayTotal, {
+          highlighted: selectedCat,
+          centerLabel,
+          centerValue,
+          onSliceClick: (cat) => setSelectedCat(selectedCat === cat ? null : cat)
+        })),
+        displayData.length > 0 ? /* @__PURE__ */ React.createElement("div", { style: styles.legendList }, displayData.map(([cat, val], i) => {
+          const color = CHART_COLORS[i % CHART_COLORS.length];
+          const pct = (val / displayTotal * 100).toFixed(1);
+          const isSel = selectedCat === cat;
+          return /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              key: cat,
+              style: {
+                ...styles.legendRow,
+                background: isSel ? "rgba(126, 224, 192, 0.08)" : "transparent",
+                opacity: selectedCat && !isSel ? 0.4 : 1,
+                cursor: "pointer",
+                borderRadius: 8,
+                padding: "4px 8px"
+              },
+              onClick: () => {
+                if (!drillCat) {
+                  setDrillCat(cat);
+                  setSelectedCat(null);
+                } else {
+                  if (scrollContainerRef.current) {
+                    savedScrollTopRef.current = scrollContainerRef.current.scrollTop;
+                  }
+                  setDrillSub(cat);
+                }
+              }
+            },
+            /* @__PURE__ */ React.createElement("div", { style: { ...styles.legendDot, background: color } }),
+            /* @__PURE__ */ React.createElement("div", { style: styles.legendIcon }, drillCat ? catIcon(chartType, drillCat) : catIcon(chartType, cat)),
+            /* @__PURE__ */ React.createElement("span", { style: styles.legendName }, cat),
+            /* @__PURE__ */ React.createElement("span", { style: styles.legendPct }, pct, "%"),
+            /* @__PURE__ */ React.createElement("span", { style: styles.legendAmt }, fmt(val))
+          );
+        }), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", textAlign: "center", marginTop: 8 } }, drillCat ? "\u9EDE\u5B50\u985E \u2192 \u770B\u660E\u7D30" : "\u9EDE\u5206\u985E \u2192 \u770B\u5B50\u985E")) : /* @__PURE__ */ React.createElement("div", { style: styles.empty }, "\u6C92\u6709\u8CC7\u6599")
+      );
+    }
+    if (blockKey === "trend") {
+      if (scope === "day") return null;
+      return /* @__PURE__ */ React.createElement(Block, { key: "trend", ...blockProps, title: scope === "month" ? "\u6BCF\u65E5\u652F\u51FA\u8DA8\u52E2" : "\u6BCF\u6708\u652F\u51FA\u8DA8\u52E2" }, /* @__PURE__ */ React.createElement("div", { style: { padding: "8px 4px 4px" } }, renderTrendChart(trendData, trendMax, chartType)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text-faint)", padding: "0 6px" } }, /* @__PURE__ */ React.createElement("span", null, scope === "month" ? "\u65E5" : "\u6708"), /* @__PURE__ */ React.createElement("span", null, "\u6700\u9AD8 ", fmt(trendMax))));
+    }
+    if (blockKey === "compare") {
+      const curVal = chartType === "expense" ? exp : inc;
+      const prevVal = chartType === "expense" ? prevExp : prevInc;
+      const diff = curVal - prevVal;
+      const diffPct = chartType === "expense" ? expDiffPct : incDiffPct;
+      const prevLabel = scope === "day" ? "\u6628\u65E5" : scope === "month" ? "\u4E0A\u6708" : "\u53BB\u5E74";
+      const isGood = chartType === "expense" ? diff < 0 : diff > 0;
+      const diffColor = diff === 0 ? "var(--text-faint)" : isGood ? "var(--mint)" : "var(--pink)";
+      return /* @__PURE__ */ React.createElement(Block, { key: "compare", ...blockProps, title: `${prevLabel}\u540C\u671F\u5C0D\u6BD4` }, /* @__PURE__ */ React.createElement("div", { style: styles.compareRow }, /* @__PURE__ */ React.createElement("div", { style: styles.compareBox }, /* @__PURE__ */ React.createElement("div", { style: styles.compareLabel }, "\u672C\u671F", chartType === "expense" ? "\u652F\u51FA" : "\u6536\u5165"), /* @__PURE__ */ React.createElement("div", { style: styles.compareVal }, fmt(curVal))), /* @__PURE__ */ React.createElement("div", { style: styles.compareBox }, /* @__PURE__ */ React.createElement("div", { style: styles.compareLabel }, prevLabel), /* @__PURE__ */ React.createElement("div", { style: { ...styles.compareVal, color: "var(--text-dim)" } }, fmt(prevVal))), /* @__PURE__ */ React.createElement("div", { style: styles.compareBox }, /* @__PURE__ */ React.createElement("div", { style: styles.compareLabel }, "\u8B8A\u5316"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.compareVal, color: diffColor } }, diff > 0 ? "+" : "", fmt(diff), diffPct != null && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, marginLeft: 4 } }, "(", diff >= 0 ? "+" : "", diffPct.toFixed(1), "%)")))), prevVal === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", textAlign: "center", marginTop: 8 } }, prevLabel, "\u6C92\u6709\u8CC7\u6599"));
+    }
+    if (blockKey === "top5") {
+      if (top5Txns.length === 0) return null;
+      const isExp = chartType === "expense";
+      const baseTitle = isExp ? "\u55AE\u7B46\u6700\u5927\u652F\u51FA Top 5" : "\u55AE\u7B46\u6700\u5927\u6536\u5165 Top 5";
+      const titleNode = drillCat ? /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", fontWeight: 700 } }, drillCat), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", margin: "0 6px" } }, "\xB7"), /* @__PURE__ */ React.createElement("span", null, baseTitle)) : baseTitle;
+      const amtColor = isExp ? "var(--pink-text)" : "var(--mint-text)";
+      const iconBg = isExp ? "rgba(245, 181, 192, 0.1)" : "rgba(126, 224, 192, 0.12)";
+      return /* @__PURE__ */ React.createElement(Block, { key: "top5", ...blockProps, title: titleNode }, /* @__PURE__ */ React.createElement("div", { style: styles.txnList }, top5Txns.map((t, i) => {
+        const acct = state.accounts.find((a) => a.id === t.accountId);
+        return /* @__PURE__ */ React.createElement("div", { key: t.id, style: styles.txn, onClick: () => onClickTxn && onClickTxn(t) }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.txnIcon, background: iconBg } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: amtColor } }, "#", i + 1)), /* @__PURE__ */ React.createElement("div", { style: styles.txnInfo }, /* @__PURE__ */ React.createElement("div", { style: styles.txnCat }, t.subCategory ? `${t.category || "\u672A\u5206\u985E"} \u203A ${t.subCategory}` : t.category || "\u672A\u5206\u985E"), /* @__PURE__ */ React.createElement("div", { style: styles.txnMeta }, t.date.replace(/-/g, "/"), acct?.name ? ` \xB7 ${acct.name}` : "", t.note ? ` \xB7 ${t.note}` : "")), /* @__PURE__ */ React.createElement("div", { style: { ...styles.txnAmt, color: amtColor } }, isExp ? "-" : "+", fmt(t.amount)));
+      })));
+    }
+    if (blockKey === "transfer") {
+      if (transferCount === 0) return null;
+      return /* @__PURE__ */ React.createElement(Block, { key: "transfer", ...blockProps, title: "\u8F49\u5E33\u52D5\u614B" }, /* @__PURE__ */ React.createElement("div", { style: styles.compareRow }, /* @__PURE__ */ React.createElement("div", { style: styles.compareBox }, /* @__PURE__ */ React.createElement("div", { style: styles.compareLabel }, "\u8F49\u5E33\u7B46\u6578"), /* @__PURE__ */ React.createElement("div", { style: styles.compareVal }, transferCount)), /* @__PURE__ */ React.createElement("div", { style: styles.compareBox }, /* @__PURE__ */ React.createElement("div", { style: styles.compareLabel }, "\u642C\u79FB\u91D1\u984D"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.compareVal, color: "var(--accent-text)" } }, fmt(transferTotal))), /* @__PURE__ */ React.createElement("div", { style: styles.compareBox }, /* @__PURE__ */ React.createElement("div", { style: styles.compareLabel }, "\u624B\u7E8C\u8CBB\u5408\u8A08"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.compareVal, color: "var(--pink-text)" } }, fmt(feeTotal)))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", textAlign: "center", marginTop: 8 } }, "\u8F49\u5E33\u4E0D\u8A08\u5165\u652F\u51FA/\u6536\u5165\u7D71\u8A08"));
+    }
+    return null;
+  })));
+}
+function SettingsPage({
+  state,
+  setState,
+  toast,
+  toastRich,
+  onReset,
+  onCleanupHistory,
+  lastBackupAt,
+  setLastBackupAt,
+  backupReminderDays,
+  setBackupReminderDays,
+  driveFolderUrl,
+  setDriveFolderUrl,
+  setConfirmDialog,
+  editMode,
+  setEditMode,
+  onSubSheetChange,
+  noteColor,
+  setNoteColor,
+  theme,
+  setTheme,
+  numFont,
+  setNumFont,
+  blockOrder,
+  moveBlock,
+  setPageOrder
+}) {
+  const [showThirdParty, setShowThirdParty] = useState(false);
+  const [showDriveSetup, setShowDriveSetup] = useState(false);
+  const [showCleanupSheet, setShowCleanupSheet] = useState(false);
+  const [showFilterDeleteSheet, setShowFilterDeleteSheet] = useState(false);
+  const [showReminderSetup, setShowReminderSetup] = useState(false);
+  const [dangerLocked, setDangerLocked] = useState(true);
+  const [showFontPreview, setShowFontPreview] = useState(false);
+  const [showFontPicker, setShowFontPicker] = useState(false);
+  const [driveInput, setDriveInput] = useState(driveFolderUrl);
+  const [expandedStat, setExpandedStat] = useState(null);
+  const anySubSheetOpen = showThirdParty || showCleanupSheet || showFilterDeleteSheet;
+  useEffect(() => {
+    if (onSubSheetChange) onSubSheetChange(anySubSheetOpen);
+  }, [anySubSheetOpen, onSubSheetChange]);
+  useEffect(() => {
+    return () => {
+      if (onSubSheetChange) onSubSheetChange(false);
+    };
+  }, [onSubSheetChange]);
+  const SNAPSHOT_KEY = "ledger_snapshots_v1";
+  const SNAPSHOT_MAX = 10;
+  const [snapshots, setSnapshots] = useState(() => {
+    try {
+      const raw = localStorage.getItem(SNAPSHOT_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [showSnapshots, setShowSnapshots] = useState(false);
+  const [snapshotsLocked, setSnapshotsLocked] = useState(true);
+  const [renamingSnapId, setRenamingSnapId] = useState(null);
+  const [renameInput, setRenameInput] = useState("");
+  const [snapshotNameInput, setSnapshotNameInput] = useState("");
+  const [showSnapshotNameDialog, setShowSnapshotNameDialog] = useState(false);
+  const [snapshotScopes, setSnapshotScopes] = useState({
+    transactions: true,
+    accounts: true,
+    categories: true,
+    accountTypes: true
+  });
+  const driveSetupSwipe = useSwipeToClose(() => setShowDriveSetup(false));
+  const reminderSetupSwipe = useSwipeToClose(() => setShowReminderSetup(false));
+  const snapshotNameSwipe = useSwipeToClose(() => setShowSnapshotNameDialog(false));
+  const snapshotsSwipe = useSwipeToClose(() => setShowSnapshots(false));
+  const persistSnapshots = (list) => {
+    setSnapshots(list);
+    try {
+      localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(list));
+    } catch (e) {
+      toast("\u5132\u5B58\u5931\u6557\uFF08\u7A7A\u9593\u4E0D\u8DB3\uFF1F\uFF09");
+    }
+  };
+  const createSnapshot = (customName) => {
+    const scopes = snapshotScopes;
+    const anyChecked = scopes.transactions || scopes.accounts || scopes.categories || scopes.accountTypes;
+    if (!anyChecked) {
+      toast("\u81F3\u5C11\u8981\u9078\u4E00\u500B\u985E\u5225");
+      return;
+    }
+    if (snapshots.length >= SNAPSHOT_MAX) {
+      setConfirmDialog({
+        title: "\u5FEB\u7167\u5DF2\u9054\u4E0A\u9650",
+        bigNumber: { value: `${SNAPSHOT_MAX} / ${SNAPSHOT_MAX}`, label: "\u500B\u5FEB\u7167" },
+        message: "\u8ACB\u5148\u5F9E\u300C\u7BA1\u7406\u5FEB\u7167\u300D\u522A\u9664\u4E0D\u9700\u8981\u7684\u820A\u5FEB\u7167,\n\u518D\u5617\u8A66\u5132\u5B58\u65B0\u5FEB\u7167\u3002",
+        confirmText: "\u6211\u77E5\u9053\u4E86",
+        singleAction: true,
+        onConfirm: () => {
+        }
+      });
+      return;
+    }
+    const now = /* @__PURE__ */ new Date();
+    const defaultName = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")} \u624B\u52D5\u5FEB\u7167`;
+    const data = {};
+    if (scopes.transactions) {
+      data.transactions = state.transactions;
+      data.holdings = state.holdings;
+      data.trades = state.trades;
+    }
+    if (scopes.accounts) data.accounts = state.accounts;
+    if (scopes.categories) data.categories = state.categories;
+    if (scopes.accountTypes) data.accountTypes = state.accountTypes;
+    const snap = {
+      id: "snap_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      name: customName && customName.trim() || defaultName,
+      createdAt: now.getTime(),
+      data,
+      scopes: { ...scopes },
+      summary: {
+        txnCount: scopes.transactions ? state.transactions.length : null,
+        holdingCount: scopes.transactions ? state.holdings.length : null,
+        tradeCount: scopes.transactions ? state.trades.length : null,
+        acctCount: scopes.accounts ? state.accounts.length : null,
+        catCount: scopes.categories ? (state.categories.expense?.length || 0) + (state.categories.income?.length || 0) : null,
+        acctTypeCount: scopes.accountTypes ? state.accountTypes.length : null
+      }
+    };
+    const next = [snap, ...snapshots].slice(0, SNAPSHOT_MAX);
+    persistSnapshots(next);
+    if (toastRich) {
+      toastRich({
+        title: "\u5DF2\u5132\u5B58\u5FEB\u7167",
+        amount: "\u2713",
+        amountColor: "var(--mint-text)",
+        lines: [
+          `\u300C${snap.name}\u300D`,
+          `${next.length} / ${SNAPSHOT_MAX} \u500B\u5FEB\u7167`
+        ]
+      }, 2400);
+    } else {
+      toast(`\u5DF2\u5132\u5B58\u5FEB\u7167\uFF1A${snap.name}`);
+    }
+  };
+  const restoreSnapshot = (snap) => {
+    const scopes = snap.scopes || { transactions: true, accounts: true, categories: true, accountTypes: true };
+    const changes = [];
+    if (scopes.transactions && snap.data.transactions) {
+      const cur = state.transactions.length;
+      const next = snap.data.transactions.length;
+      const curH = state.holdings.length;
+      const nextH = Array.isArray(snap.data.holdings) ? snap.data.holdings.length : 0;
+      const curT = state.trades.length;
+      const nextT = Array.isArray(snap.data.trades) ? snap.data.trades.length : 0;
+      const txnChanged = cur !== next;
+      const stockChanged = curH !== nextH || curT !== nextT;
+      changes.push({
+        icon: "list",
+        label: "\u4EA4\u6613\u7D00\u9304",
+        from: `\u73FE\u6709 ${cur} \u7B46${curH > 0 || curT > 0 ? ` (\u6301\u80A1 ${curH})` : ""}`,
+        to: `\u5FEB\u7167 ${next} \u7B46${nextH > 0 || nextT > 0 ? ` (\u6301\u80A1 ${nextH})` : curH > 0 || curT > 0 ? " (\u6301\u80A1 0)" : ""}`,
+        changed: txnChanged || stockChanged
+      });
+    }
+    if (scopes.accounts && snap.data.accounts) {
+      const cur = state.accounts.length;
+      const next = snap.data.accounts.length;
+      changes.push({
+        icon: "bank",
+        label: "\u5E33\u6236",
+        from: `\u73FE\u6709 ${cur} \u500B`,
+        to: `\u5FEB\u7167 ${next} \u500B`,
+        changed: cur !== next
+      });
+    }
+    if (scopes.categories && snap.data.categories) {
+      const curCount = (state.categories.expense?.length || 0) + (state.categories.income?.length || 0);
+      const nextCount = (snap.data.categories.expense?.length || 0) + (snap.data.categories.income?.length || 0);
+      changes.push({
+        icon: "note",
+        label: "\u5206\u985E\u8A2D\u5B9A",
+        from: `\u73FE\u6709 ${curCount} \u9805`,
+        to: `\u5FEB\u7167 ${nextCount} \u9805`,
+        changed: curCount !== nextCount
+      });
+    }
+    if (scopes.accountTypes && snap.data.accountTypes) {
+      const cur = state.accountTypes.length;
+      const next = snap.data.accountTypes.length;
+      changes.push({
+        icon: "briefcase",
+        label: "\u5E33\u6236\u985E\u578B",
+        from: `\u73FE\u6709 ${cur} \u7A2E`,
+        to: `\u5FEB\u7167 ${next} \u7A2E`,
+        changed: cur !== next
+      });
+    }
+    setConfirmDialog({
+      title: "\u9084\u539F\u5FEB\u7167",
+      target: { label: "\u5FEB\u7167", name: snap.name },
+      changes,
+      changesHint: "\u73FE\u6709\u8CC7\u6599\u5C07\u88AB\u5FEB\u7167\u53D6\u4EE3,\u7BAD\u982D\u53F3\u5074(\u5FEB\u7167\u7248\u672C)\u6703\u751F\u6548\u3002",
+      confirmText: "\u78BA\u8A8D\u9084\u539F",
+      danger: true,
+      onConfirm: () => {
+        setState((s) => {
+          const next = { ...s };
+          if (scopes.transactions && snap.data.transactions) {
+            next.transactions = snap.data.transactions;
+            next.holdings = Array.isArray(snap.data.holdings) ? snap.data.holdings : [];
+            next.trades = Array.isArray(snap.data.trades) ? snap.data.trades : [];
+          }
+          if (scopes.accounts && snap.data.accounts) next.accounts = snap.data.accounts;
+          if (scopes.categories && snap.data.categories) next.categories = snap.data.categories;
+          if (scopes.accountTypes && snap.data.accountTypes) next.accountTypes = snap.data.accountTypes;
+          return next;
+        });
+        const snapDate = new Date(snap.createdAt);
+        const dateStr = `${snapDate.getFullYear()}/${String(snapDate.getMonth() + 1).padStart(2, "0")}/${String(snapDate.getDate()).padStart(2, "0")} ${String(snapDate.getHours()).padStart(2, "0")}:${String(snapDate.getMinutes()).padStart(2, "0")}`;
+        const changedLabels = changes.filter((c) => c.changed).map((c) => c.label);
+        if (toastRich) {
+          toastRich({
+            title: "\u5DF2\u9084\u539F\u5FEB\u7167",
+            amount: "\u2713",
+            amountColor: "var(--mint-text)",
+            lines: [
+              `\u300C${snap.name}\u300D`,
+              `\u5FEB\u7167\u6642\u9593 \xB7 ${dateStr}`,
+              changedLabels.length > 0 ? `\u5DF2\u66F4\u65B0:${changedLabels.join("\u3001")}` : "\u8CC7\u6599\u5DF2\u540C\u6B65"
+            ]
+          }, 2600);
+        } else {
+          toast(`\u5DF2\u9084\u539F\u5FEB\u7167\uFF1A${snap.name}`);
+        }
+        setShowSnapshots(false);
+      }
+    });
+  };
+  const startRenameSnapshot = (snap) => {
+    setRenamingSnapId(snap.id);
+    setRenameInput(snap.name);
+  };
+  const cancelRenameSnapshot = () => {
+    setRenamingSnapId(null);
+    setRenameInput("");
+  };
+  const saveRenameSnapshot = () => {
+    const newName = renameInput.trim();
+    if (!newName) {
+      toast("\u540D\u7A31\u4E0D\u80FD\u70BA\u7A7A");
+      return;
+    }
+    const target = snapshots.find((s) => s.id === renamingSnapId);
+    if (!target || target.name === newName) {
+      cancelRenameSnapshot();
+      return;
+    }
+    const nextList = snapshots.map(
+      (s) => s.id === renamingSnapId ? { ...s, name: newName } : s
+    );
+    persistSnapshots(nextList);
+    cancelRenameSnapshot();
+    if (toastRich) {
+      toastRich({
+        title: "\u5DF2\u66F4\u65B0\u540D\u7A31",
+        amount: "\u2713",
+        amountColor: "var(--mint-text)",
+        lines: [`\u300C${newName}\u300D`]
+      }, 1600);
+    } else {
+      toast("\u5DF2\u66F4\u65B0\u540D\u7A31");
+    }
+  };
+  const deleteSnapshot = (snap) => {
+    setConfirmDialog({
+      title: "\u522A\u9664\u5FEB\u7167",
+      target: { label: "\u5FEB\u7167", name: snap.name },
+      message: "\u78BA\u5B9A\u8981\u522A\u9664\u9019\u500B\u5FEB\u7167?",
+      warning: "\u6B64\u64CD\u4F5C\u7121\u6CD5\u5FA9\u539F",
+      confirmText: "\u522A\u9664",
+      danger: true,
+      onConfirm: () => {
+        const nextList = snapshots.filter((s) => s.id !== snap.id);
+        persistSnapshots(nextList);
+        if (toastRich) {
+          toastRich({
+            title: "\u5DF2\u522A\u9664\u5FEB\u7167",
+            amount: "\u2713",
+            amountColor: "var(--pink-text)",
+            lines: [
+              `\u300C${snap.name}\u300D`,
+              `\u5269\u9918 ${nextList.length} \u500B\u5FEB\u7167`
+            ]
+          }, 1180);
+        } else {
+          toast("\u5DF2\u522A\u9664\u5FEB\u7167");
+        }
+      }
+    });
+  };
+  const updateLastBackup = () => {
+    const now = Date.now();
+    setLastBackupAt(now);
+    try {
+      localStorage.setItem("ledger_last_backup", String(now));
+    } catch {
+    }
+  };
+  const syncDefaultCategories = () => {
+    let addCats = 0;
+    let addSubs = 0;
+    ["expense", "income"].forEach((type) => {
+      const defs = DEFAULT_CATEGORIES[type] || [];
+      const cur = state.categories[type] || [];
+      defs.forEach((defCat) => {
+        const curCat = cur.find((c) => c.label === defCat.label);
+        if (!curCat) {
+          addCats++;
+          addSubs += (defCat.subs || []).length;
+        } else {
+          (defCat.subs || []).forEach((s) => {
+            if (!(curCat.subs || []).includes(s)) addSubs++;
+          });
+        }
+      });
+    });
+    if (addCats === 0 && addSubs === 0) {
+      toast("\u5206\u985E\u5DF2\u662F\u6700\u65B0\uFF0C\u6C92\u6709\u9700\u8981\u88DC\u7684\u9805\u76EE");
+      return;
+    }
+    setConfirmDialog({
+      title: "\u540C\u6B65\u9810\u8A2D\u5206\u985E",
+      message: `\u6703\u88DC\u4E0A\u7F3A\u5C11\u7684 ${addCats} \u500B\u5927\u5206\u985E\u3001${addSubs} \u500B\u5B50\u5206\u985E
+
+\u5DF2\u6709\u7684\u5206\u985E\uFF0F\u5B50\u5206\u985E\u4E0D\u6703\u88AB\u522A\u9664\u6216\u8B8A\u52D5\uFF0C\u53EA\u662F\u628A\u9810\u8A2D\u88E1\u6709\u3001\u4F60\u9019\u908A\u6C92\u6709\u7684\u88DC\u9032\u4F86
+
+\u78BA\u5B9A\u540C\u6B65\u55CE\uFF1F`,
+      confirmText: "\u540C\u6B65",
+      danger: false,
+      onConfirm: () => {
+        setState((s) => {
+          const nextCats = { expense: [], income: [] };
+          ["expense", "income"].forEach((type) => {
+            const defs = DEFAULT_CATEGORIES[type] || [];
+            const cur = s.categories[type] || [];
+            const merged = cur.map((curCat) => {
+              const defCat = defs.find((d) => d.label === curCat.label);
+              if (!defCat) return curCat;
+              const existSubs = curCat.subs || [];
+              const missingSubs = (defCat.subs || []).filter((s2) => !existSubs.includes(s2));
+              return missingSubs.length ? { ...curCat, subs: [...existSubs, ...missingSubs] } : curCat;
+            });
+            defs.forEach((defCat) => {
+              if (!merged.find((c) => c.label === defCat.label)) {
+                merged.push(JSON.parse(JSON.stringify(defCat)));
+              }
+            });
+            nextCats[type] = merged;
+          });
+          return { ...s, categories: nextCats };
+        });
+        toast(`\u5DF2\u88DC\u4E0A ${addCats} \u500B\u5927\u5206\u985E\u3001${addSubs} \u500B\u5B50\u5206\u985E`);
+      }
+    });
+  };
+  const EXPORTABLE_PREF_KEYS = [
+    "ledger_theme_v1",
+    "ledger_note_color_v1",
+    "ledger_note_pref_v1",
+    "ledger_block_order_v12",
+    "ledger_block_order_v13",
+    // 新版 block 排序
+    "ledger_account_order",
+    "ledger_period_order",
+    "ledger_day_order",
+    "ledger_thirdparty_order",
+    "ledger_invest_account_order",
+    // 投資帳戶頁的 block 排序
+    "ledger_dp_selected",
+    "ledger_dp_weekend",
+    "ledger_list_sort_v1",
+    "ledger_recent_filter",
+    "ledger_num_font_v1",
+    // 數字字體偏好
+    "ledger_fee_cat",
+    "ledger_fee_sub",
+    "ledger_fee_sub_expense",
+    "ledger_fee_sub_income",
+    "ledger_last_acct_expense",
+    "ledger_last_acct_income",
+    "ledger_last_acct_transfer_from",
+    "ledger_last_acct_transfer_to",
+    "ledger_default_buy_account_v1",
+    // 股票買入預設帳戶
+    "ledger_default_sell_account_v1"
+    // 股票賣出預設帳戶
+  ];
+  const collectPreferences = () => {
+    const prefs = {};
+    EXPORTABLE_PREF_KEYS.forEach((k) => {
+      try {
+        const v = localStorage.getItem(k);
+        if (v !== null) prefs[k] = v;
+      } catch {
+      }
+    });
+    return prefs;
+  };
+  const restorePreferences = (prefs) => {
+    if (!prefs || typeof prefs !== "object") return;
+    EXPORTABLE_PREF_KEYS.forEach((k) => {
+      if (prefs[k] !== void 0 && prefs[k] !== null) {
+        try {
+          localStorage.setItem(k, prefs[k]);
+        } catch {
+        }
+      }
+    });
+  };
+  const buildExportPayload = () => JSON.stringify({
+    transactions: state.transactions,
+    accounts: state.accounts,
+    categories: state.categories,
+    accountTypes: state.accountTypes,
+    holdings: state.holdings,
+    trades: state.trades,
+    preferences: collectPreferences(),
+    exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    exportVersion: 3
+  }, null, 2);
+  const doExport = () => {
+    const data = buildExportPayload();
+    try {
+      const blob = new Blob([data], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `\u8A18\u5E33\u5099\u4EFD_${todayStr()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      updateLastBackup();
+      toast("\u5DF2\u532F\u51FA JSON\uFF0C\u8ACB\u81F3\u300C\u4E0B\u8F09\u300D\u8CC7\u6599\u593E\u67E5\u770B");
+    } catch {
+      toast("\u532F\u51FA\u5931\u6557");
+    }
+  };
+  const [exportTextDialog, setExportTextDialog] = useState(null);
+  const doCopyJSON = () => {
+    const data = buildExportPayload();
+    setExportTextDialog(data);
+  };
+  const doExportCSV = () => {
+    const rows = [["\u65E5\u671F", "\u985E\u578B", "\u5927\u5206\u985E", "\u5B50\u5206\u985E", "\u91D1\u984D", "\u5E33\u6236", "\u5099\u8A3B"]];
+    state.transactions.forEach((t) => {
+      const acct = state.accounts.find((a) => a.id === t.accountId)?.name || "";
+      rows.push([
+        t.date,
+        t.type === "income" ? "\u6536\u5165" : "\u652F\u51FA",
+        t.category || "",
+        t.subCategory || "",
+        t.amount,
+        acct,
+        t.note || ""
+      ]);
+    });
+    const csv = "\uFEFF" + rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    try {
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `\u8A18\u5E33_${todayStr()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast("\u5DF2\u532F\u51FA CSV\uFF0C\u8ACB\u81F3\u300C\u4E0B\u8F09\u300D\u8CC7\u6599\u593E\u67E5\u770B");
+    } catch {
+      toast("\u532F\u51FA\u5931\u6557");
+    }
+  };
+  const fileInputRef = React.useRef(null);
+  const doImport = () => {
+    fileInputRef.current?.click();
+  };
+  const applyImportFromText = (text) => {
+    try {
+      const data = JSON.parse(text);
+      if (!data.transactions || !Array.isArray(data.transactions)) {
+        toast("\u6A94\u6848\u683C\u5F0F\u932F\u8AA4");
+        return false;
+      }
+      const hasPrefs = data.preferences && typeof data.preferences === "object" && Object.keys(data.preferences).length > 0;
+      const holdingCount = Array.isArray(data.holdings) ? data.holdings.length : 0;
+      const baseMsg = `\u6A94\u6848\u542B ${data.transactions.length} \u7B46\u7D00\u9304${holdingCount > 0 ? ` (\u6301\u80A1 ${holdingCount} \u6A94)` : ""}\u3001${(data.accounts || []).length} \u500B\u5E33\u6236`;
+      const prefMsg = hasPrefs ? "\n\n\u6703\u4E00\u4F75\u9084\u539F\u504F\u597D\u8A2D\u5B9A(\u4E3B\u984C\u3001\u6392\u5E8F\u3001\u9810\u8A2D\u624B\u7E8C\u8CBB\u5206\u985E\u7B49)" : "";
+      setShowPasteImport(false);
+      setPasteImportText("");
+      setConfirmDialog({
+        title: "\u532F\u5165\u5099\u4EFD",
+        message: `${baseMsg}${prefMsg}
+
+\u532F\u5165\u5F8C\u6703\u300C\u8986\u84CB\u300D\u76EE\u524D\u7684\u8CC7\u6599,\u7121\u6CD5\u9084\u539F
+\u78BA\u5B9A\u7E7C\u7E8C\u55CE?`,
+        confirmText: "\u532F\u5165",
+        danger: true,
+        onConfirm: () => {
+          const newState = {
+            transactions: Array.isArray(data.transactions) ? data.transactions : [],
+            accounts: Array.isArray(data.accounts) ? data.accounts : [],
+            categories: data.categories || JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
+            accountTypes: Array.isArray(data.accountTypes) && data.accountTypes.length ? data.accountTypes : [...DEFAULT_ACCOUNT_TYPES],
+            holdings: Array.isArray(data.holdings) ? data.holdings : [],
+            trades: Array.isArray(data.trades) ? data.trades : []
+          };
+          try {
+            localStorage.setItem("ledger_v16", JSON.stringify(newState));
+          } catch (e) {
+            toast("\u5BEB\u5165\u5931\u6557,\u5132\u5B58\u7A7A\u9593\u53EF\u80FD\u5DF2\u6EFF");
+            return;
+          }
+          if (hasPrefs) {
+            restorePreferences(data.preferences);
+          }
+          window.location.reload();
+        }
+      });
+      return true;
+    } catch {
+      toast("\u6A94\u6848\u8B80\u53D6\u5931\u6557");
+      return false;
+    }
+  };
+  const handleFileImport = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      applyImportFromText(ev.target.result);
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+  const [showPasteImport, setShowPasteImport] = useState(false);
+  const [pasteImportText, setPasteImportText] = useState("");
+  const openDriveFolder = () => {
+    if (!driveFolderUrl) {
+      setShowDriveSetup(true);
+      return;
+    }
+    try {
+      window.open(driveFolderUrl, "_blank");
+    } catch {
+      toast("\u7121\u6CD5\u958B\u555F\uFF0C\u8ACB\u78BA\u8A8D\u7DB2\u5740");
+    }
+  };
+  const saveDriveUrl = () => {
+    const url = driveInput.trim();
+    if (url && !/^https?:\/\//.test(url)) {
+      toast("\u8ACB\u8F38\u5165\u5B8C\u6574\u7DB2\u5740\uFF08\u542B https://\uFF09");
+      return;
+    }
+    setDriveFolderUrl(url);
+    try {
+      localStorage.setItem("ledger_drive_folder", url);
+    } catch {
+    }
+    setShowDriveSetup(false);
+    toast(url ? "\u5DF2\u5132\u5B58\u8CC7\u6599\u593E\u9023\u7D50" : "\u5DF2\u6E05\u9664\u8CC7\u6599\u593E\u9023\u7D50");
+  };
+  const daysSinceBackup = lastBackupAt ? Math.floor((Date.now() - lastBackupAt) / 864e5) : null;
+  const needsBackup = daysSinceBackup === null || daysSinceBackup >= backupReminderDays;
+  const lastBackupText = lastBackupAt ? new Date(lastBackupAt).toLocaleDateString("zh-TW", { year: "numeric", month: "2-digit", day: "2-digit" }) : "\u5F9E\u672A\u5099\u4EFD";
+  const updateReminderDays = (days) => {
+    setBackupReminderDays(days);
+    try {
+      localStorage.setItem("ledger_backup_reminder_days", String(days));
+    } catch {
+    }
+    setShowReminderSetup(false);
+    toast(`\u5DF2\u8A2D\u5B9A\u6BCF ${days} \u5929\u63D0\u9192\u5099\u4EFD`);
+  };
+  return /* @__PURE__ */ React.createElement("div", { style: styles.page }, /* @__PURE__ */ React.createElement("div", { style: styles.pageHeader }, /* @__PURE__ */ React.createElement("h1", { style: styles.pageTitle }, "\u8A2D\u5B9A"), /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode })), /* @__PURE__ */ React.createElement(EditModeBanner, { editMode, setEditMode }), /* @__PURE__ */ React.createElement("div", { style: styles.pageScroll }, needsBackup && state.transactions.length > 0 && /* @__PURE__ */ React.createElement("div", { style: styles.backupReminder, onClick: doExport }, /* @__PURE__ */ React.createElement("div", { style: { width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "warning", size: 22, color: "#f5a04a" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: "#f5a04a", marginBottom: 2 } }, daysSinceBackup === null ? "\u5EFA\u8B70\u9032\u884C\u9996\u6B21\u5099\u4EFD" : `\u5DF2 ${daysSinceBackup} \u5929\u672A\u5099\u4EFD`), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)" } }, "\u9EDE\u6B64\u7ACB\u5373\u532F\u51FA JSON \u5099\u4EFD")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), (blockOrder || ["backup-local", "backup-ext", "drive", "reminder", "account", "dataStat", "cleanup", "danger"]).map((blockKey, idx) => {
+    const order = blockOrder || ["backup-local", "backup-ext", "drive", "reminder", "account", "dataStat", "cleanup", "danger"];
+    const blockProps = {
+      onReorder: setPageOrder,
+      blockKey,
+      editMode,
+      isFirst: idx === 0,
+      isLast: idx === order.length - 1,
+      onMoveUp: () => moveBlock && moveBlock(blockKey, -1),
+      onMoveDown: () => moveBlock && moveBlock(blockKey, 1)
+    };
+    if (blockKey === "backup-local") {
+      return /* @__PURE__ */ React.createElement(Block, { key: "backup-local", ...blockProps, title: "\u672C\u5730\u5099\u4EFD" }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => {
+        if (editMode) return;
+        if (snapshots.length >= SNAPSHOT_MAX) {
+          setConfirmDialog({
+            title: "\u5FEB\u7167\u5DF2\u9054\u4E0A\u9650",
+            bigNumber: { value: `${SNAPSHOT_MAX} / ${SNAPSHOT_MAX}`, label: "\u500B\u5FEB\u7167" },
+            message: "\u8ACB\u5148\u5F9E\u300C\u7BA1\u7406\u5FEB\u7167\u300D\u522A\u9664\u4E0D\u9700\u8981\u7684\u820A\u5FEB\u7167,\n\u518D\u5617\u8A66\u5132\u5B58\u65B0\u5FEB\u7167\u3002",
+            confirmText: "\u6211\u77E5\u9053\u4E86",
+            singleAction: true,
+            onConfirm: () => {
+            }
+          });
+          return;
+        }
+        setSnapshotNameInput("");
+        setSnapshotScopes({ transactions: true, accounts: true, categories: true, accountTypes: true });
+        setShowSnapshotNameDialog(true);
+      } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "box", size: 20, color: "var(--mint-text)" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u5132\u5B58\u5FEB\u7167"), /* @__PURE__ */ React.createElement("div", { style: {
+        fontSize: 11,
+        color: snapshots.length >= SNAPSHOT_MAX ? "var(--pink)" : "var(--text-faint)",
+        fontWeight: snapshots.length >= SNAPSHOT_MAX ? 600 : 400,
+        marginTop: 2
+      } }, snapshots.length >= SNAPSHOT_MAX ? `\u5DF2\u9054\u4E0A\u9650(${snapshots.length} / ${SNAPSHOT_MAX})` : `\u5728 App \u5167\u4FDD\u5B58\u76EE\u524D\u72C0\u614B`)), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => {
+        if (!editMode) {
+          setSnapshotsLocked(true);
+          setRenamingSnapId(null);
+          setShowSnapshots(true);
+        }
+      } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "clock", size: 20, color: "var(--accent-text)" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u7BA1\u7406\u5FEB\u7167"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, snapshots.length > 0 ? `\u7DE8\u8F2F\u5728 App \u7684\u5FEB\u7167\u6A94\u6848` : "\u5C1A\u672A\u5EFA\u7ACB\u4EFB\u4F55\u5FEB\u7167")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: {
+        fontSize: 10,
+        color: snapshots.length >= SNAPSHOT_MAX * 0.9 ? "var(--pink)" : "var(--text-faint)",
+        fontWeight: snapshots.length >= SNAPSHOT_MAX * 0.9 ? 600 : 400,
+        fontVariantNumeric: "tabular-nums",
+        lineHeight: 1
+      } }, snapshots.length, " / ", SNAPSHOT_MAX), /* @__PURE__ */ React.createElement("span", { style: { ...styles.settingsArrow, lineHeight: 1 } }, "\u203A"))));
+    }
+    if (blockKey === "backup-ext") {
+      return /* @__PURE__ */ React.createElement(Block, { key: "backup-ext", ...blockProps, title: "\u5916\u5B58\u5099\u4EFD" }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && doExport() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "download", size: 20, color: "var(--accent-text)" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u532F\u51FA\u5099\u4EFD\u6A94"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, "\u76F4\u63A5\u5B58 JSON\u6A94 \u5230\u624B\u6A5F\u300C \u4E0B\u8F09\uFF0Fdownload \u300D\u8CC7\u6599\u593E")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && doImport() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "folder", size: 20, color: "#a8c8f5" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u532F\u5165\u5099\u4EFD\u6A94"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, "\u7528 JSON\u6A94 \u9084\u539F\u8CC7\u6599 ( \u6703\u8986\u84CB\u73FE\u6709 )")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && doCopyJSON() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "clipboard", size: 20, color: "var(--mint-text)" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u8907\u88FD JSON \u4EE3\u78BC"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, "\u62F7\u8C9D\u6587\u5B57\u4EE3\u78BC\u8CC7\u6599")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && setShowPasteImport(true) }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "edit", size: 20, color: "#a8c8f5" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u8CBC\u4E0A JSON \u4EE3\u78BC"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, "\u9084\u539F\u6587\u5B57\u4EE3\u78BC\u8CC7\u6599 ( \u6703\u8986\u84CB\u73FE\u6709 )")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), /* @__PURE__ */ React.createElement("input", { ref: fileInputRef, type: "file", accept: ".json,application/json", style: { display: "none" }, onChange: handleFileImport }));
+    }
+    if (blockKey === "drive") {
+      return null;
+    }
+    if (blockKey === "reminder") {
+      return null;
+    }
+    if (blockKey === "account") {
+      return /* @__PURE__ */ React.createElement(Block, { key: "account", ...blockProps, title: "\u5E33\u865F\u9023\u7D50" }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && setShowThirdParty(true) }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "link", size: 20, color: "#a8c8f5" })), /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u4E32\u9023\u7B2C\u4E09\u65B9\u9023\u7D50"), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")));
+    }
+    if (blockKey === "dataStat") {
+      const catCount = (state.categories.expense?.length || 0) + (state.categories.income?.length || 0);
+      const subCount = (state.categories.expense || []).reduce((sum, c) => sum + (c.subs?.length || 0), 0) + (state.categories.income || []).reduce((sum, c) => sum + (c.subs?.length || 0), 0);
+      const txnByType = {
+        income: state.transactions.filter((t) => t.type === "income" && !t.transferRole).length,
+        expense: state.transactions.filter((t) => t.type === "expense" && !t.transferRole).length,
+        transfer: state.transactions.filter((t) => t.transferRole === "out").length
+        // 一對轉出/轉入算一筆
+      };
+      const acctByType = (state.accountTypes || []).map((at) => ({
+        label: at.label,
+        color: at.color,
+        count: state.accounts.filter((a) => a.type === at.value).length
+      })).filter((x) => x.count > 0);
+      const statRows = [
+        {
+          key: "txn",
+          icon: "clipboard",
+          color: "var(--text-dim)",
+          label: "\u7E3D\u7D00\u9304\u7B46\u6578",
+          value: state.transactions.length,
+          details: [
+            { label: "\u652F\u51FA", color: "var(--pink-text)", count: txnByType.expense },
+            { label: "\u6536\u5165", color: "var(--mint-text)", count: txnByType.income },
+            { label: "\u8F49\u5E33", color: "var(--accent-text)", count: txnByType.transfer }
+          ]
+        },
+        {
+          key: "account",
+          icon: "bank",
+          color: "#a8c8f5",
+          label: "\u5E33\u6236\u6578",
+          value: state.accounts.length,
+          details: acctByType.map((x) => ({ label: x.label, color: x.color, count: x.count }))
+        },
+        {
+          key: "cat",
+          icon: "bag",
+          color: "var(--mint-text)",
+          label: "\u5927\u5206\u985E",
+          value: catCount,
+          details: [
+            { label: "\u652F\u51FA", color: "var(--pink-text)", count: state.categories.expense?.length || 0 },
+            { label: "\u6536\u5165", color: "var(--mint-text)", count: state.categories.income?.length || 0 }
+          ]
+        },
+        {
+          key: "sub",
+          icon: "list",
+          color: "var(--accent-text)",
+          label: "\u5B50\u5206\u985E",
+          value: subCount,
+          details: [
+            { label: "\u652F\u51FA", color: "var(--pink-text)", count: (state.categories.expense || []).reduce((s, c) => s + (c.subs?.length || 0), 0) },
+            { label: "\u6536\u5165", color: "var(--mint-text)", count: (state.categories.income || []).reduce((s, c) => s + (c.subs?.length || 0), 0) }
+          ]
+        }
+      ];
+      return /* @__PURE__ */ React.createElement(Block, { key: "dataStat", ...blockProps, title: "\u8CC7\u6599\u7D71\u8A08" }, statRows.map((row) => {
+        const isExpanded = expandedStat === row.key;
+        const canExpand = row.details && row.details.length > 0 && row.value > 0;
+        return /* @__PURE__ */ React.createElement(React.Fragment, { key: row.key }, /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            style: {
+              ...styles.statItem,
+              cursor: canExpand ? "pointer" : "default",
+              ...isExpanded ? { marginBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 } : {}
+            },
+            onClick: () => canExpand && setExpandedStat(isExpanded ? null : row.key)
+          },
+          /* @__PURE__ */ React.createElement("div", { style: styles.statIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: row.icon, size: 16, color: row.color })),
+          /* @__PURE__ */ React.createElement("div", { style: styles.statLabel }, row.label),
+          /* @__PURE__ */ React.createElement("div", { style: styles.statValue }, row.value, " \u7B46"),
+          canExpand && /* @__PURE__ */ React.createElement("div", { style: {
+            marginLeft: 6,
+            fontSize: 10,
+            color: "var(--text-faint)",
+            transition: "transform 0.15s",
+            transform: isExpanded ? "rotate(-90deg)" : "rotate(0deg)"
+          } }, "\u25C0")
+        ), isExpanded && /* @__PURE__ */ React.createElement("div", { style: {
+          background: "var(--bg-card)",
+          borderBottomLeftRadius: 10,
+          borderBottomRightRadius: 10,
+          marginTop: -4,
+          marginBottom: 4,
+          padding: "4px 14px 8px",
+          borderTop: "1px solid rgba(255,255,255,0.04)"
+        } }, row.details.map((d, di) => /* @__PURE__ */ React.createElement("div", { key: di, style: {
+          display: "flex",
+          alignItems: "center",
+          padding: "5px 0 5px 26px",
+          fontSize: 11
+        } }, d.color && /* @__PURE__ */ React.createElement("span", { style: {
+          width: 6,
+          height: 6,
+          borderRadius: 3,
+          background: d.color,
+          marginRight: 8,
+          flexShrink: 0
+        } }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, color: "var(--text-dim)" } }, d.label), /* @__PURE__ */ React.createElement("span", { style: {
+          color: "var(--text)",
+          fontFamily: "var(--num-font)",
+          fontVariantNumeric: "tabular-nums"
+        } }, d.count, " \u7B46")))));
+      }));
+    }
+    if (blockKey === "appearance") {
+      return /* @__PURE__ */ React.createElement(Block, { key: "appearance", ...blockProps, title: "\u5916\u89C0" }, /* @__PURE__ */ React.createElement("div", { style: { padding: "4px 4px 8px" } }, /* @__PURE__ */ React.createElement("div", { style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between"
+      } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "var(--text)", fontWeight: 500 } }, "\u4E3B\u984C\u984F\u8272"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)" } }, "\u5207\u63DB\u6DF1\u8272\u6216\u6DFA\u8272\u98A8\u683C")), /* @__PURE__ */ React.createElement("div", { style: {
+        display: "flex",
+        background: "var(--bg-card)",
+        border: "1px solid var(--border)",
+        borderRadius: 12,
+        padding: 4,
+        gap: 3
+      } }, [
+        { val: "dark", label: "\u6DF1\u8272" },
+        { val: "light", label: "\u6DFA\u8272" }
+      ].map((opt) => {
+        const active = theme === opt.val;
+        return /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            key: opt.val,
+            onClick: () => !editMode && setTheme(opt.val),
+            style: {
+              padding: "9px 20px",
+              border: "none",
+              borderRadius: 9,
+              background: active ? "var(--mint)" : "transparent",
+              color: active ? "#1a1a1a" : "var(--text-dim)",
+              fontSize: 13,
+              fontWeight: active ? 700 : 500,
+              cursor: "pointer",
+              transition: "all 0.15s",
+              minWidth: 56
+            }
+          },
+          opt.label
+        );
+      }))), /* @__PURE__ */ React.createElement("div", { style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginTop: 14
+      } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "var(--text)", fontWeight: 500 } }, "\u6578\u5B57\u5B57\u9AD4"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)" } }, "\u8B8A\u66F4\u7CFB\u7D71\u6578\u5B57\u5B57\u9AD4")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => !editMode && setShowFontPicker(true),
+          disabled: editMode,
+          style: {
+            width: 123,
+            height: 39,
+            padding: "0 12px",
+            borderRadius: 12,
+            background: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            color: "var(--text)",
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: editMode ? "not-allowed" : "pointer",
+            outline: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 4,
+            boxSizing: "border-box"
+          }
+        },
+        /* @__PURE__ */ React.createElement("span", null, numFont === "sans" ? "\u7121\u896F\u7DDA\u5B57" : "\u7B49\u5BEC\u6578\u5B57"),
+        /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, color: "var(--text-faint)", lineHeight: 1 } }, "\u25BC")
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => !editMode && setShowFontPreview((v) => !v),
+          disabled: editMode,
+          "aria-label": "\u5207\u63DB\u5B57\u9AD4\u9810\u89BD",
+          style: {
+            width: 39,
+            height: 39,
+            borderRadius: 12,
+            background: showFontPreview ? "var(--mint)" : "var(--bg-card)",
+            border: "1px solid var(--border)",
+            color: showFontPreview ? "#1a1a1a" : "var(--text-dim)",
+            fontSize: 18,
+            fontWeight: 700,
+            cursor: editMode ? "not-allowed" : "pointer",
+            outline: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            lineHeight: 1,
+            boxSizing: "border-box",
+            transition: "all 0.15s"
+          }
+        },
+        showFontPreview ? "\u2039" : "\u203A"
+      ))), showFontPreview && /* @__PURE__ */ React.createElement("div", { style: {
+        marginTop: 10,
+        padding: "12px",
+        borderRadius: 10,
+        background: "var(--bg-card)",
+        border: "1px solid var(--border)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 14
+      } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: {
+        fontSize: 10,
+        marginBottom: 6,
+        display: "flex",
+        alignItems: "center",
+        gap: 6
+      } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "\u672C\u6708\u6536\u652F"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontSize: 9, fontWeight: 600 } }, "( \u6578\u503C\u5B57\u9AD4\u6A21\u64EC )")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, [
+        { label: "\u6536\u5165", val: "3,680", color: "var(--mint-text)" },
+        { label: "\u652F\u51FA", val: "5,099", color: "var(--pink-text)" },
+        { label: "\u7D50\u9918", val: "-1,419", color: "var(--pink-text)" }
+      ].map((it) => /* @__PURE__ */ React.createElement("div", { key: it.label, style: {
+        flex: 1,
+        padding: "8px 6px",
+        borderRadius: 8,
+        background: "var(--bg)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 3,
+        alignItems: "center"
+      } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "var(--text-faint)" } }, it.label), /* @__PURE__ */ React.createElement("div", { style: {
+        fontFamily: "var(--num-font)",
+        fontSize: 16,
+        fontWeight: 700,
+        color: it.color,
+        letterSpacing: "-0.3px",
+        fontVariantNumeric: "tabular-nums"
+      } }, it.val))))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: {
+        fontSize: 10,
+        marginBottom: 6,
+        display: "flex",
+        alignItems: "center",
+        gap: 6
+      } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "\u6700\u8FD1\u7D00\u9304"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontSize: 9, fontWeight: 600 } }, "( \u6578\u503C\u5B57\u9AD4\u6A21\u64EC )")), /* @__PURE__ */ React.createElement("div", { style: {
+        padding: "8px 10px",
+        borderRadius: 8,
+        background: "var(--bg)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 10
+      } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text)", fontWeight: 500 } }, "\u5DE5\u4F5C\u6536\u5165 \u203A \u85AA\u6C34\u6536\u5165"), /* @__PURE__ */ React.createElement("div", { style: {
+        fontSize: 10,
+        color: "var(--text-faint)",
+        fontFamily: "var(--num-font)",
+        fontVariantNumeric: "tabular-nums"
+      } }, "2026/05/05 (\u4E8C) \u53F0\u65B0\u9280\u884C")), /* @__PURE__ */ React.createElement("div", { style: {
+        fontFamily: "var(--num-font)",
+        fontSize: 15,
+        fontWeight: 600,
+        color: "var(--mint-text)",
+        letterSpacing: "-0.3px",
+        fontVariantNumeric: "tabular-nums",
+        whiteSpace: "nowrap"
+      } }, "+3,680"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: {
+        fontSize: 10,
+        marginBottom: 6,
+        display: "flex",
+        alignItems: "center",
+        gap: 6
+      } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "\u5E33\u6236\u7E3D\u89BD"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontSize: 9, fontWeight: 600 } }, "( \u6578\u503C\u5B57\u9AD4\u6A21\u64EC )")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, [
+        { label: "\u7E3D\u8CC7\u7522", val: "1,814,536", color: "var(--mint-text)" },
+        { label: "\u7E3D\u8CA0\u50B5", val: "1,106,114", color: "var(--pink-text)" },
+        { label: "\u6DE8\u8CC7\u7522", val: "708,422", color: "var(--text)" }
+      ].map((it) => /* @__PURE__ */ React.createElement("div", { key: it.label, style: {
+        flex: 1,
+        padding: "8px 6px",
+        borderRadius: 8,
+        background: "var(--bg)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 3,
+        alignItems: "center"
+      } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "var(--text-faint)" } }, it.label), /* @__PURE__ */ React.createElement("div", { style: {
+        fontFamily: "var(--num-font)",
+        fontSize: 14,
+        fontWeight: 700,
+        color: it.color,
+        letterSpacing: "-0.3px",
+        fontVariantNumeric: "tabular-nums"
+      } }, it.val))))))));
+    }
+    if (blockKey === "cleanup") {
+      return /* @__PURE__ */ React.createElement(Block, { key: "cleanup", ...blockProps, title: "\u6E05\u7406\u6B77\u53F2\u7D00\u9304" }, /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: { ...styles.settingsItem, cursor: "pointer", alignItems: "flex-start", padding: "12px 14px" },
+          onClick: () => !editMode && setShowCleanupSheet(true)
+        },
+        /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "calendar", size: 20, color: "var(--mint-text)" })),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u4F9D\u65E5\u671F\u6E05\u9664\u820A\u7D00\u9304"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2, lineHeight: 1.5 } }, "\u79FB\u9664\u67D0\u500B\u65E5\u671F\u4E4B\u524D\u7684\u4EA4\u6613,\u964D\u4F4E\u8CC7\u6599\u91CF")),
+        /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
+      ), /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: { ...styles.settingsItem, cursor: "pointer", alignItems: "flex-start", padding: "12px 14px" },
+          onClick: () => !editMode && setShowFilterDeleteSheet(true)
+        },
+        /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "search", size: 20, color: "var(--accent-text)" })),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u689D\u4EF6\u7BE9\u9078\u522A\u9664"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2, lineHeight: 1.5 } }, "\u4F9D\u5E33\u6236\u3001\u5206\u985E\u3001\u5099\u8A3B\u7B49\u689D\u4EF6\u7CBE\u78BA\u522A\u9664\u7D00\u9304")),
+        /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
+      ));
+    }
+    if (blockKey === "danger") {
+      return /* @__PURE__ */ React.createElement(
+        Block,
+        {
+          key: "danger",
+          ...blockProps,
+          title: "\u5371\u96AA\u5340",
+          headerRight: /* @__PURE__ */ React.createElement("div", { style: styles.lockRow }, /* @__PURE__ */ React.createElement("span", { style: { ...styles.lockLabel, color: dangerLocked ? "var(--text-dim)" : "var(--pink)", display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: dangerLocked ? "lock" : "unlock", size: 12, color: dangerLocked ? "var(--text-dim)" : "var(--pink)" }), dangerLocked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: { ...styles.toggleTrack, background: dangerLocked ? "var(--bg-card)" : "var(--pink)" },
+              onClick: (e) => {
+                e.stopPropagation();
+                if (!editMode) setDangerLocked((v) => !v);
+              }
+            },
+            /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: dangerLocked ? "translateX(0)" : "translateX(18px)" } })
+          ))
+        },
+        /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            style: {
+              ...styles.settingsItem,
+              borderColor: "var(--pink)",
+              opacity: dangerLocked ? 0.4 : 1,
+              cursor: dangerLocked ? "not-allowed" : "pointer",
+              alignItems: "flex-start",
+              padding: "14px 14px"
+            },
+            onClick: () => !editMode && !dangerLocked && onReset()
+          },
+          /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "warning", size: 22, color: "var(--pink-text)" })),
+          /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.settingsLabel, color: "var(--pink-text)", fontSize: 16, fontWeight: 600, marginBottom: 8 } }, "\u6E05\u9664\u6240\u6709\u8CC7\u6599"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text)", opacity: 0.75, lineHeight: 1.7 } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 2 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", opacity: 1, fontWeight: 600 } }, "\u79FB\u9664"), /* @__PURE__ */ React.createElement("span", { style: { margin: "0 8px", opacity: 0.55 } }, "\xB7"), /* @__PURE__ */ React.createElement("span", null, "\u4EA4\u6613\u7D00\u9304"), /* @__PURE__ */ React.createElement("span", { style: { margin: "0 6px", opacity: 0.45 } }, "\uFF0F"), /* @__PURE__ */ React.createElement("span", null, "\u5E33\u6236"), /* @__PURE__ */ React.createElement("span", { style: { margin: "0 6px", opacity: 0.45 } }, "\uFF0F"), /* @__PURE__ */ React.createElement("span", null, "\u5206\u985E")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", opacity: 1, fontWeight: 600 } }, "\u4FDD\u7559"), /* @__PURE__ */ React.createElement("span", { style: { margin: "0 8px", opacity: 0.55 } }, "\xB7"), /* @__PURE__ */ React.createElement("span", null, "\u5FEB\u7167\u5099\u4EFD"), /* @__PURE__ */ React.createElement("span", { style: { margin: "0 6px", opacity: 0.45 } }, "\uFF0F"), /* @__PURE__ */ React.createElement("span", null, "\u4ECB\u9762\u6392\u5E8F")))),
+          /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
+        )
+      );
+    }
+    return null;
+  })), showThirdParty && /* @__PURE__ */ React.createElement(ThirdPartySheet, { onClose: () => setShowThirdParty(false), toast }), showCleanupSheet && /* @__PURE__ */ React.createElement(
+    CleanupHistorySheet,
+    {
+      state,
+      onClose: () => setShowCleanupSheet(false),
+      onCleanup: onCleanupHistory,
+      setConfirmDialog
+    }
+  ), showFilterDeleteSheet && /* @__PURE__ */ React.createElement(
+    FilterDeleteSheet,
+    {
+      state,
+      setState,
+      onClose: () => setShowFilterDeleteSheet(false),
+      setConfirmDialog,
+      toast,
+      toastRich
+    }
+  ), showDriveSetup && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowDriveSetup(false) }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerCard, onClick: (e) => e.stopPropagation(), ...driveSetupSwipe }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, "\u8A2D\u5B9A Google Drive \u8CC7\u6599\u593E"), /* @__PURE__ */ React.createElement("div", { style: { padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", lineHeight: 1.7, marginBottom: 10 } }, "1. \u5230 Google Drive \u5EFA\u7ACB\u5099\u4EFD\u7528\u8CC7\u6599\u593E", /* @__PURE__ */ React.createElement("br", null), "2. \u53F3\u9375 \u2192 \u5171\u7528 \u2192 \u8907\u88FD\u9023\u7D50", /* @__PURE__ */ React.createElement("br", null), "3. \u628A\u9023\u7D50\u8CBC\u5230\u4E0B\u65B9"), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      type: "text",
+      style: styles.field,
+      value: driveInput,
+      onChange: (e) => setDriveInput(e.target.value),
+      placeholder: "https://drive.google.com/drive/folders/...",
+      autoFocus: true
+    }
+  ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 8 } }, "\u7559\u7A7A\u53EF\u4EE5\u6E05\u9664\u8A2D\u5B9A")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "0 16px 16px" } }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      style: { ...styles.deleteBtn, flex: 1, marginTop: 0 },
+      onClick: () => setShowDriveSetup(false)
+    },
+    "\u53D6\u6D88"
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      style: { ...styles.saveBtn, flex: 1, background: "var(--mint)", color: "var(--on-mint)", marginTop: 0 },
+      onClick: saveDriveUrl
+    },
+    "\u5132\u5B58"
+  )))), exportTextDialog !== null && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setExportTextDialog(null) }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, "\u5099\u4EFD JSON"), /* @__PURE__ */ React.createElement("div", { style: { padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", lineHeight: 1.7, marginBottom: 10 } }, "\u9577\u6309\u4E0B\u65B9\u6587\u5B57 \u2192 \u5168\u9078 \u2192 \u8907\u88FD,\u8CBC\u5230 LINE Keep / \u8A18\u4E8B\u672C / \u53E6\u4E00\u500B\u700F\u89BD\u5668\u5206\u9801\u7684\u300C\u8CBC\u4E0A JSON \u532F\u5165\u300D"), /* @__PURE__ */ React.createElement(
+    "textarea",
+    {
+      readOnly: true,
+      style: {
+        ...styles.field,
+        minHeight: 180,
+        fontFamily: "monospace",
+        fontSize: 11,
+        resize: "vertical"
+      },
+      value: exportTextDialog,
+      onFocus: (e) => e.target.select(),
+      onClick: (e) => e.target.select()
+    }
+  ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 8 } }, "\u5171 ", exportTextDialog.length.toLocaleString(), " \u5B57\u5143")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "0 16px 16px" } }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      style: { ...styles.deleteBtn, flex: 1, marginTop: 0 },
+      onClick: () => setExportTextDialog(null)
+    },
+    "\u95DC\u9589"
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      style: { ...styles.saveBtn, flex: 1, background: "var(--mint)", color: "var(--on-mint)", marginTop: 0 },
+      onClick: async () => {
+        try {
+          await navigator.clipboard.writeText(exportTextDialog);
+          toast("\u5DF2\u8907\u88FD\u5230\u526A\u8CBC\u7C3F");
+        } catch {
+          toast("\u8ACB\u624B\u52D5\u9577\u6309\u6587\u5B57\u8907\u88FD");
+        }
+      }
+    },
+    "\u5617\u8A66\u8907\u88FD"
+  )))), showPasteImport && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => {
+    setShowPasteImport(false);
+    setPasteImportText("");
+  } }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, "\u8CBC\u4E0A JSON \u532F\u5165"), /* @__PURE__ */ React.createElement("div", { style: { padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", lineHeight: 1.7, marginBottom: 10 } }, "\u628A\u5099\u4EFD JSON \u6587\u5B57\u8CBC\u5230\u4E0B\u65B9,\u53EF\u5F9E LINE Keep / \u8A18\u4E8B\u672C\u8907\u88FD"), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      style: {
+        width: "100%",
+        padding: "10px 12px",
+        background: "var(--bg-card-alt)",
+        color: "var(--text)",
+        border: "1px dashed var(--border)",
+        borderRadius: 10,
+        fontSize: 13,
+        fontWeight: 600,
+        marginBottom: 10,
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6
+      },
+      onClick: async () => {
+        try {
+          if (!navigator.clipboard || !navigator.clipboard.readText) {
+            toast("\u6B64\u700F\u89BD\u5668\u4E0D\u652F\u63F4,\u8ACB\u6539\u7528\u4E0B\u65B9\u8CBC\u4E0A");
+            return;
+          }
+          const text = await navigator.clipboard.readText();
+          if (!text || !text.trim()) {
+            toast("\u526A\u8CBC\u7C3F\u662F\u7A7A\u7684");
+            return;
+          }
+          setPasteImportText(text);
+          toast(`\u5DF2\u8B80\u53D6 ${text.length.toLocaleString()} \u5B57\u5143`);
+        } catch (e) {
+          toast("\u8B80\u53D6\u5931\u6557,\u8ACB\u624B\u52D5\u8CBC\u4E0A");
+        }
+      }
+    },
+    "\u{1F4CB} \u5F9E\u526A\u8CBC\u7C3F\u76F4\u63A5\u8B80\u53D6(\u907F\u514D\u622A\u65B7)"
+  ), /* @__PURE__ */ React.createElement(
+    "textarea",
+    {
+      style: {
+        ...styles.field,
+        minHeight: 140,
+        fontFamily: "monospace",
+        fontSize: 11,
+        resize: "vertical"
+      },
+      value: pasteImportText,
+      onChange: (e) => setPasteImportText(e.target.value),
+      placeholder: '{"transactions":[...],"accounts":[...]...}'
+    }
+  ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 8 } }, pasteImportText.length > 0 ? `\u5DF2\u8CBC\u4E0A ${pasteImportText.length.toLocaleString()} \u5B57\u5143` : "\u5C1A\u672A\u8CBC\u4E0A\u5167\u5BB9")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "0 16px 16px" } }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      style: { ...styles.deleteBtn, flex: 1, marginTop: 0 },
+      onClick: () => {
+        setShowPasteImport(false);
+        setPasteImportText("");
+      }
+    },
+    "\u53D6\u6D88"
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      style: {
+        ...styles.saveBtn,
+        flex: 1,
+        background: pasteImportText.trim() ? "var(--mint)" : "var(--bg-card-alt)",
+        color: pasteImportText.trim() ? "var(--on-mint)" : "var(--text-faint)",
+        marginTop: 0,
+        opacity: pasteImportText.trim() ? 1 : 0.5
+      },
+      disabled: !pasteImportText.trim(),
+      onClick: () => applyImportFromText(pasteImportText.trim())
+    },
+    "\u532F\u5165"
+  )))), showReminderSetup && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowReminderSetup(false) }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerCard, onClick: (e) => e.stopPropagation(), ...reminderSetupSwipe }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, "\u5099\u4EFD\u63D0\u9192\u983B\u7387"), /* @__PURE__ */ React.createElement("div", { style: styles.pickerList }, [3, 7, 14, 30].map((d) => /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      className: "picker-item",
+      key: d,
+      style: {
+        ...styles.pickerItem,
+        ...backupReminderDays === d ? { background: "rgba(126, 224, 192, 0.08)" } : {}
+      },
+      onClick: () => updateReminderDays(d)
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.pickerItemLabel }, "\u6BCF ", d, " \u5929\u63D0\u9192"),
+    backupReminderDays === d && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--mint-text)", fontSize: 14 } }, "\u2713")
+  ))))), showSnapshotNameDialog && (() => {
+    const scopeOpts = [
+      { key: "transactions", label: "\u4EA4\u6613\u7D00\u9304", count: state.transactions.length },
+      { key: "accounts", label: "\u5E33\u6236", count: state.accounts.length },
+      { key: "categories", label: "\u5206\u985E", count: (state.categories.expense?.length || 0) + (state.categories.income?.length || 0) },
+      { key: "accountTypes", label: "\u5E33\u6236\u985E\u578B", count: state.accountTypes.length }
+    ];
+    const toggleScope = (key) => {
+      setSnapshotScopes((s) => ({ ...s, [key]: !s[key] }));
+    };
+    const anyChecked = Object.values(snapshotScopes).some(Boolean);
+    return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: () => setShowSnapshotNameDialog(false) }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.centerDialogCard, padding: "20px 20px 16px" }, onClick: (e) => e.stopPropagation(), ...snapshotNameSwipe }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 600, marginBottom: 6 } }, "\u5132\u5B58\u5FEB\u7167"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginBottom: 14 } }, "\u70BA\u9019\u500B\u5FEB\u7167\u547D\u540D\u4E26\u9078\u64C7\u8981\u5132\u5B58\u7684\u985E\u5225"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "text",
+        placeholder: "\u5FEB\u7167\u540D\u7A31\uFF08\u6700\u591A 14 \u500B\u5B57\uFF09",
+        value: snapshotNameInput,
+        onChange: (e) => {
+          if (e.target.value.length >= 14 && snapshotNameInput.length < 14) {
+            toast("\u540D\u7A31\u6700\u591A 14 \u500B\u5B57");
+          }
+          setSnapshotNameInput(e.target.value.slice(0, 14));
+        },
+        maxLength: 14,
+        style: {
+          width: "100%",
+          padding: "10px 12px",
+          background: "var(--bg)",
+          border: "1px solid var(--border)",
+          borderRadius: 10,
+          color: "var(--text)",
+          fontSize: 14,
+          boxSizing: "border-box",
+          marginBottom: 14
+        }
+      }
+    ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 8 } }, "\u5132\u5B58\u54EA\u4E9B\u985E\u5225\uFF1A"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 6 } }, scopeOpts.map((opt) => /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        key: opt.key,
+        onClick: () => toggleScope(opt.key),
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "10px 12px",
+          background: snapshotScopes[opt.key] ? "rgba(126, 224, 192, 0.08)" : "var(--bg)",
+          border: snapshotScopes[opt.key] ? "1px solid var(--mint)" : "1px solid var(--border)",
+          borderRadius: 10,
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent",
+          transition: "background 0.15s, border-color 0.15s"
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: {
+        width: 18,
+        height: 18,
+        borderRadius: 4,
+        background: snapshotScopes[opt.key] ? "var(--mint)" : "transparent",
+        border: snapshotScopes[opt.key] ? "1px solid var(--mint)" : "1.5px solid var(--text-faint)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "var(--on-mint)",
+        fontSize: 12,
+        fontWeight: 700,
+        flexShrink: 0
+      } }, snapshotScopes[opt.key] ? "\u2713" : ""),
+      /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontSize: 14, color: "var(--text)" } }, opt.label),
+      /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--text-faint)" } }, opt.count)
+    ))), /* @__PURE__ */ React.createElement("div", { style: { height: 1, background: "var(--border)", margin: "22px 0 18px", opacity: 0.6 } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: { flex: 1, padding: 10, background: "transparent", color: "var(--text-dim)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 14 },
+        onClick: () => setShowSnapshotNameDialog(false)
+      },
+      "\u53D6\u6D88"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          flex: 1,
+          padding: 10,
+          background: anyChecked ? "var(--mint)" : "var(--bg)",
+          color: anyChecked ? "#1a1a1a" : "var(--text-faint)",
+          border: "none",
+          borderRadius: 10,
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: anyChecked ? "pointer" : "not-allowed"
+        },
+        disabled: !anyChecked,
+        onClick: () => {
+          createSnapshot(snapshotNameInput);
+          setShowSnapshotNameDialog(false);
+        }
+      },
+      "\u5132\u5B58"
+    ))));
+  })(), showSnapshots && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: () => setShowSnapshots(false) }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.centerDialogCard, maxHeight: "80vh", display: "flex", flexDirection: "column" }, onClick: (e) => e.stopPropagation(), ...snapshotsSwipe }, /* @__PURE__ */ React.createElement("div", { style: { padding: "16px 20px 12px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 600 } }, "\u5FEB\u7167\u7BA1\u7406"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)" } }, snapshots.length, " / ", SNAPSHOT_MAX), snapshots.length > 0 && /* @__PURE__ */ React.createElement("div", { style: styles.lockRow }, /* @__PURE__ */ React.createElement("span", { style: { ...styles.lockLabel, color: snapshotsLocked ? "var(--text-dim)" : "var(--pink)", display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: snapshotsLocked ? "lock" : "unlock", size: 12, color: snapshotsLocked ? "var(--text-dim)" : "var(--pink)" }), snapshotsLocked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: { ...styles.toggleTrack, background: snapshotsLocked ? "var(--bg-card)" : "var(--pink)" },
+      onClick: () => setSnapshotsLocked((v) => {
+        const next = !v;
+        if (next) {
+          setRenamingSnapId(null);
+          setRenameInput("");
+        }
+        return next;
+      })
+    },
+    /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: snapshotsLocked ? "translateX(0)" : "translateX(18px)" } })
+  )))), /* @__PURE__ */ React.createElement("div", { style: { overflowY: "auto", flex: 1, padding: "8px 0" } }, snapshots.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: {
+    padding: "40px 24px",
+    textAlign: "center",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 12
+  } }, /* @__PURE__ */ React.createElement("div", { style: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    background: "var(--bg-card)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    border: "1.5px dashed var(--border)"
+  } }, /* @__PURE__ */ React.createElement("svg", { width: "26", height: "26", viewBox: "0 0 24 24", fill: "none", stroke: "var(--text-faint)", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "10" }), /* @__PURE__ */ React.createElement("polyline", { points: "12 6 12 12 16 14" }))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: "var(--text)" } }, "\u9084\u6C92\u6709\u4EFB\u4F55\u5FEB\u7167"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", lineHeight: 1.6, maxWidth: 240 } }, "\u5FEB\u7167\u80FD\u4FDD\u7559\u76EE\u524D\u6240\u6709\u8CC7\u6599\u7684\u5099\u4EFD,", /* @__PURE__ */ React.createElement("br", null), "\u91CD\u5927\u8ABF\u6574\u524D\u5EFA\u8B70\u5148\u5B58\u4E00\u4EFD\u3002"), /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      onClick: () => {
+        setShowSnapshots(false);
+        setSnapshotNameInput("");
+        setSnapshotScopes({ transactions: true, accounts: true, categories: true, accountTypes: true });
+        setShowSnapshotNameDialog(true);
+      },
+      style: {
+        marginTop: 6,
+        padding: "10px 22px",
+        background: "var(--mint)",
+        color: "#fff",
+        borderRadius: 22,
+        fontSize: 13,
+        fontWeight: 600,
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6
+      }
+    },
+    /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, lineHeight: 1 } }, "+"),
+    /* @__PURE__ */ React.createElement("span", null, "\u5EFA\u7ACB\u7B2C\u4E00\u500B\u5FEB\u7167")
+  )) : snapshots.map((snap) => {
+    const d = new Date(snap.createdAt);
+    const timeStr = `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    const scopes = snap.scopes || { transactions: true, accounts: true, categories: true, accountTypes: true };
+    const tags = [];
+    if (scopes.transactions) tags.push(`\u4EA4\u6613 ${snap.summary?.txnCount ?? "?"}`);
+    if (scopes.accounts) tags.push(`\u5E33\u6236 ${snap.summary?.acctCount ?? "?"}`);
+    if (scopes.categories) tags.push("\u5206\u985E");
+    if (scopes.accountTypes) tags.push("\u5E33\u6236\u985E\u578B");
+    return /* @__PURE__ */ React.createElement("div", { key: snap.id, style: { padding: "12px 20px", borderBottom: "1px solid var(--border)" } }, renamingSnapId === snap.id ? (
+      // 編輯模式
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 6, alignItems: "center" } }, /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          type: "text",
+          value: renameInput,
+          onChange: (e) => {
+            if (e.target.value.length >= 14 && renameInput.length < 14) {
+              toast("\u540D\u7A31\u6700\u591A 14 \u500B\u5B57");
+            }
+            setRenameInput(e.target.value.slice(0, 14));
+          },
+          onKeyDown: (e) => {
+            if (e.key === "Enter") saveRenameSnapshot();
+            else if (e.key === "Escape") cancelRenameSnapshot();
+          },
+          autoFocus: true,
+          maxLength: 14,
+          placeholder: "\u6700\u591A 14 \u500B\u5B57",
+          style: {
+            flex: 1,
+            padding: "6px 10px",
+            background: "var(--bg)",
+            border: "1px solid var(--mint)",
+            borderRadius: 8,
+            color: "var(--text)",
+            fontSize: 14,
+            fontWeight: 500,
+            outline: "none"
+          }
+        }
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          style: { width: 30, height: 30, padding: 0, background: "var(--mint)", border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" },
+          onClick: saveRenameSnapshot,
+          title: "\u5132\u5B58"
+        },
+        /* @__PURE__ */ React.createElement("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "#0a1410", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "5 12 10 17 19 8" }))
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          style: { width: 30, height: 30, padding: 0, background: "transparent", border: "1px solid var(--border)", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" },
+          onClick: cancelRenameSnapshot,
+          title: "\u53D6\u6D88"
+        },
+        /* @__PURE__ */ React.createElement("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "var(--text-dim)", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" }), /* @__PURE__ */ React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }))
+      ))
+    ) : (
+      // 正常顯示模式
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 3 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 500, wordBreak: "break-all", flex: 1 } }, snap.name), /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: {
+            padding: 4,
+            cursor: snapshotsLocked ? "not-allowed" : "pointer",
+            opacity: snapshotsLocked ? 0.3 : 0.6,
+            display: "flex",
+            alignItems: "center"
+          },
+          onClick: () => !snapshotsLocked && startRenameSnapshot(snap)
+        },
+        /* @__PURE__ */ React.createElement(TypeIcon, { name: "pencil", size: 14, color: "var(--text-dim)" })
+      ))
+    ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginBottom: 6 } }, timeStr), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 } }, tags.map((tag, i) => /* @__PURE__ */ React.createElement("span", { key: i, style: {
+      fontSize: 10,
+      padding: "2px 8px",
+      background: "rgba(126, 224, 192, 0.12)",
+      color: "var(--mint-text)",
+      borderRadius: 10
+    } }, tag))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, opacity: snapshotsLocked ? 0.4 : 1 } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          flex: 1,
+          padding: "6px 0",
+          background: "var(--mint)",
+          color: "var(--on-mint)",
+          border: "none",
+          borderRadius: 8,
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: snapshotsLocked ? "not-allowed" : "pointer"
+        },
+        onClick: () => !snapshotsLocked && restoreSnapshot(snap),
+        disabled: snapshotsLocked
+      },
+      "\u9084\u539F"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          flex: 1,
+          padding: "6px 0",
+          background: "transparent",
+          color: "var(--pink-text)",
+          border: "1px solid var(--pink)",
+          borderRadius: 8,
+          fontSize: 12,
+          cursor: snapshotsLocked ? "not-allowed" : "pointer"
+        },
+        onClick: () => !snapshotsLocked && deleteSnapshot(snap),
+        disabled: snapshotsLocked
+      },
+      "\u522A\u9664"
+    )));
+  })), /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: { padding: "12px 20px", fontSize: 13, color: "var(--text-dim)", textAlign: "center", cursor: "pointer", borderTop: "1px solid var(--border)" },
+      onClick: () => setShowSnapshots(false)
+    },
+    "\u95DC\u9589"
+  ))), showFontPicker && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: () => setShowFontPicker(false) }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogCard, onClick: (e) => e.stopPropagation() }, [
+    { val: "sans", label: "\u7121\u896F\u7DDA\u5B57", hint: "(\u9810\u8A2D)" },
+    { val: "mono", label: "\u7B49\u5BEC\u6578\u5B57" }
+  ].map((opt, idx) => {
+    const active = numFont === opt.val;
+    return /* @__PURE__ */ React.createElement(React.Fragment, { key: opt.val }, idx > 0 && /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogDivider }), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          ...styles.centerDialogItem,
+          justifyContent: "space-between",
+          color: active ? "var(--mint-text)" : "var(--text)",
+          fontWeight: active ? 600 : 400,
+          lineHeight: 1.4
+        },
+        onClick: () => {
+          setNumFont(opt.val);
+          setShowFontPicker(false);
+        }
+      },
+      /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement("span", null, opt.label), opt.hint && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, color: "var(--text-faint)", fontWeight: 400 } }, opt.hint)),
+      active && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, color: "var(--mint-text)", fontWeight: 700 } }, "\u2713")
+    ));
+  }))));
+}
+function CleanupHistorySheet({ state, onClose, onCleanup, setConfirmDialog }) {
+  const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
+  const [cutoffDate, setCutoffDate] = useState(() => todayStr());
+  const [preserveBalance, setPreserveBalance] = useState(true);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const matching = state.transactions.filter((t) => t.date < cutoffDate);
+  const totalCount = state.transactions.length;
+  const matchCount = matching.length;
+  const balanceDelta = React.useMemo(() => {
+    const map = /* @__PURE__ */ new Map();
+    for (const t of matching) {
+      if (!t.accountId) continue;
+      const cur = map.get(t.accountId) || 0;
+      if (t.type === "income") map.set(t.accountId, cur + t.amount);
+      else if (t.type === "expense") map.set(t.accountId, cur - t.amount);
+    }
+    return map;
+  }, [matching]);
+  const affectedAccounts = state.accounts.filter((a) => balanceDelta.has(a.id));
+  const fmtDate = (iso) => {
+    const [y, m, d] = iso.split("-");
+    const wd = ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][(/* @__PURE__ */ new Date(iso + "T00:00:00")).getDay()];
+    return `${y}/${m}/${d} (\u9031${wd})`;
+  };
+  const handleConfirm = () => {
+    if (matchCount === 0) return;
+    const items = [
+      {
+        type: "remove",
+        icon: "calendar",
+        label: "\u6E05\u7406\u7BC4\u570D",
+        detail: `${fmtDate(cutoffDate)} \u4EE5\u524D\u7684\u6240\u6709\u7D00\u9304`
+      },
+      {
+        type: "remove",
+        icon: "note",
+        label: "\u79FB\u9664",
+        detail: `${matchCount} \u7B46\u4EA4\u6613\u7D00\u9304\uFF08\u6536\u652F + \u8F49\u5E33\uFF09`
+      },
+      {
+        type: preserveBalance ? "keep" : "remove",
+        icon: "coin",
+        label: preserveBalance ? "\u4FDD\u7559" : "\u5F71\u97FF",
+        detail: preserveBalance ? "\u5E33\u6236\u76EE\u524D\u9918\u984D\uFF08\u8F49\u70BA\u8D77\u59CB\u9918\u984D\uFF09" : "\u5E33\u6236\u9918\u984D\u6703\u8B8A\u52D5"
+      }
+    ];
+    setConfirmDialog({
+      title: "\u78BA\u8A8D\u6E05\u7406",
+      confirmText: "\u6E05\u7406",
+      danger: true,
+      items,
+      warning: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F,\u5EFA\u8B70\u5148\u5099\u4EFD",
+      onConfirm: () => {
+        onCleanup(cutoffDate, preserveBalance);
+        onClose();
+      }
+    });
+  };
+  if (showDatePicker) {
+    return /* @__PURE__ */ React.createElement(
+      DatePicker,
+      {
+        value: cutoffDate,
+        onChange: setCutoffDate,
+        onClose: () => setShowDatePicker(false)
+      }
+    );
+  }
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-sheet": "true",
+      style: {
+        ...styles.sheet,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: styles.sheetClose, onClick: onClose }, "\u2039"), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, "\u6E05\u7406\u6B77\u53F2\u7D00\u9304"), /* @__PURE__ */ React.createElement("div", { style: { width: 50 } })),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll, "data-scroll-container": true }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.block, padding: "14px 14px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 8 } }, "\u6E05\u7406\u7BC4\u570D"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginBottom: 10, lineHeight: 1.6 } }, "\u79FB\u9664\u4EE5\u4E0B\u65E5\u671F ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--highlight)" } }, "\u4E4B\u524D"), " \u7684\u6240\u6709\u7D00\u9304\uFF1A"), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          ...styles.field,
+          width: "100%",
+          boxSizing: "border-box",
+          fontSize: 15,
+          padding: "11px 12px",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: 10
+        },
+        onClick: () => setShowDatePicker(true)
+      },
+      /* @__PURE__ */ React.createElement(TypeIcon, { name: "calendar", size: 18, color: "var(--mint-text)" }),
+      /* @__PURE__ */ React.createElement("span", { style: { flex: 1 } }, fmtDate(cutoffDate)),
+      /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 16 } }, "\u203A")
+    ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 5, marginTop: 10 } }, [
+      { label: "1 \u5E74\u524D", years: 1 },
+      { label: "2 \u5E74\u524D", years: 2 },
+      { label: "3 \u5E74\u524D", years: 3 },
+      { label: "4 \u5E74\u524D", years: 4 },
+      { label: "5 \u5E74\u524D", years: 5 },
+      { label: "6 \u5E74\u524D", years: 6 }
+    ].map((opt) => {
+      const d = /* @__PURE__ */ new Date();
+      d.setFullYear(d.getFullYear() - opt.years);
+      const targetDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const isActive = cutoffDate === targetDate;
+      return /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: opt.label,
+          style: {
+            flex: 1,
+            minWidth: 0,
+            padding: "5px 0",
+            borderRadius: 14,
+            border: isActive ? "1px solid var(--mint)" : "1px solid var(--border)",
+            background: isActive ? "rgba(126,224,192,0.15)" : "transparent",
+            color: isActive ? "var(--mint)" : "var(--text-dim)",
+            fontSize: 11,
+            cursor: "pointer",
+            whiteSpace: "nowrap"
+          },
+          onClick: () => setCutoffDate(targetDate)
+        },
+        opt.label
+      );
+    })), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, fontSize: 12, color: "var(--text-faint)" } }, fmtDate(cutoffDate), " 00:00 \u4E4B\u524D\u7684\u7D00\u9304\u5C07\u88AB\u6E05\u9664")), /* @__PURE__ */ React.createElement("div", { style: { ...styles.block, padding: "14px 14px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 10 } }, "\u9810\u89BD"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "var(--text-dim)" } }, "\u5168\u7D00\u9304"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: "var(--text)" } }, "\u5171 ", totalCount, " \u7B46")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "var(--text-dim)" } }, "\u7B26\u5408\u7BE9\u9078\u689D\u4EF6"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 20, fontWeight: 700, color: matchCount > 0 ? "var(--mint)" : "var(--text-faint)" } }, matchCount, " ", /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--text-faint)", fontWeight: 400 } }, "\u7B46"))), matchCount > 0 && affectedAccounts.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { borderTop: "1px solid var(--border)", marginTop: 8, paddingTop: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginBottom: 8 } }, "\u5F71\u97FF\u7684\u5E33\u6236 (", affectedAccounts.length, ")"), affectedAccounts.slice(0, 6).map((a) => {
+      const delta = balanceDelta.get(a.id) || 0;
+      return /* @__PURE__ */ React.createElement("div", { key: a.id, style: { display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)" } }, a.name), /* @__PURE__ */ React.createElement("span", { style: { color: delta > 0 ? "var(--mint)" : delta < 0 ? "var(--pink)" : "var(--text-faint)", fontWeight: 500 } }, delta > 0 ? "+" : "", delta.toLocaleString()));
+    }), affectedAccounts.length > 6 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", textAlign: "center", marginTop: 4 } }, "\u2026\u9084\u6709 ", affectedAccounts.length - 6, " \u500B")))), /* @__PURE__ */ React.createElement("div", { style: { ...styles.block, padding: "14px 14px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 500 } }, "\u4FDD\u7559\u76EE\u524D\u91D1\u984D"), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: { ...styles.toggleTrack, background: preserveBalance ? "var(--mint)" : "var(--bg-card)" },
+        onClick: () => setPreserveBalance((v) => !v)
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: preserveBalance ? "translateX(18px)" : "translateX(0)" } })
+    )), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", lineHeight: 1.6 } }, preserveBalance ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)" } }, "\u26A0"), " ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--highlight)" } }, "\u5E33\u6236\u9918\u984D\u7DAD\u6301\u4E0D\u8B8A"), " \uFF08\u4E26\u5C07\u6DE8\u984D\u5BEB\u5165\u5E33\u6236\u8D77\u59CB\u9918\u984D\uFF09") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)" } }, "\u26A0"), " \u76F4\u63A5\u6E05\u9664\uFF08", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--highlight)" } }, "\u5E33\u6236\u9918\u984D"), " \u6703\u4F9D\u5269\u4E0B\u7684 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--highlight)" } }, "\u7D00\u9304\u91CD\u65B0\u8A08\u7B97"), "\uFF09"))), /* @__PURE__ */ React.createElement("div", { style: { height: 20 } })),
+    /* @__PURE__ */ React.createElement("div", { style: {
+      flexShrink: 0,
+      padding: "14px 4px calc(14px + env(safe-area-inset-bottom, 0px))",
+      borderTop: "1px solid var(--border)",
+      background: "var(--bg)",
+      position: "relative",
+      zIndex: 3
+    } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          width: "100%",
+          padding: "14px",
+          borderRadius: 12,
+          border: "none",
+          background: matchCount > 0 ? "var(--mint)" : "var(--bg-card)",
+          color: matchCount > 0 ? "#0a1410" : "var(--text-faint)",
+          fontSize: 15,
+          fontWeight: 600,
+          cursor: matchCount > 0 ? "pointer" : "not-allowed",
+          opacity: matchCount > 0 ? 1 : 0.5
+        },
+        onClick: () => matchCount > 0 && handleConfirm(),
+        disabled: matchCount === 0
+      },
+      matchCount > 0 ? `\u6E05\u7406 ${matchCount} \u7B46\u7D00\u9304` : "\u6C92\u6709\u7B26\u5408\u7684\u7D00\u9304"
+    ))
+  );
+}
+function FilterDeleteSheet({ state, setState, onClose, setConfirmDialog, toast, toastRich }) {
+  const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
+  const [filterType, setFilterType] = useState("account");
+  const [locked, setLocked] = useState(true);
+  const [showFilterTypePicker, setShowFilterTypePicker] = useState(false);
+  const [showAcctPicker, setShowAcctPicker] = useState(false);
+  const [showCatPicker, setShowCatPicker] = useState(false);
+  const [showSubCatPicker, setShowSubCatPicker] = useState(false);
+  const [showAcctTypePicker, setShowAcctTypePicker] = useState(false);
+  const [datePickerField, setDatePickerField] = useState(null);
+  const [subcatStepCategory, setSubcatStepCategory] = useState(null);
+  const filterTypeSwipe = useSwipeBack(() => setShowFilterTypePicker(false));
+  const acctSwipe = useSwipeBack(() => setShowAcctPicker(false));
+  const catSwipe = useSwipeBack(() => setShowCatPicker(false));
+  const subCatSwipe = useSwipeBack(() => setShowSubCatPicker(false));
+  const acctTypeSwipe = useSwipeBack(() => setShowAcctTypePicker(false));
+  const [selAccount, setSelAccount] = useState("");
+  const [selCategory, setSelCategory] = useState("");
+  const [selSubCat, setSelSubCat] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const [keywordMode, setKeywordMode] = useState("include");
+  const [minAmount, setMinAmount] = useState("");
+  const [maxAmount, setMaxAmount] = useState("");
+  const [recordType, setRecordType] = useState("expense");
+  const [dateStart, setDateStart] = useState("");
+  const [dateEnd, setDateEnd] = useState("");
+  const [selAccountType, setSelAccountType] = useState("");
+  const filterTypeOptions = [
+    { key: "account", label: "\u5E33\u6236", icon: "bank", color: "#a8c8f5" },
+    { key: "category", label: "\u5927\u5206\u985E", icon: "folder", color: "#f5c29c" },
+    { key: "subcat", label: "\u5B50\u5206\u985E", icon: "clipboard", color: "#a8e8c8" },
+    { key: "keyword", label: "\u5099\u8A3B\u95DC\u9375\u5B57", icon: "edit", color: "#f5a8c8" },
+    { key: "amount", label: "\u91D1\u984D\u7BC4\u570D", icon: "coin", color: "#f5d29c" },
+    { key: "recordType", label: "\u7D00\u9304\u985E\u578B", icon: "chart", color: "#c8a8f5" },
+    { key: "date", label: "\u65E5\u671F\u5340\u9593", icon: "calendar", color: "#a8e8e8" },
+    { key: "accountType", label: "\u5E33\u6236\u985E\u578B", icon: "box", color: "#e8c8f5" }
+  ];
+  const matching = React.useMemo(() => {
+    if (filterType === "account") {
+      if (!selAccount) return [];
+      return state.transactions.filter((t) => {
+        if (t.accountId === selAccount) return true;
+        if (t.transferId && t.transferPeer) {
+          if (t.transferPeer.fromId === selAccount || t.transferPeer.toId === selAccount) return true;
+        }
+        return false;
+      });
+    }
+    if (filterType === "category") {
+      if (!selCategory) return [];
+      return state.transactions.filter((t) => t.category === selCategory);
+    }
+    if (filterType === "subcat") {
+      if (!selSubCat) return [];
+      const [cat, sub] = selSubCat.split("|");
+      return state.transactions.filter((t) => t.category === cat && t.subCategory === sub);
+    }
+    if (filterType === "keyword") {
+      if (!keyword.trim()) return [];
+      const kw = keyword.trim();
+      return state.transactions.filter((t) => {
+        const note = t.note || "";
+        const has = note.includes(kw);
+        return keywordMode === "include" ? has : !has;
+      });
+    }
+    if (filterType === "amount") {
+      const min = parseFloat(minAmount);
+      const max = parseFloat(maxAmount);
+      const hasMin = !isNaN(min);
+      const hasMax = !isNaN(max);
+      if (!hasMin && !hasMax) return [];
+      return state.transactions.filter((t) => {
+        const amt = Math.abs(t.amount || 0);
+        if (hasMin && amt < min) return false;
+        if (hasMax && amt > max) return false;
+        return true;
+      });
+    }
+    if (filterType === "recordType") {
+      return state.transactions.filter((t) => t.type === recordType);
+    }
+    if (filterType === "date") {
+      if (!dateStart && !dateEnd) return [];
+      return state.transactions.filter((t) => {
+        if (dateStart && t.date < dateStart) return false;
+        if (dateEnd && t.date > dateEnd) return false;
+        return true;
+      });
+    }
+    if (filterType === "accountType") {
+      if (!selAccountType) return [];
+      const acctIds = new Set(state.accounts.filter((a) => a.type === selAccountType).map((a) => a.id));
+      return state.transactions.filter((t) => {
+        if (acctIds.has(t.accountId)) return true;
+        if (t.transferId && t.transferPeer) {
+          if (acctIds.has(t.transferPeer.fromId) || acctIds.has(t.transferPeer.toId)) return true;
+        }
+        return false;
+      });
+    }
+    return [];
+  }, [filterType, selAccount, selCategory, selSubCat, keyword, keywordMode, minAmount, maxAmount, recordType, dateStart, dateEnd, selAccountType, state]);
+  const allRelatedIds = React.useMemo(() => {
+    const ids = /* @__PURE__ */ new Set();
+    const transferIds = /* @__PURE__ */ new Set();
+    for (const t of matching) {
+      ids.add(t.id);
+      if (t.transferId) transferIds.add(t.transferId);
+    }
+    if (transferIds.size > 0) {
+      for (const t of state.transactions) {
+        if (t.transferId && transferIds.has(t.transferId)) ids.add(t.id);
+      }
+    }
+    return ids;
+  }, [matching, state.transactions]);
+  const matchCount = allRelatedIds.size;
+  const totalCount = state.transactions.length;
+  const allCategories = React.useMemo(() => {
+    const map = /* @__PURE__ */ new Map();
+    for (const type of Object.keys(state.categories || {})) {
+      for (const c of state.categories[type] || []) {
+        if (c.label && !map.has(c.label)) {
+          map.set(c.label, { icon: c.icon || (type === "income" ? "bag" : "note"), type });
+        }
+      }
+    }
+    for (const t of state.transactions) {
+      if (t.category && !map.has(t.category)) {
+        map.set(t.category, { icon: t.type === "income" ? "bag" : "note", type: t.type });
+      }
+    }
+    return Array.from(map.entries()).map(([label, meta]) => ({ label, ...meta }));
+  }, [state.categories, state.transactions]);
+  const allSubCats = React.useMemo(() => {
+    const map = /* @__PURE__ */ new Map();
+    for (const type of Object.keys(state.categories || {})) {
+      for (const c of state.categories[type] || []) {
+        if (c.label && Array.isArray(c.subs)) {
+          for (const s of c.subs) {
+            const subLabel = typeof s === "string" ? s : s.label;
+            if (subLabel) {
+              const key = `${c.label}|${subLabel}`;
+              if (!map.has(key)) {
+                map.set(key, {
+                  category: c.label,
+                  sub: subLabel,
+                  catIcon: c.icon || (type === "income" ? "bag" : "note"),
+                  type
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+    for (const t of state.transactions) {
+      if (t.category && t.sub) {
+        const key = `${t.category}|${t.sub}`;
+        if (!map.has(key)) {
+          map.set(key, {
+            category: t.category,
+            sub: t.sub,
+            catIcon: t.type === "income" ? "bag" : "note",
+            type: t.type
+          });
+        }
+      }
+    }
+    return Array.from(map.values());
+  }, [state.categories, state.transactions]);
+  const handleConfirm = () => {
+    if (matchCount === 0 || locked) return;
+    let conditionDesc = "";
+    if (filterType === "account") {
+      const a = state.accounts.find((x) => x.id === selAccount);
+      conditionDesc = `\u5E33\u6236:\u300C${a?.name || "?"}\u300D`;
+    } else if (filterType === "category") {
+      conditionDesc = `\u5927\u5206\u985E:\u300C${selCategory}\u300D`;
+    } else if (filterType === "subcat") {
+      const [cat, sub] = selSubCat.split("|");
+      conditionDesc = `\u5B50\u5206\u985E:\u300C${cat} \u203A ${sub}\u300D`;
+    } else if (filterType === "keyword") {
+      conditionDesc = `\u5099\u8A3B${keywordMode === "include" ? "\u5305\u542B" : "\u4E0D\u542B"}:\u300C${keyword.trim()}\u300D`;
+    } else if (filterType === "amount") {
+      const minN = minAmount && Number(minAmount) > 0 ? Number(minAmount) : null;
+      const maxN = maxAmount && Number(maxAmount) > 0 ? Number(maxAmount) : null;
+      const fmtN = (n) => n.toLocaleString();
+      if (minN !== null && maxN !== null) {
+        if (minN === maxN) {
+          conditionDesc = `\u91D1\u984D = ${fmtN(minN)}`;
+        } else {
+          conditionDesc = `\u91D1\u984D ${fmtN(minN)} ~ ${fmtN(maxN)}`;
+        }
+      } else if (minN !== null) {
+        conditionDesc = `\u91D1\u984D \u2265 ${fmtN(minN)}`;
+      } else if (maxN !== null) {
+        conditionDesc = `\u91D1\u984D \u2264 ${fmtN(maxN)}`;
+      } else {
+        conditionDesc = "\u91D1\u984D(\u672A\u8A2D\u5B9A)";
+      }
+    } else if (filterType === "recordType") {
+      const labels = { expense: "\u652F\u51FA", income: "\u6536\u5165", transfer: "\u8F49\u5E33" };
+      conditionDesc = `\u985E\u578B:${labels[recordType]}`;
+    } else if (filterType === "date") {
+      const parts = [];
+      if (dateStart) parts.push(dateStart + " \u8D77");
+      if (dateEnd) parts.push(dateEnd + " \u6B62");
+      conditionDesc = `\u65E5\u671F:${parts.join(" / ")}`;
+    } else if (filterType === "accountType") {
+      const t = state.accountTypes.find((x) => x.value === selAccountType);
+      conditionDesc = `\u5E33\u6236\u985E\u578B:\u300C${t?.label || "?"}\u300D`;
+    }
+    const matchedTxns = state.transactions.filter((t) => allRelatedIds.has(t.id));
+    matchedTxns.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    const PREVIEW_LIMIT = 5;
+    const previewTxns = matchedTxns.slice(0, PREVIEW_LIMIT);
+    const moreCount = matchedTxns.length - previewTxns.length;
+    const previewLines = previewTxns.map((t) => {
+      const isInc = t.type === "income";
+      const isTransfer = !!t.transferId;
+      const sign = isInc ? "+" : "-";
+      const dateShort = (t.date || "").replace(/-/g, "/").slice(5);
+      const amtStr = `${sign}${(t.amount || 0).toLocaleString()}`;
+      if (isTransfer) {
+        const fromId = t.transferPeer?.fromId;
+        const toId = t.transferPeer?.toId;
+        const fromAcct = state.accounts.find((a) => a.id === fromId);
+        const toAcct = state.accounts.find((a) => a.id === toId);
+        const fromName = fromAcct?.name || t._deletedAccountName || "?";
+        const toName = toAcct?.name || t._deletedPeerName || "?";
+        const role = t.transferRole === "out" ? "\u8F49\u51FA" : "\u8F49\u5165";
+        return `${dateShort}  [${role}] ${fromName} \u2192 ${toName}  ${amtStr}`;
+      }
+      const sub = t.subCategory ? ` \u203A ${t.subCategory}` : "";
+      const acct = state.accounts.find((a) => a.id === t.accountId);
+      const acctName = acct?.name || t._deletedAccountName || "";
+      const acctPart = acctName ? ` \xB7 ${acctName}` : "";
+      const note = t.note ? ` \xB7 ${t.note}` : "";
+      return `${dateShort}  ${t.category || ""}${sub}${acctPart}${note}  ${amtStr}`;
+    });
+    setConfirmDialog({
+      title: "\u78BA\u8A8D\u522A\u9664",
+      messageList: {
+        before: `\u7B26\u5408\u689D\u4EF6 ${conditionDesc} \u7684\u7D00\u9304\u5171 ${matchCount} \u7B46,\u5C07\u6C38\u4E45\u522A\u9664:`,
+        items: [
+          ...previewLines,
+          ...moreCount > 0 ? [`\u22EF \u4EE5\u53CA\u5176\u4ED6 ${moreCount} \u7B46`] : []
+        ],
+        after: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F,\u5EFA\u8B70\u5148\u300C\u5132\u5B58\u5FEB\u7167\u300D"
+      },
+      confirmText: `\u522A\u9664 ${matchCount} \u7B46`,
+      danger: true,
+      onConfirm: () => {
+        setState((s) => ({
+          ...s,
+          transactions: s.transactions.filter((t) => !allRelatedIds.has(t.id))
+        }));
+        if (toastRich) {
+          toastRich({
+            title: `\u5DF2\u522A\u9664 ${matchCount} \u7B46`,
+            amount: "\u2713",
+            amountColor: "var(--pink-text)",
+            lines: [conditionDesc]
+          }, 1800);
+        } else {
+          toast(`\u5DF2\u522A\u9664 ${matchCount} \u7B46`);
+        }
+        onClose();
+      }
+    });
+  };
+  const pickerBtnStyle = {
+    width: "100%",
+    padding: "14px 16px",
+    borderRadius: 10,
+    border: "1px solid var(--border)",
+    background: "var(--bg-card)",
+    color: "var(--text)",
+    fontSize: 14,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    boxSizing: "border-box"
+  };
+  const renderConditionUI = () => {
+    if (filterType === "account") {
+      const a = state.accounts.find((x) => x.id === selAccount);
+      return /* @__PURE__ */ React.createElement("div", { style: pickerBtnStyle, onClick: () => setShowAcctPicker(true) }, /* @__PURE__ */ React.createElement("span", { style: { color: a ? "var(--text)" : "var(--text-faint)" } }, a ? a.name : "\u8ACB\u9078\u64C7\u5E33\u6236"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 18 } }, "\u203A"));
+    }
+    if (filterType === "category") {
+      return /* @__PURE__ */ React.createElement("div", { style: pickerBtnStyle, onClick: () => setShowCatPicker(true) }, /* @__PURE__ */ React.createElement("span", { style: { color: selCategory ? "var(--text)" : "var(--text-faint)" } }, selCategory || "\u8ACB\u9078\u64C7\u5927\u5206\u985E"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 18 } }, "\u203A"));
+    }
+    if (filterType === "subcat") {
+      const [cat, sub] = selSubCat ? selSubCat.split("|") : ["", ""];
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: pickerBtnStyle,
+          onClick: () => {
+            setSubcatStepCategory(null);
+            setShowCatPicker(true);
+          }
+        },
+        /* @__PURE__ */ React.createElement("span", { style: { color: selSubCat ? "var(--text)" : "var(--text-faint)" } }, selSubCat ? `${cat} \u203A ${sub}` : "\u8ACB\u9078\u64C7\u5B50\u5206\u985E"),
+        /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 18 } }, "\u203A")
+      );
+    }
+    if (filterType === "keyword") {
+      return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 10 } }, [
+        { key: "include", label: "\u5305\u542B" },
+        { key: "exclude", label: "\u4E0D\u542B" }
+      ].map((opt) => /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: opt.key,
+          onClick: () => setKeywordMode(opt.key),
+          style: {
+            flex: 1,
+            padding: "10px 0",
+            borderRadius: 10,
+            border: "1px solid " + (keywordMode === opt.key ? "var(--mint)" : "var(--border)"),
+            background: keywordMode === opt.key ? "rgba(126, 224, 192, 0.12)" : "var(--bg-card)",
+            color: keywordMode === opt.key ? "var(--mint-text)" : "var(--text-dim)",
+            fontSize: 13,
+            fontWeight: keywordMode === opt.key ? 600 : 400,
+            cursor: "pointer"
+          }
+        },
+        opt.label
+      ))), /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          type: "text",
+          value: keyword,
+          onChange: (e) => setKeyword(e.target.value),
+          placeholder: "\u8F38\u5165\u5099\u8A3B\u95DC\u9375\u5B57",
+          style: styles.textInput
+        }
+      ));
+    }
+    if (filterType === "amount") {
+      return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement(
+        CalcTriggerInput,
+        {
+          value: minAmount,
+          onChange: setMinAmount,
+          placeholder: "\u6700\u5C0F\u91D1\u984D",
+          fontSize: 14,
+          fontWeight: 500
+        }
+      )), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)" } }, "~"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement(
+        CalcTriggerInput,
+        {
+          value: maxAmount,
+          onChange: setMaxAmount,
+          placeholder: "\u6700\u5927\u91D1\u984D",
+          fontSize: 14,
+          fontWeight: 500
+        }
+      )));
+    }
+    if (filterType === "recordType") {
+      return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, [
+        { key: "expense", label: "\u652F\u51FA" },
+        { key: "income", label: "\u6536\u5165" },
+        { key: "transfer", label: "\u8F49\u5E33" }
+      ].map((opt) => {
+        const isSel = recordType === opt.key;
+        return /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            key: opt.key,
+            onClick: () => setRecordType(opt.key),
+            style: {
+              flex: 1,
+              padding: "12px 0",
+              borderRadius: 10,
+              border: "1px solid " + (isSel ? "var(--mint)" : "var(--border)"),
+              background: isSel ? "rgba(126, 224, 192, 0.12)" : "var(--bg-card)",
+              color: isSel ? "var(--mint-text)" : "var(--text-dim)",
+              fontSize: 14,
+              fontWeight: isSel ? 600 : 400,
+              cursor: "pointer"
+            }
+          },
+          opt.label
+        );
+      }));
+    }
+    if (filterType === "date") {
+      const fmtDate = (iso) => {
+        if (!iso) return "";
+        const [y, m, d] = iso.split("-");
+        const wd = ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][(/* @__PURE__ */ new Date(iso + "T00:00:00")).getDay()];
+        return `${y}/${m}/${d} (\u9031${wd})`;
+      };
+      const dateBtnStyle = {
+        ...pickerBtnStyle,
+        padding: "12px 14px",
+        gap: 8
+      };
+      return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u958B\u59CB\u65E5\u671F (\u9078\u586B)"), /* @__PURE__ */ React.createElement("div", { style: dateBtnStyle, onClick: () => setDatePickerField("start") }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "calendar", size: 16, color: "var(--mint-text)" }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, color: dateStart ? "var(--text)" : "var(--text-faint)" } }, dateStart ? fmtDate(dateStart) : "\u2014"), dateStart && /* @__PURE__ */ React.createElement(
+        "span",
+        {
+          onClick: (e) => {
+            e.stopPropagation();
+            setDateStart("");
+          },
+          style: { color: "var(--text-faint)", fontSize: 18, padding: "0 4px" }
+        },
+        "\xD7"
+      ), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 18 } }, "\u203A"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u7D50\u675F\u65E5\u671F (\u9078\u586B)"), /* @__PURE__ */ React.createElement("div", { style: dateBtnStyle, onClick: () => setDatePickerField("end") }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "calendar", size: 16, color: "var(--mint-text)" }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, color: dateEnd ? "var(--text)" : "var(--text-faint)" } }, dateEnd ? fmtDate(dateEnd) : "\u2014"), dateEnd && /* @__PURE__ */ React.createElement(
+        "span",
+        {
+          onClick: (e) => {
+            e.stopPropagation();
+            setDateEnd("");
+          },
+          style: { color: "var(--text-faint)", fontSize: 18, padding: "0 4px" }
+        },
+        "\xD7"
+      ), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 18 } }, "\u203A"))));
+    }
+    if (filterType === "accountType") {
+      const t = state.accountTypes.find((x) => x.value === selAccountType);
+      return /* @__PURE__ */ React.createElement("div", { style: pickerBtnStyle, onClick: () => setShowAcctTypePicker(true) }, /* @__PURE__ */ React.createElement("span", { style: { color: t ? "var(--text)" : "var(--text-faint)" } }, t ? t.label : "\u8ACB\u9078\u64C7\u5E33\u6236\u985E\u578B"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 18 } }, "\u203A"));
+    }
+    return null;
+  };
+  if (datePickerField) {
+    return /* @__PURE__ */ React.createElement(
+      DatePicker,
+      {
+        value: (datePickerField === "start" ? dateStart : dateEnd) || todayStr(),
+        onChange: (v) => {
+          if (datePickerField === "start") setDateStart(v);
+          else setDateEnd(v);
+        },
+        onClose: () => setDatePickerField(null)
+      }
+    );
+  }
+  return /* @__PURE__ */ React.createElement("div", { "data-sheet": "true", style: styles.backdrop, onClick: onClose }, /* @__PURE__ */ React.createElement("div", { style: styles.sheet, onClick: (e) => e.stopPropagation(), ...swipe }, /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: styles.sheetClose, onClick: onClose }, "\u2039"), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, "\u689D\u4EF6\u7BE9\u9078\u522A\u9664"), /* @__PURE__ */ React.createElement("div", { style: { width: 50 } })), /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: { padding: "16px 16px 24px" } }, /* @__PURE__ */ React.createElement("div", { style: {
+    background: "var(--bg-card)",
+    border: "1px solid var(--pink)",
+    borderRadius: 10,
+    padding: "10px 12px",
+    marginBottom: 16,
+    fontSize: 12,
+    color: "var(--text-dim)",
+    lineHeight: 1.6
+  } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink)", fontWeight: 600 } }, "\u26A0 \u6B64\u529F\u80FD\u6703\u6C38\u4E45\u522A\u9664\u7B26\u5408\u689D\u4EF6\u7684\u7D00\u9304"), /* @__PURE__ */ React.createElement("br", null), "\u57F7\u884C\u524D\u5EFA\u8B70\u5148\u300C\u5132\u5B58\u5FEB\u7167\u300D\u505A\u5099\u4EFD"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "var(--text-dim)", marginBottom: 8 } }, "\u7BE9\u9078\u985E\u578B"), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: pickerBtnStyle, onClick: () => setShowFilterTypePicker(true) }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text)" } }, filterTypeOptions.find((o) => o.key === filterType)?.label || "\u8ACB\u9078\u64C7"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 18 } }, "\u203A"))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "var(--text-dim)", marginBottom: 8 } }, "\u689D\u4EF6"), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 20 } }, renderConditionUI()), /* @__PURE__ */ React.createElement("div", { style: {
+    background: "var(--bg-card)",
+    borderRadius: 10,
+    padding: "14px 14px",
+    marginBottom: 16
+  } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-dim)", marginBottom: 6 } }, "\u9810\u89BD"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "var(--text)" } }, "\u7B26\u5408\u689D\u4EF6"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: {
+    fontSize: 22,
+    fontWeight: 700,
+    color: matchCount > 0 ? "var(--pink)" : "var(--text-faint)"
+  } }, matchCount), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", fontSize: 13, marginLeft: 4 } }, "/ ", totalCount, " \u7B46"))), matchCount === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginTop: 6 } }, "\u9078\u64C7\u689D\u4EF6\u5F8C\u6703\u5373\u6642\u66F4\u65B0\u9810\u89BD"), matchCount > 0 && (() => {
+    const sorted = [...matching].sort((a, b) => {
+      const dc = (b.date || "").localeCompare(a.date || "");
+      if (dc !== 0) return dc;
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
+    const PREVIEW_LIMIT = 5;
+    const visible = sorted.slice(0, PREVIEW_LIMIT);
+    const remain = sorted.length - visible.length;
+    return /* @__PURE__ */ React.createElement("div", { style: {
+      marginTop: 12,
+      paddingTop: 12,
+      borderTop: "1px solid var(--border)"
+    } }, visible.map((t, idx) => {
+      const isExpense = t.type === "expense";
+      const isIncome = t.type === "income";
+      const amtSign = isExpense ? "-" : isIncome ? "+" : "";
+      const amtColor = isExpense ? "var(--pink-text)" : isIncome ? "var(--mint-text)" : "var(--text)";
+      const label = t.transferRole === "out" ? "\u8F49\u51FA" : t.transferRole === "in" ? "\u8F49\u5165" : t.transferRole === "fee" ? "\u624B\u7E8C\u8CBB" : t.subCategory ? `${t.category || ""} \u203A ${t.subCategory}` : t.category || "\u672A\u5206\u985E";
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: t.id,
+          style: {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+            padding: "6px 0",
+            borderBottom: idx < visible.length - 1 || remain > 0 ? "1px solid var(--border)" : "none"
+          }
+        },
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 12,
+          color: "var(--text)",
+          fontWeight: 500,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis"
+        } }, label), /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 11,
+          color: "var(--text-faint)",
+          marginTop: 1,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis"
+        } }, t.date, t.note ? ` \xB7 ${t.note}` : "")),
+        /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 13,
+          fontWeight: 600,
+          color: amtColor,
+          fontFamily: "var(--num-font)",
+          flexShrink: 0
+        } }, amtSign, fmt(t.amount))
+      );
+    }), remain > 0 && /* @__PURE__ */ React.createElement("div", { style: {
+      fontSize: 12,
+      color: "var(--text-faint)",
+      textAlign: "center",
+      padding: "8px 0 2px"
+    } }, "\u4EE5\u53CA\u5176\u4ED6 ", remain, " \u7B46"));
+  })()), /* @__PURE__ */ React.createElement("div", { style: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "12px 14px",
+    background: "var(--bg-card)",
+    borderRadius: 10,
+    marginBottom: 14
+  } }, /* @__PURE__ */ React.createElement("span", { style: {
+    fontSize: 13,
+    color: locked ? "var(--text-dim)" : "var(--pink)",
+    fontWeight: 600,
+    display: "flex",
+    alignItems: "center",
+    gap: 6
+  } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: locked ? "lock" : "unlock", size: 14, color: locked ? "var(--text-dim)" : "var(--pink)" }), locked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: {
+        width: 44,
+        height: 26,
+        borderRadius: 13,
+        background: locked ? "var(--bg)" : "var(--pink)",
+        cursor: "pointer",
+        position: "relative",
+        border: "1px solid var(--border)",
+        transition: "background 0.2s"
+      },
+      onClick: () => setLocked((v) => !v)
+    },
+    /* @__PURE__ */ React.createElement("div", { style: {
+      position: "absolute",
+      top: 2,
+      left: 2,
+      width: 20,
+      height: 20,
+      borderRadius: "50%",
+      background: "#fff",
+      transform: locked ? "translateX(0)" : "translateX(18px)",
+      transition: "transform 0.2s",
+      boxShadow: "0 1px 3px rgba(0,0,0,0.2)"
+    } })
+  )), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: handleConfirm,
+      disabled: matchCount === 0 || locked,
+      style: {
+        width: "100%",
+        padding: "14px 0",
+        borderRadius: 10,
+        border: "none",
+        background: matchCount === 0 || locked ? "var(--bg-card)" : "var(--pink)",
+        color: matchCount === 0 || locked ? "var(--text-faint)" : "#fff",
+        fontSize: 15,
+        fontWeight: 700,
+        cursor: matchCount === 0 || locked ? "not-allowed" : "pointer",
+        opacity: matchCount === 0 || locked ? 0.5 : 1
+      }
+    },
+    locked ? "\u8ACB\u5148\u89E3\u9396" : matchCount === 0 ? "\u6C92\u6709\u7B26\u5408\u7684\u7D00\u9304" : `\u522A\u9664 ${matchCount} \u7B46\u7D00\u9304`
+  ))), showFilterTypePicker && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowFilterTypePicker(false) }, /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: { ...styles.pickerCard, transform: `translateY(${filterTypeSwipe.dragY}px)`, transition: filterTypeSwipe.dragY === 0 ? "transform 0.22s ease-out" : "none" },
+      onClick: (e) => e.stopPropagation(),
+      ref: filterTypeSwipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, "\u7BE9\u9078\u985E\u578B"),
+    /* @__PURE__ */ React.createElement("div", { style: styles.pickerList }, filterTypeOptions.map((opt) => /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        className: "picker-item",
+        key: opt.key,
+        style: {
+          ...styles.pickerItem,
+          ...filterType === opt.key ? { background: "rgba(126, 224, 192, 0.08)" } : {}
+        },
+        onClick: () => {
+          setFilterType(opt.key);
+          setShowFilterTypePicker(false);
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerItemIcon, background: opt.color } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: opt.icon, size: 16, color: "#fff" })),
+      /* @__PURE__ */ React.createElement("div", { style: styles.pickerItemLabel }, opt.label),
+      filterType === opt.key && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--mint)", fontSize: 18 } }, "\u2713")
+    )))
+  )), showAcctPicker && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowAcctPicker(false) }, /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: { ...styles.pickerCard, transform: `translateY(${acctSwipe.dragY}px)`, transition: acctSwipe.dragY === 0 ? "transform 0.22s ease-out" : "none" },
+      onClick: (e) => e.stopPropagation(),
+      ref: acctSwipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, "\u8ACB\u9078\u64C7\u5E33\u6236"),
+    /* @__PURE__ */ React.createElement("div", { style: styles.pickerList }, state.accounts.filter((a) => !a.isSystem).map((a) => {
+      const tm = state.accountTypes.find((t) => t.value === a.type) || { icon: "box", color: "#f5c29c" };
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          className: "picker-item",
+          key: a.id,
+          style: {
+            ...styles.pickerItem,
+            ...selAccount === a.id ? { background: "rgba(126, 224, 192, 0.08)" } : {}
+          },
+          onClick: () => {
+            setSelAccount(a.id);
+            setShowAcctPicker(false);
+          }
+        },
+        /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerItemIcon, background: tm.color || "#f5c29c" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: tm.icon || "box", size: 16, color: "#fff" })),
+        /* @__PURE__ */ React.createElement("div", { style: styles.pickerItemLabel }, a.name),
+        selAccount === a.id && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--mint)", fontSize: 18 } }, "\u2713")
+      );
+    }))
+  )), showCatPicker && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowCatPicker(false) }, /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: { ...styles.pickerCard, transform: `translateY(${catSwipe.dragY}px)`, transition: catSwipe.dragY === 0 ? "transform 0.22s ease-out" : "none" },
+      onClick: (e) => e.stopPropagation(),
+      ref: catSwipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, filterType === "subcat" ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 12, fontWeight: 500 } }, "\u6B65\u9A5F 1 / 2 \u2027 "), /* @__PURE__ */ React.createElement("span", null, "\u5148\u9078\u5927\u5206\u985E")) : "\u8ACB\u9078\u64C7\u5927\u5206\u985E"),
+    /* @__PURE__ */ React.createElement("div", { style: styles.pickerList }, allCategories.map((c) => /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        className: "picker-item",
+        key: c.label,
+        style: {
+          ...styles.pickerItem,
+          ...(filterType === "subcat" ? subcatStepCategory : selCategory) === c.label ? { background: "rgba(126, 224, 192, 0.08)" } : {}
+        },
+        onClick: () => {
+          if (filterType === "subcat") {
+            setSubcatStepCategory(c.label);
+            setShowCatPicker(false);
+            setTimeout(() => setShowSubCatPicker(true), 150);
+          } else {
+            setSelCategory(c.label);
+            setShowCatPicker(false);
+          }
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerItemIcon, background: c.type === "income" ? "rgba(126, 224, 192, 0.15)" : "rgba(245, 181, 192, 0.15)" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: c.icon, size: 16, color: c.type === "income" ? "var(--mint-text)" : "var(--pink-text)" })),
+      /* @__PURE__ */ React.createElement("div", { style: styles.pickerItemLabel }, c.label),
+      (filterType === "subcat" ? subcatStepCategory : selCategory) === c.label && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--mint)", fontSize: 18 } }, "\u2713")
+    )), allCategories.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { padding: 30, textAlign: "center", color: "var(--text-faint)", fontSize: 13 } }, "\u6C92\u6709\u4EFB\u4F55\u5927\u5206\u985E"))
+  )), showSubCatPicker && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowSubCatPicker(false) }, /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: { ...styles.pickerCard, transform: `translateY(${subCatSwipe.dragY}px)`, transition: subCatSwipe.dragY === 0 ? "transform 0.22s ease-out" : "none" },
+      onClick: (e) => e.stopPropagation(),
+      ref: subCatSwipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 12, fontWeight: 500 } }, "\u6B65\u9A5F 2 / 2 \u2027 "), /* @__PURE__ */ React.createElement("span", null, "\u9078 "), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)" } }, subcatStepCategory || ""), /* @__PURE__ */ React.createElement("span", null, " \u4E0B\u7684\u5B50\u5206\u985E")),
+    /* @__PURE__ */ React.createElement("div", { style: styles.pickerList }, allSubCats.filter((s) => s.category === subcatStepCategory).map((s) => {
+      const key = `${s.category}|${s.sub}`;
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          className: "picker-item",
+          key,
+          style: {
+            ...styles.pickerItem,
+            ...selSubCat === key ? { background: "rgba(126, 224, 192, 0.08)" } : {}
+          },
+          onClick: () => {
+            setSelSubCat(key);
+            setShowSubCatPicker(false);
+          }
+        },
+        /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerItemIcon, background: s.type === "income" ? "rgba(126, 224, 192, 0.15)" : "rgba(245, 181, 192, 0.15)" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: s.catIcon, size: 16, color: s.type === "income" ? "var(--mint-text)" : "var(--pink-text)" })),
+        /* @__PURE__ */ React.createElement("div", { style: styles.pickerItemLabel }, s.sub),
+        selSubCat === key && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--mint)", fontSize: 18 } }, "\u2713")
+      );
+    }), allSubCats.filter((s) => s.category === subcatStepCategory).length === 0 && /* @__PURE__ */ React.createElement("div", { style: { padding: 30, textAlign: "center", color: "var(--text-faint)", fontSize: 13 } }, "\u6B64\u5206\u985E\u4E0B\u6C92\u6709\u5B50\u5206\u985E"))
+  )), showAcctTypePicker && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowAcctTypePicker(false) }, /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: { ...styles.pickerCard, transform: `translateY(${acctTypeSwipe.dragY}px)`, transition: acctTypeSwipe.dragY === 0 ? "transform 0.22s ease-out" : "none" },
+      onClick: (e) => e.stopPropagation(),
+      ref: acctTypeSwipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, "\u8ACB\u9078\u64C7\u5E33\u6236\u985E\u578B"),
+    /* @__PURE__ */ React.createElement("div", { style: styles.pickerList }, state.accountTypes.map((t) => /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        className: "picker-item",
+        key: t.value,
+        style: {
+          ...styles.pickerItem,
+          ...selAccountType === t.value ? { background: "rgba(126, 224, 192, 0.08)" } : {}
+        },
+        onClick: () => {
+          setSelAccountType(t.value);
+          setShowAcctTypePicker(false);
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerItemIcon, background: t.color || "#f5c29c" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: t.icon || "box", size: 16, color: "#fff" })),
+      /* @__PURE__ */ React.createElement("div", { style: styles.pickerItemLabel }, t.label),
+      selAccountType === t.value && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--mint)", fontSize: 18 } }, "\u2713")
+    )))
+  ))));
+}
+function ThirdPartySheet({ onClose, toast }) {
+  const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
+  const defaultServices = [
+    {
+      key: "google",
+      name: "Google \u96F2\u7AEF\u786C\u789F",
+      desc: "\u81EA\u52D5\u5099\u4EFD\u8A18\u5E33\u8CC7\u6599\u5230\u60A8\u7684 Google Drive",
+      color: "#4285F4",
+      letter: "G",
+      status: "\u5373\u5C07\u63A8\u51FA"
+    },
+    {
+      key: "icloud",
+      name: "iCloud",
+      desc: "\u5099\u4EFD\u5230 iCloud\uFF08\u50C5\u652F\u63F4 iOS\uFF09",
+      color: "#8a8a8a",
+      letter: "",
+      iconName: "box",
+      status: "\u5373\u5C07\u63A8\u51FA"
+    },
+    {
+      key: "dropbox",
+      name: "Dropbox",
+      desc: "\u5099\u4EFD\u5230 Dropbox",
+      color: "#0061FF",
+      letter: "D",
+      status: "\u5373\u5C07\u63A8\u51FA"
+    }
+  ];
+  const [editMode, setEditMode] = useState(false);
+  const [order, setOrder] = useState(() => {
+    const defaults = defaultServices.map((s) => s.key);
+    try {
+      const raw = localStorage.getItem("ledger_thirdparty_order");
+      if (raw) {
+        const saved = JSON.parse(raw);
+        const defSet = new Set(defaults);
+        const filtered = Array.isArray(saved) ? saved.filter((k) => defSet.has(k)) : [];
+        const missing = defaults.filter((k) => !filtered.includes(k));
+        return [...filtered, ...missing];
+      }
+    } catch {
+    }
+    return defaults;
+  });
+  React.useEffect(() => {
+    try {
+      localStorage.setItem("ledger_thirdparty_order", JSON.stringify(order));
+    } catch {
+    }
+  }, [order]);
+  const moveService = (key, dir) => {
+    setOrder((prev) => {
+      const i = prev.indexOf(key);
+      if (i < 0) return prev;
+      const j = i + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  };
+  const serviceMap = new Map(defaultServices.map((s) => [s.key, s]));
+  const services = order.map((k) => serviceMap.get(k)).filter(Boolean);
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-sheet": "true",
+      style: {
+        ...styles.sheet,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: { width: 50 } }), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, "\u4E32\u9023\u7B2C\u4E09\u65B9\u9023\u7D50"), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 50, display: "flex", justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode }))),
+    /* @__PURE__ */ React.createElement(EditModeBanner, { editMode, setEditMode }),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll, "data-scroll-container": true }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", padding: "0 4px 16px", lineHeight: 1.6 } }, "\u9023\u7D50\u7B2C\u4E09\u65B9\u96F2\u7AEF\u670D\u52D9\uFF0C\u53EF\u81EA\u52D5\u540C\u6B65\u8207\u5099\u4EFD\u4F60\u7684\u8A18\u5E33\u8CC7\u6599\uFF0C\u63DB\u624B\u6A5F\u6216\u91CD\u88DD App \u6642\u4E5F\u80FD\u8F15\u9B06\u9084\u539F\u3002"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, services.map((s, i) => /* @__PURE__ */ React.createElement(
+      Block,
+      {
+        key: s.key,
+        blockKey: s.key,
+        editMode,
+        isFirst: i === 0,
+        isLast: i === services.length - 1,
+        onMoveUp: () => moveService(s.key, -1),
+        onMoveDown: () => moveService(s.key, 1),
+        onReorder: (newOrder) => setOrder(newOrder),
+        inline: true
+      },
+      /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: styles.thirdPartyCard,
+          onClick: () => !editMode && toast(`${s.name} ${s.status}`)
+        },
+        /* @__PURE__ */ React.createElement("div", { style: { ...styles.thirdPartyLogo, background: s.color } }, s.letter ? /* @__PURE__ */ React.createElement("span", { style: { color: "#fff", fontSize: 18, fontWeight: 700 } }, s.letter) : /* @__PURE__ */ React.createElement(TypeIcon, { name: s.iconName || "box", size: 20, color: "#fff" })),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: styles.thirdPartyName }, s.name), /* @__PURE__ */ React.createElement("div", { style: styles.thirdPartyDesc }, s.desc)),
+        /* @__PURE__ */ React.createElement("div", { style: styles.thirdPartyBadge }, s.status)
+      )
+    ))), !editMode && /* @__PURE__ */ React.createElement("div", { style: { ...styles.settingsGroup, marginTop: 20 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsGroupTitle }, "\u76EE\u524D\u53EF\u7528\u7684\u5099\u4EFD\u65B9\u5F0F"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-dim)", lineHeight: 1.7, padding: "8px 4px" } }, "\u2022 \u5728\u300C\u8A2D\u5B9A \u2192 \u8CC7\u6599\u300D\u53EF\u300C\u532F\u51FA JSON \u5099\u4EFD\u300D\uFF0C\u532F\u51FA\u5F8C\u7684\u6A94\u6848\u53EF\u624B\u52D5\u4E0A\u50B3\u5230\u60A8\u504F\u597D\u7684\u96F2\u7AEF\uFF08\u5982 Google Drive\u3001Dropbox\uFF09", /* @__PURE__ */ React.createElement("br", null), "\u2022 \u65E5\u5F8C\u9700\u9084\u539F\u6642\uFF0C\u53EF\u5C07\u6A94\u6848\u532F\u5165\u56DE App", /* @__PURE__ */ React.createElement("br", null), "\u2022 \u7B2C\u4E09\u65B9\u81EA\u52D5\u4E32\u63A5\u529F\u80FD\u6B63\u5728\u958B\u767C\u4E2D")))
+  );
+}
+function LoadMoreSentinel({ remain, onLoadMore }) {
+  const ref = React.useRef(null);
+  const onLoadMoreRef = React.useRef(onLoadMore);
+  React.useEffect(() => {
+    onLoadMoreRef.current = onLoadMore;
+  }, [onLoadMore]);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const obs = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) {
+          onLoadMoreRef.current && onLoadMoreRef.current();
+        }
+      }
+    }, { rootMargin: "200px" });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      ref,
+      style: {
+        padding: "14px 12px",
+        textAlign: "center"
+      }
+    },
+    /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => onLoadMoreRef.current && onLoadMoreRef.current(),
+        style: {
+          padding: "10px 20px",
+          fontSize: 13,
+          fontWeight: 500,
+          color: "var(--text-dim)",
+          background: "var(--bg-card)",
+          border: "1px dashed var(--border)",
+          borderRadius: 999,
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      "\u8F09\u5165\u66F4\u591A ",
+      /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 12 } }, "(\u9084\u6709 ", remain, " \u7B46)")
+    )
+  );
+}
+const LinkContext = React.createContext({ onLinkClick: null, highlightInfo: null });
+const TxnRow = React.memo(function TxnRow2({ txn, state, catIcon, onClick, onLongPress, onLinkClick, highlighted, selectMode, selected }) {
+  const linkCtx = React.useContext(LinkContext);
+  const effectiveLinkClick = onLinkClick || linkCtx.onLinkClick;
+  const info = linkCtx.highlightInfo;
+  const contextHighlighted = highlighted !== void 0 ? highlighted : info && info.ids ? info.ids.has(txn.id) : false;
+  const highlightColor = info?.color || "accent";
+  const [localHighlighted, setLocalHighlighted] = React.useState(false);
+  React.useEffect(() => {
+    if (contextHighlighted) {
+      setLocalHighlighted(true);
+      const t = setTimeout(() => setLocalHighlighted(false), 1e3);
+      return () => clearTimeout(t);
+    } else {
+      setLocalHighlighted(false);
+    }
+  }, [contextHighlighted]);
+  const effectiveHighlighted = localHighlighted;
+  const highlightBorderColor = highlightColor === "pink" ? "var(--pink)" : highlightColor === "mint" ? "var(--mint)" : "var(--accent)";
+  const acct = state.accounts.find((a) => a.id === txn.accountId);
+  const icon = catIcon(txn.type, txn.category);
+  const isExp = txn.type === "expense";
+  const isTransferRole = txn.transferRole === "out" || txn.transferRole === "in";
+  const isFee = txn.transferRole === "fee";
+  const noteColor = useNoteColor();
+  const notePref = useNotePref();
+  const noteListColor = notePref.applyToList && notePref.textColor ? notePref.textColor : noteColor;
+  const longPressTimer = React.useRef(null);
+  const movedRef = React.useRef(false);
+  const startPosRef = React.useRef(null);
+  const startTimeRef = React.useRef(0);
+  const triggeredRef = React.useRef(false);
+  const handleStart = (e) => {
+    if (!onLongPress) return;
+    if (e.touches && e.touches.length > 1) {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+      startPosRef.current = null;
+      movedRef.current = true;
+      return;
+    }
+    triggeredRef.current = false;
+    movedRef.current = false;
+    const t = e.touches ? e.touches[0] : e;
+    startPosRef.current = { x: t.clientX, y: t.clientY };
+    startTimeRef.current = Date.now();
+    longPressTimer.current = setTimeout(() => {
+      triggeredRef.current = true;
+      onLongPress();
+      try {
+        if (navigator.vibrate) navigator.vibrate(15);
+      } catch {
+      }
+    }, 600);
+  };
+  const handleMove = (e) => {
+    if (e.touches && e.touches.length > 1) {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+      movedRef.current = true;
+      return;
+    }
+    if (!startPosRef.current || !longPressTimer.current) return;
+    if (Date.now() - startTimeRef.current < 80) return;
+    const t = e.touches ? e.touches[0] : e;
+    const dx = Math.abs(t.clientX - startPosRef.current.x);
+    const dy = Math.abs(t.clientY - startPosRef.current.y);
+    if (dx > 8 || dy > 8) {
+      movedRef.current = true;
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+  const handleEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    startPosRef.current = null;
+  };
+  const handleClick = (e) => {
+    if (triggeredRef.current) {
+      e.stopPropagation();
+      e.preventDefault();
+      triggeredRef.current = false;
+      return;
+    }
+    if (onClick) onClick();
+  };
+  const roleTag = txn.transferRole === "out" ? "\u8F49\u51FA" : txn.transferRole === "in" ? "\u6536\u6B3E" : txn.transferRole === "fee" ? "\u624B\u7E8C\u8CBB" : "";
+  let peerName = "";
+  let peerVirtual = false;
+  let peerDeleted = false;
+  if (txn.transferPeer) {
+    const peerId = txn.transferRole === "out" ? txn.transferPeer.toId : txn.transferPeer.fromId;
+    const peerAcct = state.accounts.find((a) => a.id === peerId);
+    if (peerAcct) {
+      peerName = peerAcct.name;
+      peerVirtual = !!peerAcct.virtual;
+    } else if (txn._deletedPeerName) {
+      peerName = txn._deletedPeerName;
+      peerDeleted = true;
+      peerVirtual = !!txn._deletedPeerVirtual;
+    }
+  }
+  const transferPrefix = isTransferRole ? `${roleTag}${peerName ? "  " : ""}` : "";
+  const catLabel = isTransferRole ? "" : isFee ? `${roleTag} ${txn.category}${txn.subCategory ? " \u203A " + txn.subCategory : ""}` : txn.subCategory ? `${txn.category || "\u672A\u5206\u985E"} \u203A ${txn.subCategory}` : txn.category || "\u672A\u5206\u985E";
+  const dateShort = (() => {
+    if (!txn.date) return "";
+    const ymd = txn.date.replace(/-/g, "/");
+    const d = new Date(txn.date);
+    const wd = ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][d.getDay()];
+    return `${ymd} (${wd})`;
+  })();
+  const amtColor = isTransferRole ? "var(--accent)" : isExp ? "var(--pink)" : "var(--mint)";
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: {
+        ...styles.txn,
+        ...selected ? {
+          background: "rgba(245, 181, 192, 0.12)",
+          borderRadius: 8
+        } : {},
+        ...effectiveHighlighted ? {
+          borderColor: highlightBorderColor
+        } : {},
+        transition: "border-color 0.3s ease-out, background 0.15s",
+        userSelect: selectMode ? "none" : "auto",
+        WebkitUserSelect: selectMode ? "none" : "auto"
+      },
+      onClick: handleClick,
+      onTouchStart: handleStart,
+      onTouchMove: handleMove,
+      onTouchEnd: handleEnd,
+      onTouchCancel: handleEnd,
+      onMouseDown: handleStart,
+      onMouseMove: handleMove,
+      onMouseUp: handleEnd,
+      onMouseLeave: handleEnd,
+      onContextMenu: (e) => {
+        if (onLongPress) {
+          e.preventDefault();
+          if (!triggeredRef.current) {
+            triggeredRef.current = true;
+            onLongPress();
+            try {
+              if (navigator.vibrate) navigator.vibrate(15);
+            } catch {
+            }
+          }
+        }
+      }
+    },
+    selectMode && /* @__PURE__ */ React.createElement("div", { style: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      border: `1.5px solid ${selected ? "var(--pink)" : "var(--text-faint)"}`,
+      background: selected ? "var(--pink)" : "transparent",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+      marginRight: 10,
+      transition: "all 0.15s"
+    } }, selected && /* @__PURE__ */ React.createElement("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "#1a1a1a", strokeWidth: "3.5", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "20 6 9 17 4 12" }))),
+    /* @__PURE__ */ React.createElement("div", { style: styles.txnIcon }, icon),
+    /* @__PURE__ */ React.createElement("div", { style: styles.txnInfo }, /* @__PURE__ */ React.createElement("div", { style: styles.txnCat }, isTransferRole ? /* @__PURE__ */ React.createElement(React.Fragment, null, acct && acct.virtual ? /* @__PURE__ */ React.createElement(React.Fragment, null, acct.name, /* @__PURE__ */ React.createElement("span", { style: {
+      color: "var(--mint)",
+      fontSize: 10,
+      fontWeight: 500,
+      marginLeft: 4,
+      padding: "0px 5px",
+      borderRadius: 3,
+      background: "rgba(126, 224, 192, 0.12)"
+    } }, "\u865B\u64EC")) : !acct && txn._deletedAccountName ? /* @__PURE__ */ React.createElement(React.Fragment, null, txn._deletedAccountName, /* @__PURE__ */ React.createElement("span", { style: {
+      color: "var(--text-faint)",
+      fontSize: 10,
+      fontWeight: 500,
+      marginLeft: 4,
+      padding: "0px 5px",
+      borderRadius: 3,
+      background: "rgba(140, 140, 140, 0.12)"
+    } }, "\u5E33\u865F\u5DF2\u522A"), /* @__PURE__ */ React.createElement(
+      "span",
+      {
+        onClick: (e) => {
+          e.stopPropagation();
+          {
+            const ts = txn._deletedAccountCreatedAt;
+            let timeText = "\u5EFA\u7ACB\u6642\u9593\u672A\u77E5";
+            if (ts) {
+              const d = new Date(ts);
+              const Y = d.getFullYear();
+              const M = String(d.getMonth() + 1).padStart(2, "0");
+              const D = String(d.getDate()).padStart(2, "0");
+              const h = String(d.getHours()).padStart(2, "0");
+              const m = String(d.getMinutes()).padStart(2, "0");
+              timeText = `${Y}/${M}/${D} ${h}:${m}`;
+            }
+            callGlobalToastRich({
+              variant: "info_card",
+              titleSegments: [
+                { text: "\u300C", color: "var(--text-dim)" },
+                { text: txn._deletedAccountName, color: "var(--text)", weight: 700 },
+                { text: "\u300D\u5E33\u6236", color: "var(--text-dim)" }
+              ],
+              subtitle: "\u5EFA\u7ACB\u6642\u9593\u70BA",
+              highlight: timeText,
+              highlightColor: "var(--blue)"
+            }, 2147483647);
+          }
+        },
+        style: {
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 16,
+          height: 16,
+          marginLeft: 4,
+          color: "var(--text-faint)",
+          cursor: "pointer",
+          verticalAlign: "middle",
+          WebkitTapHighlightColor: "transparent"
+        },
+        title: "\u5EFA\u7ACB\u6642\u9593"
+      },
+      /* @__PURE__ */ React.createElement("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "9.5" }), /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "11", x2: "12", y2: "16.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "8", r: "0.7", fill: "currentColor" }))
+    )) : /* @__PURE__ */ React.createElement("span", null, acct ? acct.name : ""), roleTag && /* @__PURE__ */ React.createElement("span", null, "  ", roleTag)) : catLabel), /* @__PURE__ */ React.createElement("div", { style: styles.txnMeta }, dateShort, isTransferRole ? (
+      // 轉帳的 meta 行顯示對方帳戶
+      peerName ? /* @__PURE__ */ React.createElement(React.Fragment, null, " ", peerName, (peerVirtual || peerDeleted) && /* @__PURE__ */ React.createElement("span", { style: {
+        color: peerDeleted ? "var(--text-faint)" : "var(--mint)",
+        fontSize: 10,
+        fontWeight: 500,
+        marginLeft: 4,
+        padding: "0px 5px",
+        borderRadius: 3,
+        background: peerDeleted ? "rgba(140, 140, 140, 0.12)" : "rgba(126, 224, 192, 0.12)"
+      } }, peerDeleted ? "\u5E33\u865F\u5DF2\u522A" : "\u865B\u64EC")) : null
+    ) : acct ? /* @__PURE__ */ React.createElement(React.Fragment, null, " ", acct.name, acct.virtual && /* @__PURE__ */ React.createElement("span", { style: {
+      color: "var(--mint)",
+      fontSize: 10,
+      fontWeight: 500,
+      marginLeft: 4,
+      padding: "0px 5px",
+      borderRadius: 3,
+      background: "rgba(126, 224, 192, 0.12)"
+    } }, "\u865B\u64EC")) : txn._deletedAccountName ? /* @__PURE__ */ React.createElement(React.Fragment, null, " ", txn._deletedAccountName, /* @__PURE__ */ React.createElement("span", { style: {
+      color: "var(--text-faint)",
+      fontSize: 10,
+      fontWeight: 500,
+      marginLeft: 4,
+      padding: "0px 5px",
+      borderRadius: 3,
+      background: "rgba(140, 140, 140, 0.12)"
+    } }, "\u5E33\u865F\u5DF2\u522A"), /* @__PURE__ */ React.createElement(
+      "span",
+      {
+        onClick: (e) => {
+          e.stopPropagation();
+          {
+            const ts = txn._deletedAccountCreatedAt;
+            let timeText = "\u5EFA\u7ACB\u6642\u9593\u672A\u77E5";
+            if (ts) {
+              const d = new Date(ts);
+              const Y = d.getFullYear();
+              const M = String(d.getMonth() + 1).padStart(2, "0");
+              const D = String(d.getDate()).padStart(2, "0");
+              const h = String(d.getHours()).padStart(2, "0");
+              const m = String(d.getMinutes()).padStart(2, "0");
+              timeText = `${Y}/${M}/${D} ${h}:${m}`;
+            }
+            callGlobalToastRich({
+              variant: "info_card",
+              titleSegments: [
+                { text: "\u300C", color: "var(--text-dim)" },
+                { text: txn._deletedAccountName, color: "var(--text)", weight: 700 },
+                { text: "\u300D\u5E33\u6236", color: "var(--text-dim)" }
+              ],
+              subtitle: "\u5EFA\u7ACB\u6642\u9593\u70BA",
+              highlight: timeText,
+              highlightColor: "var(--blue)"
+            }, 2147483647);
+          }
+        },
+        style: {
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 16,
+          height: 16,
+          marginLeft: 4,
+          color: "var(--text-faint)",
+          cursor: "pointer",
+          verticalAlign: "middle",
+          WebkitTapHighlightColor: "transparent"
+        },
+        title: "\u5EFA\u7ACB\u6642\u9593"
+      },
+      /* @__PURE__ */ React.createElement("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "9.5" }), /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "11", x2: "12", y2: "16.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "8", r: "0.7", fill: "currentColor" }))
+    )) : null, txn.note && !isTransferRole && /* @__PURE__ */ React.createElement("span", { style: noteListColor ? { color: noteListColor } : void 0 }, " \xB7 ", txn.note))),
+    /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, flexShrink: 0 } }, (txn.transferId || txn.txnGroupId || txn.tradeId || txn.settleId) && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: (e) => {
+          e.stopPropagation();
+          effectiveLinkClick && effectiveLinkClick(txn);
+        },
+        style: {
+          background: "transparent",
+          border: "none",
+          outline: "none",
+          padding: 4,
+          margin: -4,
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        },
+        "aria-label": "\u986F\u793A\u7D81\u5B9A\u7D00\u9304"
+      },
+      /* @__PURE__ */ React.createElement(TypeIcon, { name: "link", size: 12, color: "var(--text-faint)" })
+    ), /* @__PURE__ */ React.createElement("div", { style: { ...styles.txnAmt, color: amtColor } }, isExp ? "-" : "+", fmt(txn.amount)))
+  );
+});
+function DatePicker({ value, onChange, onClose }) {
+  const swipe = useSwipeBack(onClose);
+  const today = todayStr();
+  const [viewYM, setViewYM] = useState(() => (value || today).slice(0, 7));
+  const [weekendColor, setWeekendColor] = useState(() => {
+    try {
+      return localStorage.getItem("ledger_dp_weekend") || "var(--pink)";
+    } catch {
+      return "var(--pink)";
+    }
+  });
+  const [selectedColor, setSelectedColor] = useState(() => {
+    try {
+      return localStorage.getItem("ledger_dp_selected") || "var(--mint)";
+    } catch {
+      return "var(--mint)";
+    }
+  });
+  const updateWeekendColor = (c) => {
+    setWeekendColor(c);
+    try {
+      localStorage.setItem("ledger_dp_weekend", c);
+    } catch {
+    }
+  };
+  const updateSelectedColor = (c) => {
+    setSelectedColor(c);
+    try {
+      localStorage.setItem("ledger_dp_selected", c);
+    } catch {
+    }
+  };
+  const [y, m] = viewYM.split("-").map(Number);
+  const firstDay = new Date(y, m - 1, 1);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const startWeekday = firstDay.getDay();
+  const cells = [];
+  for (let i = 0; i < startWeekday; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length < 42) cells.push(null);
+  const [slideDir, setSlideDir] = useState(0);
+  const [animKey, setAnimKey] = useState(0);
+  const shiftMonth = (delta) => {
+    let ny = y, nm = m + delta;
+    if (nm < 1) {
+      nm = 12;
+      ny -= 1;
+    }
+    if (nm > 12) {
+      nm = 1;
+      ny += 1;
+    }
+    setSlideDir(delta);
+    setAnimKey((k) => k + 1);
+    setViewYM(`${ny}-${String(nm).padStart(2, "0")}`);
+    try {
+      navigator.vibrate?.(8);
+    } catch {
+    }
+  };
+  const selectDate = (d) => {
+    const iso = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    onChange(iso);
+    onClose();
+  };
+  const selected = value || today;
+  const [sy, sm, sd] = selected.split("-").map(Number);
+  const isSelected = (d) => y === sy && m === sm && d === sd;
+  const isToday = (d) => {
+    const [ty, tm, td] = today.split("-").map(Number);
+    return y === ty && m === tm && d === td;
+  };
+  const selectedDateObj = /* @__PURE__ */ new Date(`${selected}T00:00:00`);
+  const selectedWeekday = ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][selectedDateObj.getDay()];
+  const colorOptions = [
+    { name: "\u8584\u8377\u7DA0", value: "var(--mint)", preview: "#7ee0c0" },
+    { name: "\u7C89\u7D05", value: "var(--pink)", preview: "#f5b5c0" },
+    { name: "\u7D2B", value: "var(--accent)", preview: "#8f7ff0" },
+    { name: "\u6A58", value: "#f5a04a", preview: "#f5a04a" },
+    { name: "\u9EC3", value: "#f5d84a", preview: "#f5d84a" },
+    { name: "\u85CD", value: "#6aa8f0", preview: "#6aa8f0" }
+  ];
+  return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: onClose }, /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: {
+        ...styles.datePickerCard,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref,
+      onClick: (e) => e.stopPropagation()
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: { width: 30 } }), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", fontSize: 13, fontWeight: 500, marginRight: 8 } }, "\u76EE\u524D\u9078\u64C7"), /* @__PURE__ */ React.createElement("span", { style: { color: selectedColor, fontWeight: 700 } }, sy, "/", String(sm).padStart(2, "0"), "/", String(sd).padStart(2, "0"), " \u9031", selectedWeekday)), /* @__PURE__ */ React.createElement("div", { style: { width: 30 } })),
+    /* @__PURE__ */ React.createElement("div", { style: styles.dpMonthBar }, /* @__PURE__ */ React.createElement("button", { className: "dp-nav-btn", style: styles.dpNav, onClick: () => shiftMonth(-1) }, "\u2039"), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        key: "title-" + animKey,
+        style: {
+          ...styles.dpMonthTitle,
+          animation: slideDir !== 0 ? `dpSlide${slideDir > 0 ? "Right" : "Left"} 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)` : void 0
+        }
+      },
+      y,
+      " \u5E74 ",
+      m,
+      " \u6708"
+    ), /* @__PURE__ */ React.createElement("button", { className: "dp-nav-btn", style: styles.dpNav, onClick: () => shiftMonth(1) }, "\u203A")),
+    /* @__PURE__ */ React.createElement("div", { style: styles.dpWeekRow }, ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"].map((w, i) => /* @__PURE__ */ React.createElement("div", { key: w, style: { ...styles.dpWeekLabel, color: i === 0 || i === 6 ? weekendColor : "var(--text-faint)" } }, w))),
+    /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        key: animKey,
+        style: {
+          ...styles.dpGrid,
+          animation: slideDir !== 0 ? `dpSlide${slideDir > 0 ? "Right" : "Left"} 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)` : void 0
+        }
+      },
+      cells.map((d, i) => {
+        if (d === null) return /* @__PURE__ */ React.createElement("div", { key: "e" + i, style: { aspectRatio: "1 / 1" } });
+        const sel = isSelected(d);
+        const today_ = isToday(d);
+        const weekday = (startWeekday + d - 1) % 7;
+        const isWeekend = weekday === 0 || weekday === 6;
+        return /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            key: d,
+            style: {
+              ...styles.dpDay,
+              ...sel ? { background: selectedColor, color: "var(--on-mint)", fontWeight: 700 } : {},
+              ...!sel && today_ ? { outline: `1.5px solid ${selectedColor}`, outlineOffset: "-1.5px", color: selectedColor } : {},
+              ...!sel && isWeekend ? { color: weekendColor } : {}
+            },
+            onClick: () => selectDate(d)
+          },
+          d
+        );
+      })
+    ),
+    /* @__PURE__ */ React.createElement("button", { style: { ...styles.saveBtn, background: selectedColor, color: "var(--on-mint)", marginTop: 14 }, onClick: () => selectDate(parseInt(today.slice(8))) }, "\u56DE\u5230\u4ECA\u5929"),
+    /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, marginTop: 6 }, onClick: onClose }, "\u53D6\u6D88")
+  ));
+}
+function NotePrefSheet({ pref, onClose, setConfirmDialog, toastRich }) {
+  const swipe = useSwipeToCloseAny(onClose);
+  const [textColor, setTextColor] = useState(pref.textColor || "");
+  const [bgColor, setBgColor] = useState(pref.bgColor || "");
+  const [applyToInput, setApplyToInput] = useState(pref.applyToInput !== false);
+  const [applyToList, setApplyToList] = useState(pref.applyToList !== false);
+  const TEXT_PRESETS = ["", "#f5b5c0", "#7ee0c0", "#8f7ff0", "#f5d84a", "#f5a04a", "#6aa8f0", "#e88a8a"];
+  const BG_PRESETS = ["", "#1a1c20", "#3a2828", "#283a28", "#28323a", "#3a2838", "#f5f5f0", "#fde4e8"];
+  const apply = () => {
+    const newPref = { textColor, bgColor, applyToInput, applyToList };
+    const doApply = () => {
+      try {
+        localStorage.setItem(NOTE_PREF_KEY, JSON.stringify(newPref));
+      } catch {
+      }
+      notePrefBroadcast(newPref);
+      onClose();
+      if (toastRich) {
+        toastRich({
+          title: "\u5DF2\u5957\u7528\u5099\u8A3B\u6A23\u5F0F",
+          amount: "\u2713",
+          amountColor: "var(--mint-text)",
+          lines: [
+            applyToInput && applyToList ? "\u8A18\u5E33\u6642 + \u700F\u89BD\u6642" : applyToInput ? "\u50C5\u8A18\u5E33\u6642" : applyToList ? "\u50C5\u700F\u89BD\u6642" : "\u5169\u8005\u90FD\u672A\u555F\u7528"
+          ]
+        });
+      }
+    };
+    if (!setConfirmDialog) {
+      doApply();
+      return;
+    }
+    setConfirmDialog({
+      title: "\u5957\u7528\u5099\u8A3B\u6A23\u5F0F",
+      message: "\u78BA\u5B9A\u8981\u5957\u7528\u76EE\u524D\u7684\u5099\u8A3B\u6A23\u5F0F\u55CE?\n\u6703\u8986\u84CB\u73FE\u6709\u8A2D\u5B9A\u3002",
+      confirmText: "\u5957\u7528",
+      onConfirm: doApply
+    });
+  };
+  const reset = () => {
+    if (!setConfirmDialog) return;
+    setConfirmDialog({
+      title: "\u91CD\u8A2D\u5099\u8A3B\u6A23\u5F0F",
+      messageList: {
+        before: "\u78BA\u5B9A\u8981\u9084\u539F\u6210\u9810\u8A2D\u6A23\u5F0F\u55CE?",
+        items: ["\u6587\u5B57\u8272", "\u80CC\u666F\u8272", "\u5957\u7528\u7BC4\u570D"],
+        after: "\u90FD\u6703\u56DE\u5230\u539F\u672C\u7684\u8A2D\u5B9A\u3002"
+      },
+      confirmText: "\u91CD\u8A2D",
+      danger: true,
+      onConfirm: () => {
+        setTextColor("");
+        setBgColor("");
+        setApplyToInput(true);
+        setApplyToList(true);
+        const defaultPref = { textColor: "", bgColor: "", applyToInput: true, applyToList: true };
+        try {
+          localStorage.setItem(NOTE_PREF_KEY, JSON.stringify(defaultPref));
+        } catch {
+        }
+        try {
+          localStorage.removeItem(NOTE_COLOR_KEY);
+        } catch {
+        }
+        noteColorBroadcast("");
+        notePrefBroadcast(defaultPref);
+        onClose();
+        if (toastRich) {
+          toastRich({
+            title: "\u5DF2\u91CD\u8A2D\u5099\u8A3B\u6A23\u5F0F",
+            amount: "\u2713",
+            amountColor: "var(--mint-text)",
+            lines: ["\u6587\u5B57\u8272 / \u80CC\u666F\u8272 / \u5957\u7528\u7BC4\u570D \u5DF2\u9084\u539F\u9810\u8A2D"]
+          });
+        }
+      }
+    });
+  };
+  const ColorSwatch = ({ value, active, onClick, isText }) => {
+    const isLight = value && /^#[a-f0-9]{6}$/i.test(value) ? parseInt(value.slice(1, 3), 16) * 0.299 + parseInt(value.slice(3, 5), 16) * 0.587 + parseInt(value.slice(5, 7), 16) * 0.114 > 160 : false;
+    const checkColor = !value ? "var(--mint)" : isLight ? "#1a1a1a" : "#fff";
+    return /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick,
+        style: {
+          aspectRatio: "1",
+          borderRadius: isText ? "50%" : 10,
+          border: "1px solid var(--border)",
+          background: value || "transparent",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 0,
+          position: "relative"
+        }
+      },
+      active && /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", width: "60%", height: "60%", fill: "none", stroke: checkColor, strokeWidth: "3.5", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "4 12 10 18 20 6" })),
+      !value && !active && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "var(--text-faint)", lineHeight: 1 } }, "\u2014")
+    );
+  };
+  const [pickerFor, setPickerFor] = useState(null);
+  const CustomColorBtn = ({ value, fieldKey, isText }) => {
+    return /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setPickerFor(fieldKey),
+        style: {
+          aspectRatio: "1",
+          borderRadius: isText ? "50%" : 10,
+          border: "1px solid var(--border)",
+          background: value || "conic-gradient(from 0deg, #f5b5c0, #f5d84a, #7ee0c0, #6aa8f0, #8f7ff0, #f5b5c0)",
+          cursor: "pointer",
+          padding: 0,
+          position: "relative",
+          overflow: "hidden"
+        },
+        title: "\u81EA\u8A02\u8272"
+      }
+    );
+  };
+  const ToggleRow = ({ label, sublabel, val, set }) => /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      onClick: () => set((v) => !v),
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "8px 12px",
+        background: "var(--bg-card)",
+        borderRadius: 8,
+        cursor: "pointer",
+        flex: 1,
+        gap: 6
+      }
+    },
+    /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", minWidth: 0 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--text)", fontWeight: 600 } }, label), sublabel && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, color: "var(--text-faint)", marginTop: 1 } }, sublabel)),
+    /* @__PURE__ */ React.createElement("div", { style: {
+      width: 32,
+      height: 18,
+      borderRadius: 9,
+      background: val ? "var(--mint)" : "var(--border)",
+      position: "relative",
+      flexShrink: 0,
+      transition: "background 0.2s"
+    } }, /* @__PURE__ */ React.createElement("div", { style: {
+      position: "absolute",
+      top: 2,
+      left: 2,
+      width: 14,
+      height: 14,
+      borderRadius: "50%",
+      background: "#fff",
+      transition: "transform 0.2s",
+      transform: val ? "translateX(14px)" : "translateX(0)"
+    } }))
+  );
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-picker-backdrop": "true",
+      style: {
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.4)",
+        zIndex: 350,
+        display: "flex",
+        alignItems: "flex-end"
+      },
+      onClick: onClose
+    },
+    /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        ...swipe,
+        style: {
+          width: "100%",
+          background: "var(--bg)",
+          borderTopLeftRadius: 18,
+          borderTopRightRadius: 18,
+          padding: "10px 14px calc(12px + env(safe-area-inset-bottom, 0px))",
+          boxShadow: "0 -10px 40px rgba(0,0,0,0.5)",
+          transform: `translateY(${swipe.dragY}px)`,
+          transition: swipe.dragY === 0 ? "transform 0.2s" : "none",
+          animation: swipe.dragY === 0 ? "slideUp 0.2s ease-out" : "none"
+        },
+        onClick: (e) => e.stopPropagation()
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "center", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: "var(--border)" } })),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 10, textAlign: "center" } }, "\u5099\u8A3B\u6A23\u5F0F\u8A2D\u5B9A"),
+      /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginBottom: 5, fontWeight: 600 } }, "\u6587\u5B57\u984F\u8272"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(9, 1fr)", gap: 5, alignItems: "center" } }, TEXT_PRESETS.map((v) => /* @__PURE__ */ React.createElement(ColorSwatch, { key: v || "def", value: v, active: textColor === v, onClick: () => setTextColor(v), isText: true })), /* @__PURE__ */ React.createElement(CustomColorBtn, { value: textColor && !TEXT_PRESETS.includes(textColor) ? textColor : "", fieldKey: "text", isText: true }))),
+      /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginBottom: 5, fontWeight: 600 } }, "\u6846\u80CC\u666F\u8272"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(9, 1fr)", gap: 5, alignItems: "center" } }, BG_PRESETS.map((v) => /* @__PURE__ */ React.createElement(ColorSwatch, { key: v || "def", value: v, active: bgColor === v, onClick: () => setBgColor(v) })), /* @__PURE__ */ React.createElement(CustomColorBtn, { value: bgColor && !BG_PRESETS.includes(bgColor) ? bgColor : "", fieldKey: "bg" }))),
+      /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginBottom: 5, fontWeight: 600 } }, "\u5957\u7528\u7BC4\u570D"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 5 } }, /* @__PURE__ */ React.createElement(ToggleRow, { label: "\u8A18\u5E33\u6642", sublabel: "\u65B0\u589E/\u7DE8\u8F2F\u5099\u8A3B\u6B04", val: applyToInput, set: setApplyToInput }), /* @__PURE__ */ React.createElement(ToggleRow, { label: "\u700F\u89BD\u6642", sublabel: "\u660E\u7D30\u9801\u7684\u5099\u8A3B", val: applyToList, set: setApplyToList }))),
+      /* @__PURE__ */ React.createElement("div", { style: {
+        padding: "8px 12px",
+        background: bgColor || "var(--bg-card)",
+        borderRadius: 8,
+        marginBottom: 10,
+        border: "1px dashed var(--border)",
+        minHeight: 36,
+        display: "flex",
+        alignItems: "center"
+      } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, color: "var(--text-faint)", marginRight: 8 } }, "\u9810\u89BD"), /* @__PURE__ */ React.createElement("span", { style: { color: textColor || "var(--text)", fontSize: 13 } }, "\u8A18\u4E0B\u4ED6\u5011\u4ECA\u5929\u4E00\u8D77\u5403\u62C9\u9EB5")),
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: reset,
+          style: {
+            flex: 1,
+            padding: "10px",
+            border: "1px solid var(--border)",
+            borderRadius: 10,
+            background: "transparent",
+            color: "var(--text-dim)",
+            fontSize: 13,
+            cursor: "pointer"
+          }
+        },
+        "\u91CD\u8A2D"
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: apply,
+          style: {
+            flex: 2,
+            padding: "10px",
+            border: "none",
+            borderRadius: 10,
+            background: "var(--mint)",
+            color: "var(--on-mint)",
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: "pointer"
+          }
+        },
+        "\u5957\u7528"
+      ))
+    ),
+    pickerFor && /* @__PURE__ */ React.createElement(
+      ColorPickerDialog,
+      {
+        initial: pickerFor === "text" ? textColor || "#7ee0c0" : bgColor || "#2a2d34",
+        onCancel: () => setPickerFor(null),
+        onConfirm: (c) => {
+          if (pickerFor === "text") setTextColor(c);
+          else setBgColor(c);
+          setPickerFor(null);
+        }
+      }
+    )
+  );
+}
+function ColorPickerDialog({ initial, onCancel, onConfirm }) {
+  const swipe = useSwipeToCloseAny(onCancel);
+  const parseHex = (hex) => {
+    if (!hex || !/^#[0-9a-f]{6}$/i.test(hex)) return { h: 180, s: 50, l: 50 };
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const l2 = (max + min) / 2;
+    let h2 = 0, s2 = 0;
+    if (max !== min) {
+      const d = max - min;
+      s2 = l2 > 0.5 ? d / (2 - max - min) : d / (max + min);
+      if (max === r) h2 = (g - b) / d + (g < b ? 6 : 0);
+      else if (max === g) h2 = (b - r) / d + 2;
+      else h2 = (r - g) / d + 4;
+      h2 *= 60;
+    }
+    return { h: Math.round(h2), s: Math.round(s2 * 100), l: Math.round(l2 * 100) };
+  };
+  const hslToHex = (h2, s2, l2) => {
+    s2 /= 100;
+    l2 /= 100;
+    const k = (n) => (n + h2 / 30) % 12;
+    const a = s2 * Math.min(l2, 1 - l2);
+    const f = (n) => l2 - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    const toHex = (x) => Math.round(x * 255).toString(16).padStart(2, "0");
+    return "#" + toHex(f(0)) + toHex(f(8)) + toHex(f(4));
+  };
+  const init = parseHex(initial);
+  const [h, setH] = useState(init.h);
+  const [s, setS] = useState(init.s);
+  const [l, setL] = useState(init.l);
+  const [hexInput, setHexInput] = useState(initial);
+  const currentHex = hslToHex(h, s, l);
+  React.useEffect(() => {
+    setHexInput(currentHex);
+  }, [h, s, l]);
+  const onHexChange = (val) => {
+    setHexInput(val);
+    if (/^#[0-9a-f]{6}$/i.test(val)) {
+      const parsed = parseHex(val);
+      setH(parsed.h);
+      setS(parsed.s);
+      setL(parsed.l);
+    }
+  };
+  const QUICK_COLORS = [
+    "#f5b5c0",
+    "#7ee0c0",
+    "#8f7ff0",
+    "#f5d84a",
+    "#f5a04a",
+    "#6aa8f0",
+    "#e88a8a",
+    "#1a1c20",
+    "#2a2d34",
+    "#3a2828",
+    "#283a28",
+    "#28323a",
+    "#3a2838",
+    "#f5f5f0",
+    "#fde4e8",
+    "#ffffff"
+  ];
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-picker-backdrop": "true",
+      style: {
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.6)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+        zIndex: 500,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        animation: "fadeIn 0.15s ease-out"
+      },
+      onClick: onCancel
+    },
+    /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        ...swipe,
+        onClick: (e) => e.stopPropagation(),
+        style: {
+          width: "calc(100% - 32px)",
+          maxWidth: 360,
+          background: "var(--bg)",
+          borderRadius: 18,
+          padding: 18,
+          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+          transform: `translateX(${swipe.dragX || 0}px) translateY(${swipe.dragY}px)`,
+          transition: swipe.dragY === 0 ? "transform 0.2s" : "none",
+          animation: swipe.dragY === 0 ? "centerAlertPop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)" : "none"
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: {
+        width: "100%",
+        height: 80,
+        background: currentHex,
+        borderRadius: 12,
+        marginBottom: 14,
+        border: "1px solid var(--border)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 14,
+        fontWeight: 700,
+        fontFamily: "var(--num-font)",
+        color: l > 60 ? "#1a1a1a" : "#fff",
+        letterSpacing: "1px"
+      } }, currentHex.toUpperCase()),
+      /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginBottom: 4 } }, "\u8272\u76F8 H \xB7 ", h, "\xB0"), /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          type: "range",
+          onTouchStart: (e) => e.stopPropagation(),
+          onTouchMove: (e) => e.stopPropagation(),
+          min: "0",
+          max: "360",
+          value: h,
+          onChange: (e) => setH(Number(e.target.value)),
+          style: {
+            width: "100%",
+            height: 22,
+            appearance: "none",
+            WebkitAppearance: "none",
+            background: "linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
+            borderRadius: 11,
+            outline: "none",
+            cursor: "pointer"
+          }
+        }
+      )),
+      /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginBottom: 4 } }, "\u98FD\u548C\u5EA6 S \xB7 ", s, "%"), /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          type: "range",
+          onTouchStart: (e) => e.stopPropagation(),
+          onTouchMove: (e) => e.stopPropagation(),
+          min: "0",
+          max: "100",
+          value: s,
+          onChange: (e) => setS(Number(e.target.value)),
+          style: {
+            width: "100%",
+            height: 22,
+            appearance: "none",
+            WebkitAppearance: "none",
+            background: `linear-gradient(to right, ${hslToHex(h, 0, l)}, ${hslToHex(h, 100, l)})`,
+            borderRadius: 11,
+            outline: "none",
+            cursor: "pointer"
+          }
+        }
+      )),
+      /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginBottom: 4 } }, "\u660E\u5EA6 L \xB7 ", l, "%"), /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          type: "range",
+          onTouchStart: (e) => e.stopPropagation(),
+          onTouchMove: (e) => e.stopPropagation(),
+          min: "0",
+          max: "100",
+          value: l,
+          onChange: (e) => setL(Number(e.target.value)),
+          style: {
+            width: "100%",
+            height: 22,
+            appearance: "none",
+            WebkitAppearance: "none",
+            background: `linear-gradient(to right, #000, ${hslToHex(h, s, 50)}, #fff)`,
+            borderRadius: 11,
+            outline: "none",
+            cursor: "pointer"
+          }
+        }
+      )),
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "var(--text-dim)", flexShrink: 0 } }, "HEX"), /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          type: "text",
+          onTouchStart: (e) => e.stopPropagation(),
+          value: hexInput,
+          onChange: (e) => onHexChange(e.target.value),
+          placeholder: "#7ee0c0",
+          maxLength: 7,
+          style: {
+            flex: 1,
+            padding: "8px 10px",
+            background: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            color: "var(--text)",
+            fontSize: 13,
+            fontFamily: "var(--num-font)",
+            outline: "none",
+            textTransform: "uppercase"
+          }
+        }
+      )),
+      /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginBottom: 5 } }, "\u5FEB\u901F\u9078\u8272"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 5 } }, QUICK_COLORS.map((c) => /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: c,
+          onClick: () => onHexChange(c),
+          style: {
+            aspectRatio: "1",
+            borderRadius: 8,
+            border: currentHex.toLowerCase() === c.toLowerCase() ? "2px solid var(--mint)" : "1px solid var(--border)",
+            background: c,
+            cursor: "pointer",
+            padding: 0
+          }
+        }
+      )))),
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: onCancel,
+          style: {
+            flex: 1,
+            padding: "11px",
+            border: "1px solid var(--border)",
+            borderRadius: 10,
+            background: "transparent",
+            color: "var(--text-dim)",
+            fontSize: 13,
+            cursor: "pointer"
+          }
+        },
+        "\u53D6\u6D88"
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => onConfirm(currentHex),
+          style: {
+            flex: 2,
+            padding: "11px",
+            border: "none",
+            borderRadius: 10,
+            background: "var(--mint)",
+            color: "var(--on-mint)",
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: "pointer"
+          }
+        },
+        "\u78BA\u5B9A"
+      )),
+      /* @__PURE__ */ React.createElement("style", null, `
+          input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid rgba(0,0,0,0.3);
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+          }
+          input[type="range"]::-moz-range-thumb {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid rgba(0,0,0,0.3);
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+          }
+        `)
+    )
+  );
+}
+function CalcTriggerInput({
+  value,
+  onChange,
+  placeholder = "",
+  fontSize = 16,
+  fontWeight = 600,
+  align = "left",
+  // 'left' | 'right' | 'center'
+  disabled = false,
+  style = {}
+}) {
+  const [show, setShow] = React.useState(false);
+  const displayValue = (() => {
+    if (value === "" || value === null || value === void 0) return "";
+    const n = Number(value);
+    return !isNaN(n) && String(value).match(/^-?\d+(\.\d+)?$/) ? n.toLocaleString("en-US") : String(value);
+  })();
+  return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      onClick: () => {
+        if (!disabled) setShow(true);
+      },
+      style: {
+        width: "100%",
+        padding: "10px 12px",
+        fontSize,
+        fontWeight,
+        fontFamily: "var(--num-font)",
+        background: "var(--bg-card)",
+        color: displayValue ? "var(--text)" : "var(--text-faint)",
+        border: "1.5px solid var(--border)",
+        borderRadius: 10,
+        outline: "none",
+        boxSizing: "border-box",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.55 : 1,
+        textAlign: align,
+        WebkitTapHighlightColor: "transparent",
+        userSelect: "none",
+        ...style
+      }
+    },
+    displayValue || placeholder
+  ), show && /* @__PURE__ */ React.createElement(
+    CalculatorSheet,
+    {
+      expr: value === "0" ? "" : String(value || ""),
+      onChange: (v) => onChange(v),
+      onClose: () => setShow(false)
+    }
+  ));
+}
+function CalculatorSheet({ expr, onChange, mainColor, onMainColor, onClose }) {
+  const swipe = useSwipeToCloseAny(onClose);
+  const [pristine, setPristine] = useState(true);
+  const haptic = (key) => {
+    try {
+      if (!navigator.vibrate) return;
+      if (key === "=" || key === "C") navigator.vibrate(20);
+      else if (["+", "-", "*", "/", "%", "BACK"].includes(key)) navigator.vibrate(12);
+      else navigator.vibrate(8);
+    } catch {
+    }
+  };
+  const press = (key) => {
+    haptic(key);
+    let cur = expr || "";
+    if (key === "C") {
+      onChange("");
+      setPristine(false);
+      return;
+    }
+    if (key === "BACK") {
+      onChange(cur.slice(0, -1));
+      setPristine(false);
+      return;
+    }
+    if (key === "=") {
+      const result = evalExpr(cur);
+      if (result !== null) onChange(String(result));
+      setPristine(false);
+      return;
+    }
+    if (key === "%") {
+      setPristine(false);
+      if (!cur || /[+\-*/]$/.test(cur)) return;
+      const m2 = cur.match(/^(.*?)([+\-*/])([0-9.]+)$/);
+      if (!m2) {
+        const n = parseFloat(cur);
+        if (!isNaN(n)) onChange(String(n / 100));
+        return;
+      }
+      const [, prefix, op, lastNum2] = m2;
+      const lastN = parseFloat(lastNum2);
+      if (isNaN(lastN)) return;
+      const baseVal = evalExpr(prefix);
+      if (baseVal === null) return;
+      let result;
+      if (op === "+") result = baseVal + baseVal * lastN / 100;
+      else if (op === "-") result = baseVal - baseVal * lastN / 100;
+      else if (op === "*") result = baseVal * lastN / 100;
+      else if (op === "/") result = baseVal / lastN / 100;
+      if (!Number.isFinite(result)) return;
+      onChange(String(Math.round(result * 1e4) / 1e4));
+      return;
+    }
+    if (["+", "-", "*", "/"].includes(key)) {
+      setPristine(false);
+      if (/[+\-*/]$/.test(cur)) {
+        onChange(cur.slice(0, -1) + key);
+        return;
+      }
+      if (cur === "") return;
+      onChange(cur + key);
+      return;
+    }
+    const startFresh = pristine;
+    setPristine(false);
+    const base = startFresh ? "" : cur;
+    if (key === ".") {
+      const m2 = base.match(/[0-9.]*$/);
+      const lastNum2 = m2 ? m2[0] : "";
+      if (lastNum2.includes(".")) return;
+      if (lastNum2 === "") onChange(base + "0.");
+      else onChange(base + ".");
+      return;
+    }
+    if (key === "00") {
+      const m2 = base.match(/[0-9.]*$/);
+      const lastNum2 = m2 ? m2[0] : "";
+      if (lastNum2 === "" || lastNum2 === "0") {
+        onChange(base === "" ? "0" : base);
+      } else {
+        onChange(base + "00");
+      }
+      return;
+    }
+    const m = base.match(/[0-9.]*$/);
+    const lastNum = m ? m[0] : "";
+    if (lastNum === "0") {
+      onChange(base.slice(0, -1) + key);
+    } else {
+      onChange(base + key);
+    }
+  };
+  const btnBase = {
+    border: "none",
+    background: "var(--bg-card)",
+    color: "var(--text)",
+    fontSize: 22,
+    fontWeight: 500,
+    padding: "14px 0",
+    borderRadius: 12,
+    cursor: "pointer",
+    fontFamily: "var(--num-font)",
+    WebkitTapHighlightColor: "transparent",
+    transition: "transform 0.08s ease-out, background 0.08s ease-out",
+    userSelect: "none"
+  };
+  const opBtn = { ...btnBase, color: mainColor, fontWeight: 600 };
+  const fnBtn = { ...btnBase, color: "var(--text-dim)", fontSize: 18 };
+  const activeBgVar = "--calc-active-bg";
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-picker-backdrop": "true",
+      ...swipe,
+      style: {
+        position: "fixed",
+        inset: 0,
+        background: "transparent",
+        zIndex: 350,
+        display: "flex",
+        alignItems: "flex-end"
+      },
+      onClick: onClose
+    },
+    /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          width: "100%",
+          background: "var(--bg)",
+          borderTopLeftRadius: 18,
+          borderTopRightRadius: 18,
+          padding: "14px 12px calc(12px + env(safe-area-inset-bottom, 0px))",
+          boxShadow: "0 -10px 40px rgba(0,0,0,0.5)",
+          transform: `translateY(${swipe.dragY}px)`,
+          transition: swipe.dragY === 0 ? "transform 0.2s" : "none",
+          animation: swipe.dragY === 0 ? "slideUp 0.2s ease-out" : "none",
+          touchAction: "none"
+        },
+        onClick: (e) => e.stopPropagation()
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 } }, /* @__PURE__ */ React.createElement("button", { className: "calc-btn calc-btn-fn", style: fnBtn, onClick: () => press("C") }, "C"), /* @__PURE__ */ React.createElement("button", { className: "calc-btn calc-btn-fn", style: fnBtn, onClick: () => press("BACK") }, "\u232B"), /* @__PURE__ */ React.createElement("button", { className: "calc-btn calc-btn-op", style: opBtn, onClick: () => press("%") }, "%"), /* @__PURE__ */ React.createElement("button", { className: "calc-btn calc-btn-op", style: opBtn, onClick: () => press("/") }, "\xF7"), /* @__PURE__ */ React.createElement("button", { className: "calc-btn", style: btnBase, onClick: () => press("7") }, "7"), /* @__PURE__ */ React.createElement("button", { className: "calc-btn", style: btnBase, onClick: () => press("8") }, "8"), /* @__PURE__ */ React.createElement("button", { className: "calc-btn", style: btnBase, onClick: () => press("9") }, "9"), /* @__PURE__ */ React.createElement("button", { className: "calc-btn calc-btn-op", style: opBtn, onClick: () => press("*") }, "\xD7"), /* @__PURE__ */ React.createElement("button", { className: "calc-btn", style: btnBase, onClick: () => press("4") }, "4"), /* @__PURE__ */ React.createElement("button", { className: "calc-btn", style: btnBase, onClick: () => press("5") }, "5"), /* @__PURE__ */ React.createElement("button", { className: "calc-btn", style: btnBase, onClick: () => press("6") }, "6"), /* @__PURE__ */ React.createElement("button", { className: "calc-btn calc-btn-op", style: opBtn, onClick: () => press("-") }, "\u2212"), /* @__PURE__ */ React.createElement("button", { className: "calc-btn", style: btnBase, onClick: () => press("1") }, "1"), /* @__PURE__ */ React.createElement("button", { className: "calc-btn", style: btnBase, onClick: () => press("2") }, "2"), /* @__PURE__ */ React.createElement("button", { className: "calc-btn", style: btnBase, onClick: () => press("3") }, "3"), /* @__PURE__ */ React.createElement("button", { className: "calc-btn calc-btn-op", style: opBtn, onClick: () => press("+") }, "+"), /* @__PURE__ */ React.createElement("button", { className: "calc-btn", style: { ...btnBase, gridColumn: "span 2" }, onClick: () => press("0") }, "0"), /* @__PURE__ */ React.createElement("button", { className: "calc-btn", style: btnBase, onClick: () => press(".") }, "."), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "calc-btn calc-btn-eq",
+          style: { ...opBtn, background: mainColor, color: onMainColor || "#1a1a1a", fontWeight: 700 },
+          onClick: () => press("=")
+        },
+        "="
+      )),
+      /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "calc-btn calc-btn-eq",
+          onClick: () => {
+            haptic("=");
+            const result = evalExpr(expr || "");
+            if (result !== null) onChange(String(result));
+            onClose();
+          },
+          style: {
+            width: "100%",
+            marginTop: 10,
+            padding: "14px 0",
+            background: mainColor,
+            color: onMainColor || "#1a1a1a",
+            border: "none",
+            borderRadius: 12,
+            fontSize: 15,
+            fontWeight: 700,
+            cursor: "pointer",
+            fontFamily: "inherit"
+          }
+        },
+        "\u5B8C\u6210"
+      )
+    )
+  );
+}
+function evalExpr(expr) {
+  try {
+    if (!/^[0-9+\-*/.]*$/.test(expr)) return null;
+    if (!expr) return 0;
+    const clean = expr.replace(/[+\-*/]+$/, "");
+    if (!clean) return 0;
+    const result = Function('"use strict"; return (' + clean + ")")();
+    if (!Number.isFinite(result)) return null;
+    return Math.round(result * 1e4) / 1e4;
+  } catch {
+    return null;
+  }
+}
+function fmtExprDisplay(expr) {
+  if (!expr) return "";
+  return expr.replace(/\*/g, "\xD7").replace(/\//g, "\xF7").replace(/-/g, "\u2212");
+}
+function AddTxnSheet({ state, type, setType, editing, defaultDate, onSave, onDelete, toast, toastRich, alertCenter, noteColor, onClose, editMode, setEditMode, blockOrder, moveBlock, onManageCategory, onManageAccount, onAddSubCategory, setConfirmDialog, onOpenStockEntry, reopenOtherTypeTrigger }) {
+  const [showCalculator, setShowCalculator] = useState(false);
+  const [showNotePref, setShowNotePref] = useState(false);
+  const [showOtherTypeSheet, setShowOtherTypeSheet] = useState(false);
+  const otherTypeSheetSwipe = useSwipeToClose(() => setShowOtherTypeSheet(false));
+  const lastTriggerRef = React.useRef(reopenOtherTypeTrigger);
+  React.useEffect(() => {
+    if (reopenOtherTypeTrigger !== lastTriggerRef.current) {
+      lastTriggerRef.current = reopenOtherTypeTrigger;
+      setShowOtherTypeSheet(true);
+    }
+  }, [reopenOtherTypeTrigger]);
+  const notePref = useNotePref();
+  const DEFAULT_ADD_TXN_ORDER = ["amount", "typeToggle", "date", "category", "subCategory", "account", "fee", "note"];
+  const DEFAULT_TRANSFER_ORDER = ["amount", "typeToggle", "date", "fromAccount", "toAccount", "note"];
+  const DEFAULT_LEND_ORDER = ["amount", "typeToggle", "date", "fromAccount", "note", "expectDate"];
+  const isTransfer = type === "transfer";
+  const isLend = type === "lend";
+  const rawOrder = isTransfer ? DEFAULT_TRANSFER_ORDER : isLend ? DEFAULT_LEND_ORDER : blockOrder && blockOrder.length > 0 ? blockOrder : DEFAULT_ADD_TXN_ORDER;
+  const effectiveOrder = (() => {
+    let out = [...rawOrder];
+    if (!out.includes("note")) {
+      const accountIdx = out.indexOf("account");
+      if (accountIdx >= 0) out.splice(accountIdx + 1, 0, "note");
+      else out.push("note");
+    }
+    if (!isTransfer && !isLend && !out.includes("fee")) {
+      const noteIdx = out.indexOf("note");
+      if (noteIdx >= 0) out.splice(noteIdx, 0, "fee");
+      else out.push("fee");
+    }
+    return out;
+  })();
+  const [amount, setAmount] = useState(editing ? String(editing.amount) : "0");
+  const [fieldsLocked, setFieldsLocked] = useState(!!editing);
+  const [transferAcked, setTransferAcked] = useState(false);
+  const [category, setCategory] = useState(editing?.category || state.categories[type]?.[0]?.label || "");
+  const [subCategory, setSubCategory] = useState(editing?.subCategory || state.categories[type]?.[0]?.subs?.[0] || "");
+  const getLastUsedAccount = (key) => {
+    try {
+      const id = localStorage.getItem(key);
+      if (id && state.accounts.find((a) => a.id === id && !a.isSystem)) return id;
+    } catch {
+    }
+    return null;
+  };
+  const accountKeyForType = (t) => {
+    if (t === "income") return "ledger_last_acct_income";
+    return "ledger_last_acct_expense";
+  };
+  const [accountId, setAccountId] = useState(
+    editing?.accountId || getLastUsedAccount(accountKeyForType(type)) || state.accounts.find((a) => !a.isSystem)?.id || state.accounts[0]?.id
+  );
+  const [note, setNote] = useState(editing?.note || "");
+  const [date, setDate] = useState(editing?.date || defaultDate || todayStr());
+  const editingTransfer = editing && editing.transferId;
+  const transferGroup = editingTransfer ? state.transactions.filter((t) => t.transferId === editing.transferId) : null;
+  const editOut = transferGroup ? transferGroup.find((t) => t.transferRole === "out") : null;
+  const editIn = transferGroup ? transferGroup.find((t) => t.transferRole === "in") : null;
+  const editFee = transferGroup ? transferGroup.find((t) => t.transferRole === "fee") : null;
+  const editingGroupedTxn = editing && editing.txnGroupId && !editingTransfer;
+  const editGroupedFee = editingGroupedTxn ? state.transactions.find((t) => t.txnGroupId === editing.txnGroupId && t.transferRole === "grouped_fee") : null;
+  const transferDeletedVirtual = editingTransfer && (!!editOut?._deletedAccountName || !!editIn?._deletedAccountName);
+  const editingLend = editing && editing.lendId;
+  const lendGroup = editingLend ? state.transactions.filter((t) => t.lendId === editing.lendId) : null;
+  const editLendOut = lendGroup ? lendGroup.find((t) => t.transferRole === "lend_out") : null;
+  const realAccounts = state.accounts.filter((a) => !a.isSystem);
+  const defaultFromId = realAccounts[0]?.id;
+  const defaultToId = realAccounts.find((a) => a.id !== defaultFromId)?.id || "";
+  const [fromAccountId, setFromAccountId] = useState(
+    editOut?.accountId || editLendOut?.accountId || getLastUsedAccount("ledger_last_acct_transfer_from") || defaultFromId
+  );
+  const [toAccountId, setToAccountId] = useState(
+    editIn?.accountId || getLastUsedAccount("ledger_last_acct_transfer_to") || defaultToId
+  );
+  const [fee, setFee] = useState(
+    editFee ? String(editFee.amount) : editGroupedFee ? String(editGroupedFee.amount) : "0"
+  );
+  const [showFromSheet, setShowFromSheet] = useState(false);
+  const [showToSheet, setShowToSheet] = useState(false);
+  const [expectDate, setExpectDate] = useState(editLendOut?.lendMeta?.expectDate || "");
+  const [debtor, setDebtor] = useState(editLendOut?.lendMeta?.debtor || "");
+  const [showExpectDateSheet, setShowExpectDateSheet] = useState(false);
+  const getDefaultFeeSubByType = (currentType) => {
+    try {
+      if (currentType === "transfer") {
+        return localStorage.getItem("ledger_fee_sub") || "\u8F49\u5E33(\u624B\u7E8C\u8CBB)";
+      }
+      if (currentType === "income") {
+        return localStorage.getItem("ledger_fee_sub_income") || "\u5B58\u6B3E(\u624B\u7E8C\u8CBB)";
+      }
+      return localStorage.getItem("ledger_fee_sub_expense") || "\u63D0\u6B3E(\u624B\u7E8C\u8CBB)";
+    } catch {
+      if (currentType === "transfer") return "\u8F49\u5E33(\u624B\u7E8C\u8CBB)";
+      if (currentType === "income") return "\u5B58\u6B3E(\u624B\u7E8C\u8CBB)";
+      return "\u63D0\u6B3E(\u624B\u7E8C\u8CBB)";
+    }
+  };
+  const [feeCategory, setFeeCategory] = useState(() => {
+    if (editFee) return editFee.category;
+    if (editGroupedFee) return editGroupedFee.category;
+    try {
+      return localStorage.getItem("ledger_fee_cat") || "\u624B\u7E8C\u8CBB\u7528";
+    } catch {
+      return "\u624B\u7E8C\u8CBB\u7528";
+    }
+  });
+  const [feeSubCategory, setFeeSubCategory] = useState(() => {
+    if (editFee) return editFee.subCategory;
+    if (editGroupedFee) return editGroupedFee.subCategory;
+    return getDefaultFeeSubByType(type);
+  });
+  const [showFeeCatPicker, setShowFeeCatPicker] = useState(false);
+  const [showFeeSection, setShowFeeSection] = useState(false);
+  const [feeCatStep, setFeeCatStep] = useState(1);
+  const [feeCatStepCat, setFeeCatStepCat] = useState(null);
+  const userTouchedFeeRef = React.useRef(false);
+  React.useEffect(() => {
+    if (editing) return;
+    if (userTouchedFeeRef.current) return;
+    setFeeSubCategory(getDefaultFeeSubByType(type));
+  }, [type, editing]);
+  const userTouchedAcctRef = React.useRef(false);
+  React.useEffect(() => {
+    if (editing) return;
+    if (userTouchedAcctRef.current) return;
+    if (type === "transfer" || type === "lend") return;
+    const remembered = getLastUsedAccount(accountKeyForType(type));
+    if (remembered) setAccountId(remembered);
+  }, [type, editing]);
+  const updateFeeCat = (cat, sub) => {
+    userTouchedFeeRef.current = true;
+    setFeeCategory(cat);
+    setFeeSubCategory(sub);
+    try {
+      localStorage.setItem("ledger_fee_cat", cat);
+      if (type === "transfer") {
+        localStorage.setItem("ledger_fee_sub", sub);
+      } else if (type === "income") {
+        localStorage.setItem("ledger_fee_sub_income", sub);
+      } else {
+        localStorage.setItem("ledger_fee_sub_expense", sub);
+      }
+    } catch {
+    }
+  };
+  const openFeeCatPicker = () => {
+    if (feeCategory && feeSubCategory) {
+      setFeeCatStepCat(feeCategory);
+      setFeeCatStep(2);
+    } else {
+      setFeeCatStep(1);
+      setFeeCatStepCat(null);
+    }
+    setShowFeeCatPicker(true);
+  };
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showCategorySheet, setShowCategorySheet] = useState(false);
+  const [showSubCategorySheet, setShowSubCategorySheet] = useState(false);
+  const [showAccountSheet, setShowAccountSheet] = useState(false);
+  const [showSubInput, setShowSubInput] = useState(false);
+  const [subInputValue, setSubInputValue] = useState("");
+  const [showDateColorSettings, setShowDateColorSettings] = useState(false);
+  const [weekendColor, setWeekendColor] = useState(() => {
+    try {
+      return localStorage.getItem("ledger_dp_weekend") || "var(--pink)";
+    } catch {
+      return "var(--pink)";
+    }
+  });
+  const [selectedDateColor, setSelectedDateColor] = useState(() => {
+    try {
+      return localStorage.getItem("ledger_dp_selected") || "var(--mint)";
+    } catch {
+      return "var(--mint)";
+    }
+  });
+  const updateWeekendColor = (c) => {
+    setWeekendColor(c);
+    try {
+      localStorage.setItem("ledger_dp_weekend", c);
+    } catch {
+    }
+  };
+  const updateSelectedDateColor = (c) => {
+    setSelectedDateColor(c);
+    try {
+      localStorage.setItem("ledger_dp_selected", c);
+    } catch {
+    }
+  };
+  const dateColorOptions = [
+    { name: "\u8584\u8377\u7DA0", value: "var(--mint)", preview: "#7ee0c0" },
+    { name: "\u7C89\u7D05", value: "var(--pink)", preview: "#f5b5c0" },
+    { name: "\u7D2B", value: "var(--accent)", preview: "#8f7ff0" },
+    { name: "\u6A58", value: "#f5a04a", preview: "#f5a04a" },
+    { name: "\u9EC3", value: "#f5d84a", preview: "#f5d84a" },
+    { name: "\u85CD", value: "#6aa8f0", preview: "#6aa8f0" }
+  ];
+  const cats = state.categories[type] || [];
+  useEffect(() => {
+    if (editingTransfer && type !== "transfer") {
+      setType("transfer");
+    }
+  }, []);
+  const changeType = (newType) => {
+    setType(newType);
+    if (newType === "transfer" || newType === "lend") return;
+    const firstCat = state.categories[newType][0];
+    setCategory(firstCat?.label || "");
+    setSubCategory(firstCat?.subs?.[0] || "");
+  };
+  const handleSaveTransfer = () => {
+    const evalResult = /[+\-*/]/.test(amount) ? evalExpr(amount) : parseFloat(amount);
+    const amt = evalResult === null || isNaN(evalResult) ? 0 : evalResult;
+    if (!amt) {
+      (alertCenter || toast)("\u5C1A\u672A\u8F38\u5165\u91D1\u984D");
+      return;
+    }
+    if (amt < 0) {
+      (alertCenter || toast)("\u91D1\u984D\u5FC5\u9808\u5927\u65BC 0");
+      return;
+    }
+    if (amt === 0) {
+      (alertCenter || toast)("\u91D1\u984D\u4E0D\u80FD\u70BA 0");
+      return;
+    }
+    if (/[+\-*/]/.test(amount)) setAmount(String(amt));
+    if (!fromAccountId) {
+      toast && toast("\u5C1A\u672A\u9078\u64C7\u8F49\u51FA\u5E33\u6236");
+      return;
+    }
+    if (!toAccountId) {
+      toast && toast("\u5C1A\u672A\u9078\u64C7\u8F49\u5165\u5E33\u6236");
+      return;
+    }
+    if (fromAccountId === toAccountId) {
+      toast && toast("\u8F49\u51FA\u8207\u8F49\u5165\u5E33\u6236\u4E0D\u80FD\u76F8\u540C");
+      return;
+    }
+    const feeAmt = parseFloat(fee) || 0;
+    const doSave = () => {
+      onSave({
+        _transfer: {
+          transferId: editing?.transferId,
+          amount: amt,
+          fee: feeAmt > 0 ? feeAmt : 0,
+          feeCategory,
+          feeSubCategory,
+          fromId: fromAccountId,
+          toId: toAccountId,
+          date,
+          note: note.trim(),
+          createdAt: editing?.createdAt
+        }
+      });
+      try {
+        localStorage.setItem("ledger_last_acct_transfer_from", fromAccountId);
+        localStorage.setItem("ledger_last_acct_transfer_to", toAccountId);
+      } catch {
+      }
+    };
+    if (editing && setConfirmDialog) {
+      const acctName = (id) => state.accounts.find((a) => a.id === id)?.name || "(\u672A\u77E5)";
+      const fmtNum = (n) => Number(n).toLocaleString("en-US");
+      const oldAmt = editOut?.amount ?? 0;
+      const oldFee = editFee?.amount ?? 0;
+      const oldFrom = editOut?.accountId;
+      const oldTo = editIn?.accountId;
+      const oldDate = editOut?.date || editing.date;
+      const fieldMap = {
+        amount: (() => {
+          const changed = oldAmt !== amt;
+          const d = amt - oldAmt;
+          return {
+            icon: "coin",
+            label: "\u8F49\u5E33\u91D1\u984D",
+            from: fmtNum(oldAmt),
+            to: fmtNum(amt),
+            changed,
+            diff: changed ? (d > 0 ? "+" : "") + fmtNum(d) : null
+          };
+        })(),
+        date: {
+          icon: "calendar",
+          label: "\u65E5\u671F",
+          from: oldDate,
+          to: date,
+          changed: oldDate !== date
+        },
+        fromAccount: {
+          icon: "bank",
+          label: "\u8F49\u51FA\u5E33\u6236",
+          from: acctName(oldFrom),
+          to: acctName(fromAccountId),
+          changed: oldFrom !== fromAccountId
+        },
+        toAccount: {
+          icon: "bank",
+          label: "\u8F49\u5165\u5E33\u6236",
+          from: acctName(oldTo),
+          to: acctName(toAccountId),
+          changed: oldTo !== toAccountId
+        },
+        // 手續費跟著轉入帳戶一起顯示（原頁面佈局也是放在轉入帳戶後面）
+        fee: (() => {
+          const changed = oldFee !== feeAmt;
+          const d = feeAmt - oldFee;
+          return {
+            icon: "coin",
+            label: "\u624B\u7E8C\u8CBB",
+            from: fmtNum(oldFee),
+            to: fmtNum(feeAmt),
+            changed,
+            diff: changed ? (d > 0 ? "+" : "") + fmtNum(d) : null
+          };
+        })(),
+        note: (() => {
+          const oldNote = (editOut?.note || "").trim();
+          const newNote = note.trim();
+          return {
+            icon: "note",
+            label: "\u5099\u8A3B",
+            from: oldNote || "(\u7A7A\u767D)",
+            to: newNote || "(\u7A7A\u767D)",
+            changed: oldNote !== newNote
+          };
+        })()
+      };
+      const TRANSFER_CONFIRM_ORDER = ["amount", "date", "fromAccount", "toAccount", "fee", "note"];
+      const changes = TRANSFER_CONFIRM_ORDER.map((k) => fieldMap[k]).filter(Boolean);
+      const anyChanged = changes.some((c) => c.changed);
+      setConfirmDialog({
+        title: anyChanged ? "\u78BA\u8A8D\u8B8A\u66F4\u5167\u5BB9" : "\u78BA\u8A8D\u5132\u5B58",
+        changes,
+        confirmText: anyChanged ? "\u78BA\u5B9A\u8B8A\u66F4" : "\u78BA\u5B9A",
+        danger: true,
+        onConfirm: doSave
+      });
+      return;
+    }
+    doSave();
+  };
+  const handleSaveLend = () => {
+    const evalResult = /[+\-*/]/.test(amount) ? evalExpr(amount) : parseFloat(amount);
+    const amt = evalResult === null || isNaN(evalResult) ? 0 : evalResult;
+    if (!amt) {
+      (alertCenter || toast)("\u5C1A\u672A\u8F38\u5165\u91D1\u984D");
+      return;
+    }
+    if (amt < 0) {
+      (alertCenter || toast)("\u91D1\u984D\u5FC5\u9808\u5927\u65BC 0");
+      return;
+    }
+    if (amt === 0) {
+      (alertCenter || toast)("\u91D1\u984D\u4E0D\u80FD\u70BA 0");
+      return;
+    }
+    if (/[+\-*/]/.test(amount)) setAmount(String(amt));
+    if (!fromAccountId) {
+      toast && toast("\u5C1A\u672A\u9078\u64C7\u4ED8\u6B3E\u5E33\u6236");
+      return;
+    }
+    onSave({
+      _lend: {
+        lendId: editing?.lendId,
+        amount: amt,
+        fromId: fromAccountId,
+        date,
+        note: note.trim(),
+        expectDate: expectDate || "",
+        debtor: debtor.trim() || "",
+        createdAt: editing?.createdAt
+      }
+    });
+  };
+  const handleSave = () => {
+    const evalResult = /[+\-*/]/.test(amount) ? evalExpr(amount) : parseFloat(amount);
+    const amt = evalResult === null || isNaN(evalResult) ? 0 : evalResult;
+    if (!amt) {
+      (alertCenter || toast)("\u5C1A\u672A\u8F38\u5165\u91D1\u984D");
+      return;
+    }
+    if (amt < 0) {
+      (alertCenter || toast)("\u91D1\u984D\u5FC5\u9808\u5927\u65BC 0");
+      return;
+    }
+    if (amt === 0) {
+      (alertCenter || toast)("\u91D1\u984D\u4E0D\u80FD\u70BA 0");
+      return;
+    }
+    if (/[+\-*/]/.test(amount)) {
+      setAmount(String(amt));
+    }
+    if (!accountId) {
+      toast && toast("\u5C1A\u672A\u9078\u64C7\u5E33\u6236");
+      return;
+    }
+    if (!category) {
+      toast && toast("\u5C1A\u672A\u9078\u64C7\u5927\u5206\u985E");
+      return;
+    }
+    const doSave = () => {
+      const feeAmt = Number(fee) || 0;
+      onSave({
+        id: editing?.id || uid(),
+        type,
+        amount: amt,
+        date,
+        note: note.trim(),
+        category,
+        subCategory: subCategory || "",
+        accountId,
+        createdAt: editing?.createdAt || Date.now(),
+        ...feeAmt > 0 ? {
+          _groupedFee: {
+            amount: feeAmt,
+            category: feeCategory,
+            subCategory: feeSubCategory
+          }
+        } : {}
+      });
+      try {
+        if (type === "income") {
+          localStorage.setItem("ledger_last_acct_income", accountId);
+        } else {
+          localStorage.setItem("ledger_last_acct_expense", accountId);
+        }
+      } catch {
+      }
+    };
+    if (editing && setConfirmDialog) {
+      const acctName = (id) => state.accounts.find((a) => a.id === id)?.name || "(\u672A\u77E5)";
+      const fmtNum = (n) => Number(n).toLocaleString("en-US");
+      const fieldMap = {
+        amount: (() => {
+          const changed = editing.amount !== amt;
+          const diff = amt - editing.amount;
+          return {
+            icon: "coin",
+            label: "\u91D1\u984D",
+            from: fmtNum(editing.amount),
+            to: fmtNum(amt),
+            changed,
+            diff: changed ? (diff > 0 ? "+" : "") + fmtNum(diff) : null
+          };
+        })(),
+        date: {
+          icon: "calendar",
+          label: "\u65E5\u671F",
+          from: editing.date,
+          to: date,
+          changed: editing.date !== date
+        },
+        account: {
+          icon: "bank",
+          label: "\u6536\u652F\u5E33\u6236",
+          from: acctName(editing.accountId),
+          to: acctName(accountId),
+          changed: editing.accountId !== accountId
+        },
+        category: {
+          icon: "bag",
+          label: "\u5927\u5206\u985E",
+          from: editing.category || "(\u7121)",
+          to: category || "(\u7121)",
+          changed: (editing.category || "") !== (category || "")
+        },
+        subCategory: {
+          icon: "list",
+          label: "\u5B50\u5206\u985E",
+          from: editing.subCategory || "(\u7121)",
+          to: subCategory || "(\u7121)",
+          changed: (editing.subCategory || "") !== (subCategory || "")
+        },
+        note: {
+          icon: "note",
+          label: "\u5099\u8A3B",
+          from: (editing.note || "").trim() || "(\u7A7A\u767D)",
+          to: note.trim() || "(\u7A7A\u767D)",
+          changed: (editing.note || "").trim() !== note.trim()
+        },
+        fee: (() => {
+          const oldFeeAmt = editGroupedFee?.amount || 0;
+          const newFeeAmt = Number(fee) || 0;
+          const changed = oldFeeAmt !== newFeeAmt;
+          const diff = newFeeAmt - oldFeeAmt;
+          return {
+            icon: "coin",
+            label: "\u624B\u7E8C\u8CBB",
+            from: oldFeeAmt > 0 ? fmtNum(oldFeeAmt) : "(\u7121)",
+            to: newFeeAmt > 0 ? fmtNum(newFeeAmt) : "(\u7121)",
+            changed,
+            diff: changed && oldFeeAmt > 0 && newFeeAmt > 0 ? (diff > 0 ? "+" : "") + fmtNum(diff) : null
+          };
+        })()
+      };
+      const changes = effectiveOrder.map((k) => fieldMap[k]).filter(Boolean);
+      const anyChanged = changes.some((c) => c.changed);
+      setConfirmDialog({
+        title: anyChanged ? "\u78BA\u8A8D\u8B8A\u66F4\u5167\u5BB9" : "\u78BA\u8A8D\u5132\u5B58",
+        changes,
+        confirmText: anyChanged ? "\u78BA\u5B9A\u8B8A\u66F4" : "\u78BA\u5B9A",
+        danger: true,
+        onConfirm: doSave
+      });
+      return;
+    }
+    doSave();
+  };
+  const mainColor = type === "income" ? "var(--mint)" : "var(--pink)";
+  const onMainColor = type === "income" ? "var(--on-mint)" : "var(--on-pink)";
+  const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
+  const catPickerSwipe = useSwipeBack(() => setShowCategorySheet(false));
+  const subPickerSwipe = useSwipeBack(() => setShowSubCategorySheet(false));
+  const accountPickerSwipe = useSwipeBack(() => setShowAccountSheet(false));
+  const fromPickerSwipe = useSwipeBack(() => setShowFromSheet(false));
+  const toPickerSwipe = useSwipeBack(() => setShowToSheet(false));
+  const subInputSwipe = useSwipeBack(() => setShowSubInput(false));
+  const dateColorSwipe = useSwipeBack(() => setShowDateColorSettings(false));
+  const feeCatPickerSwipe = useSwipeBack(() => {
+    if (feeCatStep === 2) {
+      setFeeCatStep(1);
+      setFeeCatStepCat(null);
+    } else {
+      setShowFeeCatPicker(false);
+    }
+  });
+  if (showDatePicker) {
+    return /* @__PURE__ */ React.createElement(
+      DatePicker,
+      {
+        value: date,
+        onChange: setDate,
+        onClose: () => setShowDatePicker(false)
+      }
+    );
+  }
+  if (showExpectDateSheet) {
+    return /* @__PURE__ */ React.createElement(
+      DatePicker,
+      {
+        value: expectDate || todayStr(),
+        onChange: setExpectDate,
+        onClose: () => setShowExpectDateSheet(false)
+      }
+    );
+  }
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-sheet": "true",
+      style: {
+        ...styles.sheet,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: { width: 80 } }), /* @__PURE__ */ React.createElement("div", { style: { ...styles.sheetTitle, color: "var(--text)" } }, editing ? isTransfer ? "\u7DE8\u8F2F\u8F49\u5E33\u7D00\u9304" : isLend ? "\u7DE8\u8F2F\u4EE3\u588A\u7D00\u9304" : "\u7DE8\u8F2F\u6536\u652F\u7D00\u9304" : isTransfer ? "\u65B0\u589E\u8F49\u5E33" : isLend ? "\u65B0\u589E\u4EE3\u588A" : "\u65B0\u589E\u6536\u652F\u7D00\u9304"), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 80, display: "flex", justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode }))),
+    /* @__PURE__ */ React.createElement(EditModeBanner, { editMode, setEditMode }),
+    editing && !showCalculator && /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick: () => !editMode && setFieldsLocked((v) => !v),
+        style: {
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          margin: "8px 0 10px",
+          padding: "10px 14px",
+          background: fieldsLocked ? "rgba(255,180,180,0.06)" : "rgba(126,224,192,0.08)",
+          border: `1px solid ${fieldsLocked ? "rgba(255,180,180,0.22)" : "rgba(126,224,192,0.3)"}`,
+          borderRadius: 10,
+          cursor: editMode ? "default" : "pointer",
+          userSelect: "none"
+        }
+      },
+      /* @__PURE__ */ React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-dim)" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: fieldsLocked ? "lock" : "unlock", size: 16, color: fieldsLocked ? "var(--text-dim)" : "var(--mint)" }), /* @__PURE__ */ React.createElement("span", null, fieldsLocked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 12 } }, "\xB7 ", fieldsLocked ? "\u9EDE\u6B64\u89E3\u9396\u5F8C\u53EF\u7DE8\u8F2F\u6B04\u4F4D" : "\u9EDE\u6B64\u9396\u5B9A\u6B04\u4F4D")),
+      /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: {
+            width: 36,
+            height: 20,
+            borderRadius: 10,
+            background: fieldsLocked ? "var(--border)" : "var(--mint)",
+            position: "relative",
+            transition: "background 0.2s",
+            flexShrink: 0
+          }
+        },
+        /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            style: {
+              position: "absolute",
+              top: 2,
+              left: fieldsLocked ? 2 : 18,
+              width: 16,
+              height: 16,
+              borderRadius: "50%",
+              background: "#fff",
+              transition: "left 0.2s"
+            }
+          }
+        )
+      )
+    ),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll, "data-scroll-container": true }, effectiveOrder.map((blockKey, idx) => {
+      const blockProps = {
+        key: blockKey,
+        blockKey,
+        editMode,
+        isFirst: idx === 0,
+        isLast: idx === effectiveOrder.length - 1,
+        onMoveUp: () => moveBlock(blockKey, -1),
+        onMoveDown: () => moveBlock(blockKey, 1)
+      };
+      if (blockKey === "amount") {
+        const hasOperator = /[+\-*/]/.test(amount);
+        const formatAmount = (raw) => {
+          if (!raw || raw === "0") return "";
+          if (hasOperator) {
+            return raw.split(/([+\-*/])/).map((part) => {
+              if (/[+\-*/]/.test(part)) {
+                return " " + fmtExprDisplay(part) + " ";
+              }
+              if (!part) return "";
+              const [intPart2, decPart2] = part.split(".");
+              const withComma2 = intPart2 ? Number(intPart2).toLocaleString("en-US") : "";
+              return decPart2 !== void 0 ? `${withComma2}.${decPart2}` : withComma2;
+            }).join("");
+          }
+          const [intPart, decPart] = raw.split(".");
+          const withComma = Number(intPart || 0).toLocaleString("en-US");
+          return decPart !== void 0 ? `${withComma}.${decPart}` : withComma;
+        };
+        const displayAmount = formatAmount(amount);
+        const amtLen = displayAmount.length || 1;
+        const dynFontSize = amtLen <= 6 ? 48 : amtLen <= 8 ? 40 : amtLen <= 10 ? 32 : amtLen <= 12 ? 26 : amtLen <= 16 ? 22 : 18;
+        const isLocked = !!editing && fieldsLocked || transferDeletedVirtual;
+        return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: "\u91D1\u984D" }, /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            style: {
+              ...styles.amountBoxCompact,
+              position: "relative",
+              cursor: isLocked ? "not-allowed" : "pointer",
+              opacity: isLocked ? 0.55 : 1
+            },
+            onTouchEnd: (e) => {
+              if (isLocked) return;
+              e.preventDefault();
+              setShowCalculator(true);
+            },
+            onClick: () => {
+              if (isLocked) return;
+              setShowCalculator(true);
+            }
+          },
+          /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: {
+                color: amount && amount !== "0" ? mainColor : "var(--text-faint)",
+                background: "transparent",
+                width: "100%",
+                height: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: dynFontSize,
+                fontWeight: 700,
+                fontFamily: "var(--num-font)",
+                letterSpacing: "-0.5px",
+                transition: "font-size 0.15s",
+                padding: "0 12px",
+                textAlign: "center",
+                wordBreak: "break-all",
+                // 計算機開啟且尚未輸入金額時 → 慢速脈動提示
+                animation: showCalculator && (!amount || amount === "0") ? "amountPulse 1.4s ease-in-out infinite" : "none"
+              }
+            },
+            displayAmount || "0"
+          )
+        ));
+      }
+      if (blockKey === "typeToggle" && !editing) {
+        const otherTypes = ["transfer"];
+        const isOther = otherTypes.includes(type);
+        const otherLabel = type === "transfer" ? "\u8F49\u5E33" : "\u5176\u4ED6";
+        return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: "\u985E\u578B", inline: true }, /* @__PURE__ */ React.createElement("div", { style: styles.typeToggle }, /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: () => {
+              if (!editMode) changeType("expense");
+            },
+            style: {
+              ...styles.typeBtn,
+              ...type === "expense" ? { background: "var(--pink)", color: "var(--on-pink)" } : {}
+            }
+          },
+          "\u652F\u51FA"
+        ), /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: () => {
+              if (!editMode) changeType("income");
+            },
+            style: {
+              ...styles.typeBtn,
+              ...type === "income" ? { background: "var(--mint)", color: "var(--on-mint)" } : {}
+            }
+          },
+          "\u6536\u5165"
+        ), /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: () => {
+              if (!editMode) setShowOtherTypeSheet(true);
+            },
+            style: {
+              ...styles.typeBtn,
+              ...isOther ? { background: "var(--accent)", color: "var(--on-accent)" } : {},
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 4
+            }
+          },
+          isOther ? otherLabel : "\u5176\u4ED6",
+          /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, opacity: 0.8 } }, "\u25BE")
+        )));
+      }
+      if (blockKey === "category") {
+        const currentCat = cats.find((c) => c.label === category);
+        const catLocked = !!editing && fieldsLocked;
+        return /* @__PURE__ */ React.createElement(
+          Block,
+          {
+            ...blockProps,
+            title: "\u5927\u5206\u985E",
+            inline: true,
+            headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: catLocked ? 0.3 : 1 }, onClick: (e) => {
+              e.stopPropagation();
+              !editMode && !catLocked && onManageCategory(type);
+            } }, "\u2699\uFE0F")
+          },
+          /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: { ...styles.selectFieldCompact, opacity: catLocked ? 0.55 : 1, cursor: catLocked ? "not-allowed" : "pointer" },
+              onClick: () => !editMode && !catLocked && setShowCategorySheet(true)
+            },
+            currentCat ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: type === "income" ? "rgba(126, 224, 192, 0.15)" : "rgba(245, 181, 192, 0.15)" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: currentCat.icon, size: 16, color: mainColor })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, currentCat.label)) : /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldPlaceholder }, "\u9078\u64C7\u5927\u5206\u985E"),
+            /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
+          )
+        );
+      }
+      if (blockKey === "subCategory") {
+        const currentCat = cats.find((c) => c.label === category);
+        const subLocked = !!editing && fieldsLocked;
+        return /* @__PURE__ */ React.createElement(
+          Block,
+          {
+            ...blockProps,
+            title: "\u5B50\u5206\u985E",
+            inline: true,
+            headerRight: /* @__PURE__ */ React.createElement(
+              "span",
+              {
+                style: { ...styles.gearBtn, opacity: currentCat && !subLocked ? 1 : 0.3 },
+                onClick: (e) => {
+                  e.stopPropagation();
+                  if (!editMode && currentCat && !subLocked) onManageCategory(type, category);
+                }
+              },
+              "\u2699\uFE0F"
+            )
+          },
+          /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: { ...styles.selectFieldCompact, opacity: subLocked ? 0.55 : 1, cursor: subLocked ? "not-allowed" : "pointer" },
+              onClick: () => !editMode && !subLocked && setShowSubCategorySheet(true)
+            },
+            subCategory ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: type === "income" ? "rgba(126, 224, 192, 0.15)" : "rgba(245, 181, 192, 0.15)" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: currentCat?.icon || "note", size: 16, color: mainColor })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, subCategory)) : /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldPlaceholder }, "\u9078\u64C7\u5B50\u5206\u985E\uFF08\u9078\u586B\uFF09"),
+            /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
+          )
+        );
+      }
+      if (blockKey === "fee") {
+        if (isTransfer || isLend) return null;
+        const feeGearLocked = !!editing && fieldsLocked;
+        const feeLockedNow = !!editing && fieldsLocked;
+        const feeDisplayValue = fee === "0" ? "" : fee;
+        return /* @__PURE__ */ React.createElement(
+          Block,
+          {
+            ...blockProps,
+            title: "\u624B\u7E8C\u8CBB\u7528",
+            inline: true,
+            headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: feeGearLocked ? 0.3 : 1 }, onClick: (e) => {
+              e.stopPropagation();
+              !editMode && !feeGearLocked && openFeeCatPicker();
+            } }, "\u2699\uFE0F")
+          },
+          /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldCompact, opacity: feeLockedNow ? 0.55 : 1 } }, /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: { ...styles.selectFieldIconSm, background: "var(--accent)", cursor: feeLockedNow ? "not-allowed" : "pointer" },
+              onClick: (e) => {
+                e.stopPropagation();
+                !editMode && !feeLockedNow && openFeeCatPicker();
+              }
+            },
+            /* @__PURE__ */ React.createElement(TypeIcon, { name: "coin", size: 16, color: "#fff" })
+          ), /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: { ...styles.selectFieldLabelCompact, cursor: feeLockedNow ? "not-allowed" : "pointer", flex: "none", maxWidth: "55%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+              onClick: (e) => {
+                e.stopPropagation();
+                !editMode && !feeLockedNow && openFeeCatPicker();
+              }
+            },
+            feeSubCategory || feeCategory
+          ), /* @__PURE__ */ React.createElement(
+            "input",
+            {
+              type: "text",
+              inputMode: "decimal",
+              readOnly: feeLockedNow,
+              style: {
+                flex: 1,
+                background: "transparent",
+                border: "none",
+                outline: "none",
+                color: "var(--text)",
+                fontSize: 14,
+                textAlign: "right",
+                padding: 0,
+                margin: 0,
+                fontFamily: "var(--num-font)",
+                minWidth: 0,
+                height: "100%",
+                boxSizing: "border-box",
+                cursor: feeLockedNow ? "not-allowed" : "text"
+              },
+              value: feeDisplayValue,
+              onChange: (e) => {
+                if (feeLockedNow) return;
+                const v = e.target.value;
+                if (v === "" || /^\d*\.?\d*$/.test(v)) setFee(v);
+              },
+              onFocus: (e) => {
+                if (feeLockedNow) {
+                  e.target.blur();
+                  return;
+                }
+                if (fee === "0") setFee("");
+                e.target.select();
+              },
+              onClick: (e) => {
+                if (!feeLockedNow) e.target.select();
+              },
+              onBlur: () => {
+                if (fee === "") setFee("0");
+              },
+              placeholder: "\u9078\u586B",
+              disabled: editMode
+            }
+          ))
+        );
+      }
+      if (blockKey === "note") {
+        const noteLocked = !!editing && fieldsLocked;
+        const inputBg = notePref.applyToInput && notePref.bgColor ? notePref.bgColor : "var(--bg-card)";
+        const inputColor = notePref.applyToInput && notePref.textColor ? notePref.textColor : noteColor || "var(--text)";
+        return /* @__PURE__ */ React.createElement(
+          Block,
+          {
+            ...blockProps,
+            title: "\u5099\u8A3B",
+            inline: true,
+            headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: noteLocked || editMode ? 0.3 : 1 }, onClick: (e) => {
+              e.stopPropagation();
+              if (!editMode && !noteLocked) setShowNotePref(true);
+            } }, "\u2699\uFE0F")
+          },
+          /* @__PURE__ */ React.createElement("div", { style: { position: "relative", width: "100%" } }, /* @__PURE__ */ React.createElement(
+            "textarea",
+            {
+              value: note,
+              onChange: (e) => setNote(e.target.value),
+              onInput: (e) => {
+                e.target.style.height = "auto";
+                e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
+              },
+              ref: (el) => {
+                if (el && note) {
+                  el.style.height = "auto";
+                  el.style.height = Math.min(el.scrollHeight, 160) + "px";
+                }
+              },
+              placeholder: "\u9078\u586B\uFF08 \u4E0A\u9650 100 \u5B57 \uFF09",
+              disabled: noteLocked,
+              maxLength: 100,
+              rows: 1,
+              style: {
+                ...styles.selectFieldCompact,
+                border: "none",
+                outline: "none",
+                background: inputBg,
+                color: inputColor,
+                fontSize: 14,
+                width: "100%",
+                opacity: noteLocked ? 0.55 : 1,
+                cursor: noteLocked ? "not-allowed" : "text",
+                resize: "none",
+                height: 44,
+                minHeight: 44,
+                maxHeight: 160,
+                fontFamily: "inherit",
+                lineHeight: "22px",
+                padding: "11px 12px",
+                boxSizing: "border-box",
+                overflow: "hidden",
+                display: "block"
+              }
+            }
+          ), note.length > 0 && !noteLocked && /* @__PURE__ */ React.createElement("div", { style: {
+            position: "absolute",
+            bottom: 4,
+            right: 10,
+            fontSize: 10,
+            color: note.length >= 90 ? "var(--pink)" : "var(--text-faint)",
+            pointerEvents: "none",
+            fontVariantNumeric: "tabular-nums",
+            fontWeight: note.length >= 90 ? 600 : 400
+          } }, note.length, " / 100"))
+        );
+      }
+      if (blockKey === "account") {
+        const currentAcct = state.accounts.find((a) => a.id === accountId);
+        const currentTypeMeta = currentAcct ? state.accountTypes.find((t) => t.value === currentAcct.type) : null;
+        const acctLocked = !!editing && fieldsLocked;
+        return /* @__PURE__ */ React.createElement(
+          Block,
+          {
+            ...blockProps,
+            title: "\u6536\u652F\u5E33\u6236",
+            inline: true,
+            headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: acctLocked ? 0.3 : 1 }, onClick: (e) => {
+              e.stopPropagation();
+              !editMode && !acctLocked && onManageAccount();
+            } }, "\u2699\uFE0F")
+          },
+          state.accounts.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: styles.emptyAccountHint, onClick: () => !editMode && !acctLocked && onManageAccount() }, "\u5C1A\u672A\u5EFA\u7ACB\u5E33\u6236\uFF0C\u9EDE\u9019\u88E1\u6216 \u2699\uFE0F \u65B0\u589E") : /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: { ...styles.selectFieldCompact, opacity: acctLocked ? 0.55 : 1, cursor: acctLocked ? "not-allowed" : "pointer" },
+              onClick: () => !editMode && !acctLocked && setShowAccountSheet(true)
+            },
+            currentAcct ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: currentTypeMeta?.color || "#f5c29c" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: currentTypeMeta?.icon || "box", size: 16, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, currentAcct.name), /* @__PURE__ */ React.createElement("span", { style: styles.selectFieldSubInline }, (() => {
+              const b = calcBalance(currentAcct, state.transactions);
+              return b.toLocaleString();
+            })())) : /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldPlaceholder }, "\u9078\u64C7\u5E33\u6236"),
+            /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
+          )
+        );
+      }
+      if (blockKey === "fromAccount") {
+        const currentAcct = state.accounts.find((a) => a.id === fromAccountId);
+        const currentTypeMeta = currentAcct ? state.accountTypes.find((t) => t.value === currentAcct.type) : null;
+        const isDeletedFrom = editingTransfer && editOut?._deletedAccountName;
+        const deletedFromName = isDeletedFrom ? editOut._deletedAccountName : "";
+        const gearLocked = !!editing && fieldsLocked;
+        const fromLocked = gearLocked || isDeletedFrom || transferDeletedVirtual;
+        const blockTitle = isLend ? "\u4ED8\u6B3E\u5E33\u6236" : "\u8F49\u51FA\u5E33\u6236";
+        const placeholder = isLend ? "\u9078\u64C7\u4ED8\u6B3E\u5E33\u6236" : "\u9078\u64C7\u8F49\u51FA\u5E33\u6236";
+        return /* @__PURE__ */ React.createElement(
+          Block,
+          {
+            ...blockProps,
+            title: blockTitle,
+            inline: true,
+            headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: gearLocked ? 0.3 : 1 }, onClick: (e) => {
+              e.stopPropagation();
+              !editMode && !gearLocked && onManageAccount();
+            } }, "\u2699\uFE0F")
+          },
+          state.accounts.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: styles.emptyAccountHint, onClick: () => !editMode && !fromLocked && onManageAccount() }, "\u5C1A\u672A\u5EFA\u7ACB\u5E33\u6236\uFF0C\u9EDE\u9019\u88E1\u6216 \u2699\uFE0F \u65B0\u589E") : /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: { ...styles.selectFieldCompact, opacity: fromLocked ? 0.55 : 1, cursor: fromLocked ? "not-allowed" : "pointer" },
+              onClick: () => !editMode && !fromLocked && setShowFromSheet(true)
+            },
+            isDeletedFrom ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: "var(--text-faint)" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "box", size: 16, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, deletedFromName), /* @__PURE__ */ React.createElement("span", { style: {
+              color: "var(--text-faint)",
+              fontSize: 10,
+              fontWeight: 500,
+              marginLeft: 6,
+              padding: "1px 6px",
+              borderRadius: 4,
+              background: "rgba(140, 140, 140, 0.12)"
+            } }, "\u5E33\u865F\u5DF2\u522A")) : currentAcct ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: currentTypeMeta?.color || "#f5c29c" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: currentTypeMeta?.icon || "box", size: 16, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, currentAcct.name), /* @__PURE__ */ React.createElement("span", { style: styles.selectFieldSubInline }, (() => {
+              const b = calcBalance(currentAcct, state.transactions);
+              return b.toLocaleString();
+            })())) : /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldPlaceholder }, placeholder),
+            /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
+          )
+        );
+      }
+      if (blockKey === "toAccount") {
+        const currentAcct = state.accounts.find((a) => a.id === toAccountId);
+        const currentTypeMeta = currentAcct ? state.accountTypes.find((t) => t.value === currentAcct.type) : null;
+        const sameAcct = fromAccountId && toAccountId && fromAccountId === toAccountId;
+        const isDeletedTo = editingTransfer && editIn?._deletedAccountName;
+        const deletedToName = isDeletedTo ? editIn._deletedAccountName : "";
+        const toGearLocked = !!editing && fieldsLocked;
+        const toLocked = toGearLocked || isDeletedTo || transferDeletedVirtual;
+        const feeGearLocked = !!editing && fieldsLocked;
+        const feeLockedNow = !!editing && fieldsLocked || transferDeletedVirtual;
+        return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+          Block,
+          {
+            ...blockProps,
+            title: "\u8F49\u5165\u5E33\u6236",
+            inline: true,
+            headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: toGearLocked ? 0.3 : 1 }, onClick: (e) => {
+              e.stopPropagation();
+              !editMode && !toGearLocked && onManageAccount();
+            } }, "\u2699\uFE0F")
+          },
+          state.accounts.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: styles.emptyAccountHint, onClick: () => !editMode && !toLocked && onManageAccount() }, "\u5C1A\u672A\u5EFA\u7ACB\u5E33\u6236\uFF0C\u9EDE\u9019\u88E1\u6216 \u2699\uFE0F \u65B0\u589E") : /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: { ...styles.selectFieldCompact, opacity: toLocked ? 0.55 : 1, cursor: toLocked ? "not-allowed" : "pointer", ...sameAcct ? { borderColor: "var(--pink)" } : {} },
+              onClick: () => !editMode && !toLocked && setShowToSheet(true)
+            },
+            isDeletedTo ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: "var(--text-faint)" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "box", size: 16, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, deletedToName), /* @__PURE__ */ React.createElement("span", { style: {
+              color: "var(--text-faint)",
+              fontSize: 10,
+              fontWeight: 500,
+              marginLeft: 6,
+              padding: "1px 6px",
+              borderRadius: 4,
+              background: "rgba(140, 140, 140, 0.12)"
+            } }, "\u5E33\u865F\u5DF2\u522A")) : currentAcct ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: currentTypeMeta?.color || "#f5c29c" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: currentTypeMeta?.icon || "box", size: 16, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, currentAcct.name), /* @__PURE__ */ React.createElement("span", { style: styles.selectFieldSubInline }, (() => {
+              const b = calcBalance(currentAcct, state.transactions);
+              return b.toLocaleString();
+            })())) : /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldPlaceholder }, "\u9078\u64C7\u8F49\u5165\u5E33\u6236"),
+            /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
+          )
+        ), sameAcct && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--pink-text)", marginTop: -4, marginBottom: 6, padding: "0 14px" } }, "\u8F49\u51FA\u8207\u8F49\u5165\u5E33\u6236\u4E0D\u80FD\u76F8\u540C"), state.accounts.length > 0 && (() => {
+          const feeCatData = (state.categories.expense || []).find((c) => c.label === feeCategory);
+          return /* @__PURE__ */ React.createElement(
+            Block,
+            {
+              blockKey: "fee",
+              editMode,
+              title: "\u624B\u7E8C\u8CBB\u7528",
+              inline: true,
+              headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: feeGearLocked ? 0.3 : 1 }, onClick: (e) => {
+                e.stopPropagation();
+                !editMode && !feeGearLocked && openFeeCatPicker();
+              } }, "\u2699\uFE0F")
+            },
+            /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldCompact, opacity: feeLockedNow ? 0.55 : 1 } }, /* @__PURE__ */ React.createElement(
+              "div",
+              {
+                style: { ...styles.selectFieldIconSm, background: "var(--accent)", cursor: feeLockedNow ? "not-allowed" : "pointer" },
+                onClick: (e) => {
+                  e.stopPropagation();
+                  !editMode && !feeLockedNow && openFeeCatPicker();
+                }
+              },
+              /* @__PURE__ */ React.createElement(TypeIcon, { name: "coin", size: 16, color: "#fff" })
+            ), /* @__PURE__ */ React.createElement(
+              "div",
+              {
+                style: { ...styles.selectFieldLabelCompact, cursor: feeLockedNow ? "not-allowed" : "pointer", flex: "none", maxWidth: "55%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+                onClick: (e) => {
+                  e.stopPropagation();
+                  !editMode && !feeLockedNow && openFeeCatPicker();
+                }
+              },
+              feeSubCategory || feeCategory
+            ), /* @__PURE__ */ React.createElement(
+              "input",
+              {
+                type: "text",
+                inputMode: "decimal",
+                readOnly: feeLockedNow,
+                style: {
+                  flex: 1,
+                  background: "transparent",
+                  border: "none",
+                  outline: "none",
+                  color: "var(--text)",
+                  fontSize: 14,
+                  textAlign: "right",
+                  padding: 0,
+                  margin: 0,
+                  fontFamily: "var(--num-font)",
+                  minWidth: 0,
+                  height: "100%",
+                  boxSizing: "border-box",
+                  cursor: feeLockedNow ? "not-allowed" : "text"
+                },
+                value: fee === "0" ? "" : fee,
+                onChange: (e) => {
+                  if (feeLockedNow) return;
+                  const v = e.target.value;
+                  if (v === "" || /^\d*\.?\d*$/.test(v)) setFee(v);
+                },
+                onFocus: (e) => {
+                  if (feeLockedNow) {
+                    e.target.blur();
+                    return;
+                  }
+                  if (fee === "0") setFee("");
+                  e.target.select();
+                },
+                onClick: (e) => {
+                  if (!feeLockedNow) e.target.select();
+                },
+                onBlur: () => {
+                  if (fee === "") setFee("0");
+                },
+                placeholder: "\u9078\u586B",
+                disabled: editMode
+              }
+            ))
+          );
+        })());
+      }
+      if (blockKey === "date") {
+        const [y, m, d] = date.split("-");
+        const dObj = /* @__PURE__ */ new Date(`${date}T00:00:00`);
+        const wd = ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][dObj.getDay()];
+        const dayOfWeek = dObj.getDay();
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        const dateLabel = `${y}/${String(m).padStart(2, "0")}/${String(d).padStart(2, "0")}`;
+        const dateLocked = !!editing && fieldsLocked;
+        return /* @__PURE__ */ React.createElement(
+          Block,
+          {
+            ...blockProps,
+            title: "\u65E5\u671F",
+            inline: true,
+            headerRight: /* @__PURE__ */ React.createElement(
+              "span",
+              {
+                style: { ...styles.gearBtn, opacity: dateLocked ? 0.3 : 1 },
+                onClick: (e) => {
+                  e.stopPropagation();
+                  !editMode && !dateLocked && setShowDateColorSettings(true);
+                }
+              },
+              "\u2699\uFE0F"
+            )
+          },
+          /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: { ...styles.selectFieldCompact, opacity: dateLocked ? 0.55 : 1, cursor: dateLocked ? "not-allowed" : "pointer" },
+              onClick: () => !editMode && !dateLocked && setShowDatePicker(true)
+            },
+            /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, dateLabel, /* @__PURE__ */ React.createElement("span", { style: { color: isWeekend ? weekendColor : "var(--text-dim)", marginLeft: 6, fontSize: 13 } }, "(", wd, ")")),
+            /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
+          )
+        );
+      }
+      if (blockKey === "expectDate") {
+        const dateLabel = expectDate ? expectDate.replace(/-/g, "/") : "";
+        const wd = expectDate ? ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][new Date(expectDate).getDay()] : "";
+        return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: "\u9810\u8A08\u6536\u56DE", inline: true }, /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            style: { ...styles.selectFieldCompact, cursor: "pointer" },
+            onClick: () => !editMode && setShowExpectDateSheet(true)
+          },
+          /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, expectDate ? /* @__PURE__ */ React.createElement(React.Fragment, null, dateLabel, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", marginLeft: 6, fontSize: 13 } }, "(", wd, ")")) : /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "\u9078\u586B")),
+          expectDate && /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              onClick: (e) => {
+                e.stopPropagation();
+                setExpectDate("");
+              },
+              style: {
+                background: "transparent",
+                border: "none",
+                color: "var(--text-faint)",
+                fontSize: 18,
+                cursor: "pointer",
+                marginRight: 4,
+                padding: "0 4px"
+              }
+            },
+            "\xD7"
+          ),
+          /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
+        ));
+      }
+      if (blockKey === "note") {
+        return null;
+      }
+      return null;
+    }), editing && isTransfer && editingTransfer && /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick: () => !editMode && setTransferAcked((v) => !v),
+        style: {
+          margin: "12px 0 0",
+          padding: "12px 14px",
+          background: transferAcked ? "rgba(126,224,192,0.08)" : "rgba(143,127,240,0.08)",
+          border: `1px solid ${transferAcked ? "rgba(126,224,192,0.35)" : "rgba(143,127,240,0.30)"}`,
+          borderRadius: 10,
+          cursor: editMode ? "default" : "pointer",
+          userSelect: "none",
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 10,
+          transition: "background 0.2s, border-color 0.2s"
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: {
+        width: 20,
+        height: 20,
+        borderRadius: 5,
+        border: `2px solid ${transferAcked ? "var(--mint)" : "var(--accent-text)"}`,
+        background: transferAcked ? "var(--mint)" : "transparent",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        marginTop: 1,
+        transition: "all 0.18s"
+      } }, transferAcked && /* @__PURE__ */ React.createElement("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "var(--on-mint)", strokeWidth: "3.5", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "5 12 10 17 19 8" }))),
+      /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 13, color: "var(--text)", lineHeight: 1.55 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 600, marginBottom: 3 } }, "\u9019\u662F\u4E00\u7D44\u8F49\u5E33(\u5171 ", transferGroup ? transferGroup.length : 2, " \u7B46\u95DC\u806F\u8F49\u5E33\u7D00\u9304)"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)" } }, "\u6211\u5DF2\u4E86\u89E3 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", fontWeight: 600 } }, "\u4FEE\u6539\u5F8C\u5132\u5B58"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "/"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontWeight: 600 } }, "\u9078\u64C7\u522A\u9664"), " \u5F8C,\u6703\u540C\u6B65 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", fontWeight: 600 } }, "\u66F4\u65B0"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "/"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontWeight: 600 } }, "\u522A\u9664"), " \u6240\u6709\u95DC\u806F\u7D00\u9304"))
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          ...styles.saveBtn,
+          background: isTransfer ? "var(--accent)" : mainColor,
+          color: isTransfer ? "var(--on-accent)" : onMainColor || "#1a1a1a",
+          marginTop: 10,
+          opacity: editing && fieldsLocked || editing && isTransfer && editingTransfer && !transferAcked ? 0.4 : 1,
+          cursor: editing && fieldsLocked || editing && isTransfer && editingTransfer && !transferAcked ? "not-allowed" : "pointer"
+        },
+        onClick: () => {
+          if (editMode) return;
+          if (editing && fieldsLocked) {
+            (alertCenter || toast)("\u8ACB\u5148\u89E3\u9396\u624D\u80FD\u7DE8\u8F2F");
+            return;
+          }
+          if (editing && isTransfer && editingTransfer && !transferAcked) {
+            (alertCenter || toast)("\u8ACB\u5148\u52FE\u9078\u78BA\u8A8D\u5F8C\u518D\u5132\u5B58");
+            return;
+          }
+          isTransfer ? handleSaveTransfer() : isLend ? handleSaveLend() : handleSave();
+        }
+      },
+      "\u5132\u5B58"
+    ), editing && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 6 } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          ...styles.deleteBtn,
+          flex: 1,
+          marginTop: 0,
+          opacity: isTransfer && editingTransfer && !transferAcked ? 0.4 : 1,
+          cursor: isTransfer && editingTransfer && !transferAcked ? "not-allowed" : "pointer"
+        },
+        onClick: () => {
+          if (editMode) return;
+          if (isTransfer && editingTransfer && !transferAcked) {
+            (alertCenter || toast)("\u8ACB\u5148\u52FE\u9078\u78BA\u8A8D\u5F8C\u518D\u522A\u9664");
+            return;
+          }
+          onDelete(editing.id);
+        }
+      },
+      "\u522A\u9664"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          flex: 1,
+          padding: "12px",
+          background: "var(--bg-card)",
+          border: "1px solid var(--text-dim)",
+          borderRadius: 10,
+          color: "var(--text)",
+          fontSize: 15,
+          fontWeight: 500,
+          cursor: "pointer"
+        },
+        onClick: onClose
+      },
+      "\u53D6\u6D88"
+    ))),
+    showCalculator && /* @__PURE__ */ React.createElement(
+      CalculatorSheet,
+      {
+        expr: amount === "0" ? "" : amount,
+        onChange: (v) => setAmount(v === "" ? "0" : v),
+        mainColor,
+        onMainColor,
+        onClose: () => setShowCalculator(false)
+      }
+    ),
+    showNotePref && /* @__PURE__ */ React.createElement(
+      NotePrefSheet,
+      {
+        pref: notePref,
+        onClose: () => setShowNotePref(false),
+        setConfirmDialog,
+        toastRich
+      }
+    ),
+    showOtherTypeSheet && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowOtherTypeSheet(false) }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: { ...styles.pickerCard, maxWidth: 320 },
+        onClick: (e) => e.stopPropagation(),
+        ...otherTypeSheetSwipe
+      },
+      /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, "\u9078\u64C7\u985E\u578B"),
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, padding: "8px 12px 16px" } }, /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            padding: "14px 16px",
+            borderRadius: 12,
+            background: type === "transfer" ? "var(--accent-bg, rgba(143,127,240,0.12))" : "var(--bg-card-2, rgba(127,127,127,0.06))",
+            border: type === "transfer" ? "1.5px solid var(--accent)" : "1.5px solid transparent",
+            color: "var(--text)",
+            cursor: "pointer",
+            textAlign: "left"
+          },
+          onClick: () => {
+            changeType("transfer");
+            setShowOtherTypeSheet(false);
+          }
+        },
+        /* @__PURE__ */ React.createElement("div", { style: {
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          background: "var(--accent)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0
+        } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "bolt", size: 20, color: "var(--on-accent)" })),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600 } }, "\u8F49\u5E33"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, "\u5728\u5E33\u6236\u4E4B\u9593\u642C\u79FB\u8CC7\u91D1"))
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => {
+            if (onOpenStockEntry) onOpenStockEntry();
+          },
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            padding: "14px 16px",
+            borderRadius: 12,
+            background: "var(--bg-card-2, rgba(127,127,127,0.04))",
+            border: "1.5px solid transparent",
+            color: "var(--text)",
+            cursor: "pointer",
+            textAlign: "left"
+          }
+        },
+        /* @__PURE__ */ React.createElement("div", { style: {
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          background: "#9ae0d4",
+          // invest 類型色
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0
+        } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "chart", size: 20, color: "#fff" })),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600 } }, "\u80A1\u7968"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, "\u8CB7\u9032\u3001\u8CE3\u51FA\u3001\u4F30\u5E02\u503C"))
+      ))
+    )),
+    showCategorySheet && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowCategorySheet(false) }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          ...styles.pickerCard,
+          transform: `translateX(${catPickerSwipe.dragX}px)`,
+          transition: catPickerSwipe.dragX === 0 ? "transform 0.2s" : "none"
+        },
+        ref: catPickerSwipe.ref,
+        onClick: (e) => e.stopPropagation()
+      },
+      /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text)" } }, "\u8ACB\u9078\u64C7 "), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--blue)" } }, "\u5927\u5206\u985E")),
+      /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: {
+            background: "var(--bg)",
+            borderBottom: "1px solid var(--border)"
+          }
+        },
+        /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            style: {
+              padding: "11px 12px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--mint-text)",
+              cursor: "pointer",
+              WebkitTapHighlightColor: "transparent"
+            },
+            onClick: () => {
+              setShowCategorySheet(false);
+              onManageCategory(type, "__new__");
+            }
+          },
+          /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, fontWeight: 400, lineHeight: 1 } }, "\uFF0B"),
+          /* @__PURE__ */ React.createElement("span", null, "\u65B0\u589E\u5927\u5206\u985E")
+        )
+      ),
+      /* @__PURE__ */ React.createElement("div", { style: styles.pickerList }, cats.map((c) => /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          className: "picker-item",
+          key: c.label,
+          style: {
+            ...styles.pickerItem,
+            ...category === c.label ? { background: "rgba(126, 224, 192, 0.08)" } : {}
+          },
+          onClick: () => {
+            setCategory(c.label);
+            setSubCategory(c.subs?.[0] || "");
+            setShowCategorySheet(false);
+            setTimeout(() => setShowSubCategorySheet(true), 150);
+          }
+        },
+        /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerItemIcon, background: type === "income" ? "rgba(126, 224, 192, 0.15)" : "rgba(245, 181, 192, 0.15)" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: c.icon, size: 16, color: mainColor })),
+        /* @__PURE__ */ React.createElement("div", { style: styles.pickerItemLabel }, c.label),
+        category === c.label && /* @__PURE__ */ React.createElement("div", { style: { color: mainColor, fontSize: 14 } }, "\u2713")
+      )))
+    )),
+    showSubCategorySheet && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowSubCategorySheet(false) }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          ...styles.pickerCard,
+          transform: `translateX(${subPickerSwipe.dragX}px)`,
+          transition: subPickerSwipe.dragX === 0 ? "transform 0.2s" : "none"
+        },
+        ref: subPickerSwipe.ref,
+        onClick: (e) => e.stopPropagation()
+      },
+      /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text)" } }, "\u8ACB\u9078\u64C7 "), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)" } }, category || ""), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text)" } }, " "), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--blue)" } }, "\u5B50\u5206\u985E")),
+      /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: {
+            display: "flex",
+            alignItems: "stretch",
+            background: "var(--bg)",
+            borderBottom: "1px solid var(--border)"
+          }
+        },
+        /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            style: {
+              flex: 1,
+              padding: "11px 12px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              fontSize: 13,
+              fontWeight: 500,
+              color: !subCategory ? "var(--mint-text)" : "var(--text-faint)",
+              background: !subCategory ? "rgba(126, 224, 192, 0.10)" : "transparent",
+              cursor: "pointer",
+              WebkitTapHighlightColor: "transparent",
+              transition: "background 0.15s"
+            },
+            onClick: () => {
+              setSubCategory("");
+              setShowSubCategorySheet(false);
+            }
+          },
+          /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, opacity: 0.8 } }, "\u2298"),
+          /* @__PURE__ */ React.createElement("span", null, "\u4E0D\u4F7F\u7528\u5B50\u5206\u985E"),
+          !subCategory && /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 2, fontSize: 13 } }, "\u2713")
+        ),
+        /* @__PURE__ */ React.createElement("div", { style: { width: 1, background: "var(--border)" } }),
+        /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            style: {
+              flex: 1,
+              padding: "11px 12px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--mint-text)",
+              cursor: "pointer",
+              WebkitTapHighlightColor: "transparent"
+            },
+            onClick: () => {
+              setShowSubCategorySheet(false);
+              setSubInputValue("");
+              setTimeout(() => setShowSubInput(true), 100);
+            }
+          },
+          /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, fontWeight: 400, lineHeight: 1 } }, "\uFF0B"),
+          /* @__PURE__ */ React.createElement("span", null, "\u65B0\u589E\u5B50\u5206\u985E")
+        )
+      ),
+      /* @__PURE__ */ React.createElement("div", { style: styles.pickerList }, (() => {
+        const cc = cats.find((c) => c.label === category);
+        const subs = cc?.subs || [];
+        if (subs.length === 0) {
+          return /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerEmpty } }, "\u6B64\u5206\u985E\u66AB\u7121\u5B50\u5206\u985E\uFF0C\u9EDE\u4E0A\u65B9\u300C\uFF0B \u65B0\u589E\u5B50\u5206\u985E\u300D\u5EFA\u7ACB");
+        }
+        return subs.map((s) => /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            className: "picker-item",
+            key: s,
+            style: {
+              ...styles.pickerItem,
+              ...subCategory === s ? { background: "rgba(126, 224, 192, 0.08)" } : {}
+            },
+            onClick: () => {
+              setSubCategory(s);
+              setShowSubCategorySheet(false);
+            }
+          },
+          /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerItemIcon, background: type === "income" ? "rgba(126, 224, 192, 0.15)" : "rgba(245, 181, 192, 0.15)" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: cc?.icon || "note", size: 16, color: mainColor })),
+          /* @__PURE__ */ React.createElement("div", { style: styles.pickerItemLabel }, s),
+          subCategory === s && /* @__PURE__ */ React.createElement("div", { style: { color: mainColor, fontSize: 14 } }, "\u2713")
+        ));
+      })())
+    )),
+    showAccountSheet && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowAccountSheet(false) }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          ...styles.pickerCard,
+          transform: `translateX(${accountPickerSwipe.dragX}px)`,
+          transition: accountPickerSwipe.dragX === 0 ? "transform 0.2s" : "none"
+        },
+        ref: accountPickerSwipe.ref,
+        onClick: (e) => e.stopPropagation()
+      },
+      /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, "\u8ACB\u9078\u64C7\u5E33\u6236"),
+      /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: {
+            background: "var(--bg)",
+            borderBottom: "1px solid var(--border)"
+          }
+        },
+        /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            style: {
+              padding: "11px 12px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--mint-text)",
+              cursor: "pointer",
+              WebkitTapHighlightColor: "transparent"
+            },
+            onClick: () => {
+              setShowAccountSheet(false);
+              onManageAccount("__new__");
+            }
+          },
+          /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, fontWeight: 400, lineHeight: 1 } }, "\uFF0B"),
+          /* @__PURE__ */ React.createElement("span", null, "\u65B0\u589E\u5E33\u6236")
+        )
+      ),
+      /* @__PURE__ */ React.createElement("div", { style: styles.pickerList }, (() => {
+        const regular = state.accounts.filter((a) => !a.virtual);
+        const virtuals = state.accounts.filter((a) => a.virtual);
+        const renderRow = (a) => {
+          const tm = state.accountTypes.find((t) => t.value === a.type) || { icon: "box", color: "#f5c29c" };
+          const bal = calcBalance(a, state.transactions);
+          return /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              className: "picker-item",
+              key: a.id,
+              style: {
+                ...styles.pickerItem,
+                ...accountId === a.id ? { background: "rgba(126, 224, 192, 0.08)" } : {}
+              },
+              onClick: () => {
+                userTouchedAcctRef.current = true;
+                setAccountId(a.id);
+                setShowAccountSheet(false);
+              }
+            },
+            /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerItemIcon, background: tm.color || "#f5c29c" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: tm.icon || "box", size: 16, color: "#fff" })),
+            /* @__PURE__ */ React.createElement("div", { style: styles.pickerItemLabel }, /* @__PURE__ */ React.createElement("span", { style: { display: "flex", alignItems: "center", flexWrap: "wrap" } }, a.name, a.virtual && /* @__PURE__ */ React.createElement("span", { style: {
+              color: "var(--mint)",
+              fontSize: 10,
+              fontWeight: 500,
+              marginLeft: 6,
+              padding: "1px 5px",
+              borderRadius: 3,
+              background: "rgba(126, 224, 192, 0.12)"
+            } }, "\u865B\u64EC")), /* @__PURE__ */ React.createElement("span", { style: styles.pickerItemSub }, bal.toLocaleString())),
+            accountId === a.id && /* @__PURE__ */ React.createElement("div", { style: { color: mainColor, fontSize: 14 } }, "\u2713")
+          );
+        };
+        return /* @__PURE__ */ React.createElement(React.Fragment, null, regular.length > 0 && virtuals.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", padding: "6px 14px 4px", fontWeight: 500 } }, "\u4E00\u822C\u5E33\u6236"), regular.map(renderRow), virtuals.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", padding: "8px 14px 4px", fontWeight: 500, marginTop: regular.length > 0 ? 4 : 0 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint)", fontWeight: 600 } }, "\u865B\u64EC\u5E33\u6236")), virtuals.map(renderRow));
+      })())
+    )),
+    showFromSheet && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowFromSheet(false) }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          ...styles.pickerCard,
+          transform: `translateX(${fromPickerSwipe.dragX}px)`,
+          transition: fromPickerSwipe.dragX === 0 ? "transform 0.2s" : "none"
+        },
+        ref: fromPickerSwipe.ref,
+        onClick: (e) => e.stopPropagation()
+      },
+      /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, "\u8ACB\u9078\u64C7\u8F49\u51FA\u5E33\u6236"),
+      /* @__PURE__ */ React.createElement("div", { style: styles.pickerList }, (() => {
+        const regular = state.accounts.filter((a) => !a.virtual);
+        const virtuals = state.accounts.filter((a) => a.virtual);
+        const renderRow = (a) => {
+          const tm = state.accountTypes.find((t) => t.value === a.type) || { icon: "box", color: "#f5c29c" };
+          const bal = calcBalance(a, state.transactions);
+          return /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              className: "picker-item",
+              key: a.id,
+              style: { ...styles.pickerItem, ...fromAccountId === a.id ? { background: "rgba(126, 224, 192, 0.08)" } : {} },
+              onClick: () => {
+                setFromAccountId(a.id);
+                if (a.id === toAccountId) {
+                  const realList = state.accounts.filter((x) => !x.isSystem);
+                  const idx = realList.findIndex((x) => x.id === a.id);
+                  if (idx >= 0 && realList.length > 1) {
+                    const nextIdx = (idx + 1) % realList.length;
+                    setToAccountId(realList[nextIdx].id);
+                  }
+                }
+                setShowFromSheet(false);
+              }
+            },
+            /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerItemIcon, background: tm.color || "#f5c29c" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: tm.icon || "box", size: 16, color: "#fff" })),
+            /* @__PURE__ */ React.createElement("div", { style: styles.pickerItemLabel }, /* @__PURE__ */ React.createElement("span", { style: { display: "flex", alignItems: "center", flexWrap: "wrap" } }, a.name, a.virtual && /* @__PURE__ */ React.createElement("span", { style: {
+              color: "var(--mint)",
+              fontSize: 10,
+              fontWeight: 500,
+              marginLeft: 6,
+              padding: "1px 5px",
+              borderRadius: 3,
+              background: "rgba(126, 224, 192, 0.12)"
+            } }, "\u865B\u64EC")), /* @__PURE__ */ React.createElement("span", { style: styles.pickerItemSub }, bal.toLocaleString())),
+            fromAccountId === a.id && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--accent-text)", fontSize: 14 } }, "\u2713")
+          );
+        };
+        return /* @__PURE__ */ React.createElement(React.Fragment, null, regular.length > 0 && virtuals.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", padding: "6px 14px 4px", fontWeight: 500 } }, "\u4E00\u822C\u5E33\u6236"), regular.map(renderRow), virtuals.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", padding: "8px 14px 4px", fontWeight: 500, marginTop: regular.length > 0 ? 4 : 0 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint)", fontWeight: 600 } }, "\u865B\u64EC\u5E33\u6236")), virtuals.map(renderRow));
+      })())
+    )),
+    showToSheet && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowToSheet(false) }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          ...styles.pickerCard,
+          transform: `translateX(${toPickerSwipe.dragX}px)`,
+          transition: toPickerSwipe.dragX === 0 ? "transform 0.2s" : "none"
+        },
+        ref: toPickerSwipe.ref,
+        onClick: (e) => e.stopPropagation()
+      },
+      /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, "\u8ACB\u9078\u64C7\u8F49\u5165\u5E33\u6236"),
+      /* @__PURE__ */ React.createElement("div", { style: styles.pickerList }, (() => {
+        const regular = state.accounts.filter((a) => !a.virtual);
+        const virtuals = state.accounts.filter((a) => a.virtual);
+        const renderRow = (a) => {
+          const tm = state.accountTypes.find((t) => t.value === a.type) || { icon: "box", color: "#f5c29c" };
+          const bal = calcBalance(a, state.transactions);
+          const isSameAsFrom = fromAccountId === a.id;
+          return /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              className: "picker-item",
+              key: a.id,
+              style: {
+                ...styles.pickerItem,
+                ...toAccountId === a.id ? { background: "rgba(126, 224, 192, 0.08)" } : {},
+                ...isSameAsFrom ? { opacity: 0.35, cursor: "not-allowed", pointerEvents: "none" } : {}
+              },
+              onClick: () => {
+                if (isSameAsFrom) return;
+                setToAccountId(a.id);
+                setShowToSheet(false);
+              }
+            },
+            /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerItemIcon, background: tm.color || "#f5c29c" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: tm.icon || "box", size: 16, color: "#fff" })),
+            /* @__PURE__ */ React.createElement("div", { style: styles.pickerItemLabel }, /* @__PURE__ */ React.createElement("span", { style: { display: "flex", alignItems: "center", flexWrap: "wrap" } }, a.name, a.virtual && /* @__PURE__ */ React.createElement("span", { style: {
+              color: "var(--mint)",
+              fontSize: 10,
+              fontWeight: 500,
+              marginLeft: 6,
+              padding: "1px 5px",
+              borderRadius: 3,
+              background: "rgba(126, 224, 192, 0.12)"
+            } }, "\u865B\u64EC")), /* @__PURE__ */ React.createElement("span", { style: styles.pickerItemSub }, bal.toLocaleString()), isSameAsFrom && /* @__PURE__ */ React.createElement("span", { style: { display: "block", fontSize: 10, color: "var(--text-faint)", marginTop: 2 } }, "\u5DF2\u662F\u8F49\u51FA\u5E33\u6236")),
+            toAccountId === a.id && !isSameAsFrom && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--accent-text)", fontSize: 14 } }, "\u2713")
+          );
+        };
+        return /* @__PURE__ */ React.createElement(React.Fragment, null, regular.length > 0 && virtuals.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", padding: "6px 14px 4px", fontWeight: 500 } }, "\u4E00\u822C\u5E33\u6236"), regular.map(renderRow), virtuals.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", padding: "8px 14px 4px", fontWeight: 500, marginTop: regular.length > 0 ? 4 : 0 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint)", fontWeight: 600 } }, "\u865B\u64EC\u5E33\u6236")), virtuals.map(renderRow));
+      })())
+    )),
+    showFeeCatPicker && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowFeeCatPicker(false) }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          ...styles.pickerCard,
+          transform: `translateX(${feeCatPickerSwipe.dragX}px)`,
+          transition: feeCatPickerSwipe.dragX === 0 ? "transform 0.2s" : "none"
+        },
+        ref: feeCatPickerSwipe.ref,
+        onClick: (e) => e.stopPropagation()
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerTitle, display: "flex", alignItems: "center", gap: 8, padding: "12px 12px 12px 12px" } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, textAlign: "center", fontSize: 15, fontWeight: 600 } }, feeCatStep === 1 ? /* @__PURE__ */ React.createElement(React.Fragment, null, "\u9078\u64C7 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--blue)" } }, "\u5927\u5206\u985E")) : /* @__PURE__ */ React.createElement(React.Fragment, null, "\u7FA4\u7D44 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--blue)" } }, "\u5B50\u5206\u985E")))),
+      /* @__PURE__ */ React.createElement("div", { style: {
+        margin: "4px 16px 10px",
+        padding: "10px 12px",
+        background: "rgba(126, 224, 192, 0.10)",
+        border: "1px solid rgba(126, 224, 192, 0.35)",
+        borderRadius: 10,
+        fontSize: 13
+      } }, /* @__PURE__ */ React.createElement("div", { style: { color: "var(--text-dim)", fontSize: 11, marginBottom: 3 } }, "\u76EE\u524D\u9078\u64C7"), /* @__PURE__ */ React.createElement("div", { style: { color: "var(--mint-text)", fontWeight: 600, fontSize: 14 } }, feeCategory, feeSubCategory ? ` > ${feeSubCategory}` : "")),
+      /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerList, maxHeight: "55vh", padding: "0 8px 12px" } }, feeCatStep === 1 ? (
+        // 第一階:大分類列表
+        (state.categories.expense || []).map((cat) => {
+          const isCurrent = feeCategory === cat.label;
+          const hasSubs = (cat.subs || []).length > 0;
+          return /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              className: "picker-item",
+              key: cat.label,
+              style: {
+                ...styles.pickerItem,
+                padding: "14px 14px",
+                marginBottom: 6,
+                borderRadius: 10,
+                ...isCurrent ? { background: "rgba(143, 127, 240, 0.12)", border: "1px solid rgba(143, 127, 240, 0.4)" } : { background: "rgba(255,255,255,0.02)" }
+              },
+              onClick: () => {
+                if (hasSubs) {
+                  setFeeCatStepCat(cat.label);
+                  setFeeCatStep(2);
+                } else {
+                  updateFeeCat(cat.label, "");
+                  setShowFeeCatPicker(false);
+                }
+              }
+            },
+            /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerItemLabel, fontSize: 15 } }, cat.label),
+            isCurrent && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--accent-text)", fontSize: 16, marginRight: 6 } }, "\u2713"),
+            hasSubs && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 12, marginRight: 4 } }, cat.subs.length, " \u9805"), /* @__PURE__ */ React.createElement("div", { style: { color: "var(--text-faint)", fontSize: 18 } }, "\u203A"))
+          );
+        })
+      ) : (
+        // 第二階:子分類列表
+        (() => {
+          const catObj = (state.categories.expense || []).find((c) => c.label === feeCatStepCat);
+          if (!catObj) return null;
+          return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              className: "picker-item",
+              style: {
+                ...styles.pickerItem,
+                padding: "14px 14px",
+                marginBottom: 6,
+                borderRadius: 10,
+                ...feeCategory === feeCatStepCat && !feeSubCategory ? { background: "rgba(143, 127, 240, 0.12)", border: "1px solid rgba(143, 127, 240, 0.4)" } : { background: "rgba(255,255,255,0.02)" }
+              },
+              onClick: () => {
+                updateFeeCat(feeCatStepCat, "");
+                setShowFeeCatPicker(false);
+              }
+            },
+            /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerItemLabel, color: "var(--text-faint)", fontSize: 13 } }, "(\u4E0D\u6307\u5B9A\u5B50\u5206\u985E)"),
+            feeCategory === feeCatStepCat && !feeSubCategory && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--accent-text)", fontSize: 16 } }, "\u2713")
+          ), (catObj.subs || []).map((sub) => {
+            const isCurrent = feeCategory === feeCatStepCat && feeSubCategory === sub;
+            return /* @__PURE__ */ React.createElement(
+              "div",
+              {
+                className: "picker-item",
+                key: sub,
+                style: {
+                  ...styles.pickerItem,
+                  padding: "14px 14px",
+                  marginBottom: 6,
+                  borderRadius: 10,
+                  ...isCurrent ? { background: "rgba(143, 127, 240, 0.12)", border: "1px solid rgba(143, 127, 240, 0.4)" } : { background: "rgba(255,255,255,0.02)" }
+                },
+                onClick: () => {
+                  updateFeeCat(feeCatStepCat, sub);
+                  setShowFeeCatPicker(false);
+                }
+              },
+              /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerItemLabel, fontSize: 15 } }, sub),
+              isCurrent && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--accent-text)", fontSize: 16 } }, "\u2713")
+            );
+          }));
+        })()
+      ))
+    )),
+    showSubInput && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowSubInput(false) }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          ...styles.pickerCard,
+          transform: `translateX(${subInputSwipe.dragX}px)`,
+          transition: subInputSwipe.dragX === 0 ? "transform 0.2s" : "none"
+        },
+        ref: subInputSwipe.ref,
+        onClick: (e) => e.stopPropagation()
+      },
+      /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, "\u65B0\u589E\u5B50\u5206\u985E\u5230\u300C", category, "\u300D"),
+      /* @__PURE__ */ React.createElement("div", { style: { padding: "14px 16px" } }, /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          type: "text",
+          style: styles.field,
+          value: subInputValue,
+          onChange: (e) => setSubInputValue(e.target.value),
+          placeholder: "\u8ACB\u8F38\u5165\u5B50\u5206\u985E\u540D\u7A31",
+          autoFocus: true,
+          maxLength: 20
+        }
+      )),
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "0 16px 16px" } }, /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          style: { ...styles.deleteBtn, flex: 1, marginTop: 0 },
+          onClick: () => setShowSubInput(false)
+        },
+        "\u53D6\u6D88"
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          style: { ...styles.saveBtn, flex: 1, background: "var(--mint)", color: "var(--on-mint)", marginTop: 0 },
+          onClick: () => {
+            const val = subInputValue.trim();
+            if (!val) return alert("\u8ACB\u8F38\u5165\u540D\u7A31");
+            const cc = cats.find((c) => c.label === category);
+            const existingSubs = cc?.subs || [];
+            if (existingSubs.includes(val)) return alert("\u6B64\u5B50\u5206\u985E\u5DF2\u5B58\u5728");
+            onAddSubCategory && onAddSubCategory(type, category, val);
+            setSubCategory(val);
+            setShowSubInput(false);
+          }
+        },
+        "\u78BA\u5B9A"
+      ))
+    )),
+    showDateColorSettings && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowDateColorSettings(false) }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          ...styles.pickerCard,
+          transform: `translateX(${dateColorSwipe.dragX}px)`,
+          transition: dateColorSwipe.dragX === 0 ? "transform 0.2s" : "none"
+        },
+        ref: dateColorSwipe.ref,
+        onClick: (e) => e.stopPropagation()
+      },
+      /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, "\u65E5\u66C6\u984F\u8272\u8A2D\u5B9A"),
+      /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 8 } }, "\u9078\u4E2D\u65E5\u671F\u984F\u8272"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8, marginBottom: 16 } }, dateColorOptions.map((c) => {
+        const sel = selectedDateColor === c.value;
+        return /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            key: c.value,
+            onClick: () => updateSelectedDateColor(c.value),
+            style: {
+              aspectRatio: "1",
+              borderRadius: 12,
+              background: c.preview,
+              cursor: "pointer",
+              position: "relative"
+            }
+          },
+          sel && /* @__PURE__ */ React.createElement("div", { style: {
+            position: "absolute",
+            top: -4,
+            right: -4,
+            width: 18,
+            height: 18,
+            borderRadius: "50%",
+            background: "var(--mint)",
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: 700,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.18)"
+          } }, "\u2713")
+        );
+      })), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 8 } }, "\u9031\u672B\u65E5\u671F\u984F\u8272"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8 } }, dateColorOptions.map((c) => {
+        const sel = weekendColor === c.value;
+        return /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            key: c.value,
+            onClick: () => updateWeekendColor(c.value),
+            style: {
+              aspectRatio: "1",
+              borderRadius: 12,
+              background: c.preview,
+              cursor: "pointer",
+              position: "relative"
+            }
+          },
+          sel && /* @__PURE__ */ React.createElement("div", { style: {
+            position: "absolute",
+            top: -4,
+            right: -4,
+            width: 18,
+            height: 18,
+            borderRadius: "50%",
+            background: "var(--mint)",
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: 700,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.18)"
+          } }, "\u2713")
+        );
+      })), /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          onClick: () => {
+            const a = dateColorOptions[Math.floor(Math.random() * dateColorOptions.length)];
+            let b = dateColorOptions[Math.floor(Math.random() * dateColorOptions.length)];
+            while (b.value === a.value && dateColorOptions.length > 1) {
+              b = dateColorOptions[Math.floor(Math.random() * dateColorOptions.length)];
+            }
+            updateSelectedDateColor(a.value);
+            updateWeekendColor(b.value);
+          },
+          style: {
+            marginTop: 16,
+            padding: "10px 14px",
+            borderRadius: 12,
+            background: "var(--bg-input)",
+            border: "1px dashed var(--border)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            cursor: "pointer",
+            userSelect: "none"
+          }
+        },
+        /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16 } }, "\u{1F3A8}"),
+        /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "var(--text)" } }, "\u4E00\u9375\u96A8\u6A5F\u914D\u8272")
+      )),
+      /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 16px" } }, /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          style: { ...styles.saveBtn, background: "var(--mint)", color: "var(--on-mint)" },
+          onClick: () => setShowDateColorSettings(false)
+        },
+        "\u5B8C\u6210"
+      ))
+    ))
+  );
+}
+function PeriodDetailSheet({ state, setState, catIcon, periodKey, onClose, onClickTxn, setConfirmDialog, toastRich, toast }) {
+  const today = todayStr();
+  const now = /* @__PURE__ */ new Date();
+  const toIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  let title = "", range = "", predicate = () => false;
+  if (periodKey === "today") {
+    title = "\u672C\u65E5\u82B1\u8CBB";
+    range = today.replace(/-/g, "/");
+    predicate = (d) => d === today;
+  } else if (periodKey === "week") {
+    const dow = now.getDay();
+    const ws = new Date(now);
+    ws.setDate(now.getDate() - dow);
+    const we = new Date(ws);
+    we.setDate(ws.getDate() + 6);
+    const s = toIso(ws), e = toIso(we);
+    title = "\u672C\u9031\u82B1\u8CBB";
+    range = `${s.replace(/-/g, "/")} ~ ${e.replace(/-/g, "/")}`;
+    predicate = (d) => d >= s && d <= e;
+  } else if (periodKey === "month") {
+    const ym = today.slice(0, 7);
+    const lastDay = new Date(parseInt(ym.slice(0, 4)), parseInt(ym.slice(5, 7)), 0).getDate();
+    title = "\u672C\u6708\u82B1\u8CBB";
+    range = `${ym.replace("-", "/")}/01 ~ ${ym.replace("-", "/")}/${String(lastDay).padStart(2, "0")}`;
+    predicate = (d) => d.startsWith(ym);
+  } else if (periodKey === "year") {
+    const y = today.slice(0, 4);
+    title = "\u672C\u5E74\u82B1\u8CBB";
+    range = `${y}/01/01 ~ ${y}/12/31`;
+    predicate = (d) => d.startsWith(y);
+  }
+  const txns = state.transactions.filter((t) => predicate(t.date)).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+  let inc = 0, exp = 0;
+  for (const t of txns) {
+    if (!isRealFlow(t)) continue;
+    if (t.type === "income") inc += t.amount;
+    else if (t.type === "expense") exp += t.amount;
+  }
+  const groups = {};
+  txns.forEach((t) => {
+    var _a;
+    (groups[_a = t.date] || (groups[_a] = [])).push(t);
+  });
+  const groupKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+  const [editMode, setEditMode] = React.useState(false);
+  const [selectMode, setSelectMode] = React.useState(false);
+  const [selectedIds, setSelectedIds] = React.useState(() => /* @__PURE__ */ new Set());
+  const PAGE_SIZE = 150;
+  const [visibleCount, setVisibleCount] = React.useState(PAGE_SIZE);
+  React.useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [periodKey]);
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(/* @__PURE__ */ new Set());
+  };
+  const swipe = useSwipeBack(selectMode ? exitSelectMode : onClose, { skipInPickerBackdrop: true });
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const enterSelectModeWith = (id) => {
+    setSelectMode(true);
+    setSelectedIds(/* @__PURE__ */ new Set([id]));
+  };
+  const selectableCount = txns.length;
+  const allSelected = selectableCount > 0 && selectedIds.size === selectableCount;
+  const toggleAll = () => {
+    if (allSelected) setSelectedIds(/* @__PURE__ */ new Set());
+    else setSelectedIds(new Set(txns.map((t) => t.id)));
+  };
+  const doBatchDelete = () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const sel = state.transactions.filter((t) => ids.includes(t.id));
+    const transferIds = /* @__PURE__ */ new Set();
+    const settleIds = /* @__PURE__ */ new Set();
+    sel.forEach((t) => {
+      if (t.transferId) transferIds.add(t.transferId);
+      if (t.settleId) settleIds.add(t.settleId);
+    });
+    const actuallyDeleteIds = new Set(ids);
+    state.transactions.forEach((t) => {
+      if (t.transferId && transferIds.has(t.transferId)) actuallyDeleteIds.add(t.id);
+      if (t.settleId && settleIds.has(t.settleId)) actuallyDeleteIds.add(t.id);
+    });
+    const cascadeIds = expandStockBuyCascade(state, actuallyDeleteIds);
+    if (cascadeIds.size > 0) {
+      for (const id of cascadeIds) actuallyDeleteIds.add(id);
+    }
+    const delCount = actuallyDeleteIds.size;
+    const includesTransfer = transferIds.size > 0;
+    const includesSettle = settleIds.size > 0;
+    const expandedCount = delCount - ids.length;
+    const listText = buildBatchDeletePreview(state.transactions, selectedIds, actuallyDeleteIds);
+    if (!setConfirmDialog) return;
+    let linkMsg;
+    if (expandedCount > 0) {
+      if (includesTransfer && includesSettle) {
+        linkMsg = "\u540C\u7D44\u8F49\u5E33\u8207\u80A1\u7968\u7D50\u7B97\u5C07\u4E00\u4F75\u522A\u9664\u3002";
+      } else if (includesSettle) {
+        linkMsg = "\u672C\u91D1\u6B78\u9084\u8207\u640D\u76CA\u5C6C\u540C\u4E00\u7D44,\u5C07\u4E00\u4F75\u522A\u9664\u3002";
+      } else if (includesTransfer) {
+        linkMsg = "\u8F49\u5E33\u5169\u7AEF\u7D00\u9304\u5C6C\u540C\u4E00\u7D44,\u5C07\u4E00\u4F75\u522A\u9664\u3002";
+      }
+    }
+    const stockImpact = detectStockBuyImpact(state, actuallyDeleteIds);
+    if (stockImpact.msg) {
+      linkMsg = (linkMsg ? linkMsg + "\n\n" : "") + stockImpact.msg;
+    }
+    setConfirmDialog({
+      title: stockImpact.anyHoldingDestroyed ? "\u522A\u9664\u80A1\u7968\u8CB7\u9032" : includesSettle && includesTransfer ? "\u522A\u9664\u591A\u7B46\u7D00\u9304" : includesSettle ? "\u522A\u9664\u80A1\u7968\u7D50\u7B97" : includesTransfer ? "\u522A\u9664\u8F49\u5E33" : `\u522A\u9664 ${ids.length} \u7B46\u4EA4\u6613`,
+      target: { label: "\u5C07\u522A\u9664", name: listText, multiline: true },
+      message: linkMsg,
+      warning: "\u6B64\u64CD\u4F5C\u7121\u6CD5\u5FA9\u539F",
+      confirmText: stockImpact.anyHoldingDestroyed ? "\u4ECD\u8981\u522A\u9664\u6301\u80A1" : "\u522A\u9664",
+      highlightWords: stockImpact.highlightWords,
+      danger: true,
+      onConfirm: () => {
+        setState && setState((s) => ({
+          ...s,
+          transactions: s.transactions.filter((t) => !actuallyDeleteIds.has(t.id))
+        }));
+        if (toastRich) {
+          toastRich({ title: `\u5DF2\u522A\u9664 ${delCount} \u7B46`, amount: "\u2713", amountColor: "var(--pink-text)" }, 1200);
+        } else if (toast) {
+          toast(`\u5DF2\u522A\u9664 ${delCount} \u7B46`);
+        }
+        exitSelectMode();
+      }
+    });
+  };
+  const [blockOrder, setBlockOrder] = React.useState(() => {
+    const defaults = ["summary", "list"];
+    try {
+      const raw = localStorage.getItem("ledger_period_order");
+      if (raw) {
+        const saved = JSON.parse(raw);
+        const defSet = new Set(defaults);
+        const filtered = Array.isArray(saved) ? saved.filter((k) => defSet.has(k)) : [];
+        const missing = defaults.filter((k) => !filtered.includes(k));
+        return [...filtered, ...missing];
+      }
+    } catch {
+    }
+    return defaults;
+  });
+  React.useEffect(() => {
+    try {
+      localStorage.setItem("ledger_period_order", JSON.stringify(blockOrder));
+    } catch {
+    }
+  }, [blockOrder]);
+  const moveBlock = (key, dir) => {
+    setBlockOrder((prev) => {
+      const i = prev.indexOf(key);
+      if (i < 0) return prev;
+      const j = i + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  };
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-sheet": "true",
+      style: {
+        ...styles.sheet,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, selectMode ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { width: 50 } }), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)" } }, "\u5DF2\u9078"), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 6, fontVariantNumeric: "tabular-nums" } }, selectedIds.size), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 4, fontSize: 14, fontWeight: 500, color: "var(--text-dim)" } }, "/", selectableCount)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement(
+      "span",
+      {
+        style: {
+          fontSize: 14,
+          fontWeight: 600,
+          color: "var(--pink-text)",
+          cursor: "pointer",
+          padding: "6px 14px",
+          borderRadius: 16,
+          border: "1.5px solid var(--pink)",
+          background: "rgba(245, 181, 192, 0.08)",
+          userSelect: "none",
+          WebkitTapHighlightColor: "transparent"
+        },
+        onClick: exitSelectMode
+      },
+      "\u53D6\u6D88"
+    ))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { width: 50 } }), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, title), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 50, display: "flex", justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode })))),
+    /* @__PURE__ */ React.createElement(EditModeBanner, { editMode, setEditMode }),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll, "data-scroll-container": true }, /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "var(--text-dim)", fontSize: 13, marginBottom: 14 } }, range), blockOrder.map((blockKey, idx) => {
+      const blockProps = {
+        blockKey,
+        editMode,
+        isFirst: idx === 0,
+        isLast: idx === blockOrder.length - 1,
+        onMoveUp: () => moveBlock(blockKey, -1),
+        onMoveDown: () => moveBlock(blockKey, 1),
+        onReorder: (newOrder) => setBlockOrder(newOrder),
+        inline: true
+      };
+      if (blockKey === "summary") {
+        return /* @__PURE__ */ React.createElement(Block, { key: "summary", ...blockProps }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryRow }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u6536\u5165"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: "var(--mint-text)", fontSize: autoFitFontSize(fmt(inc)) } }, fmt(inc))), /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u652F\u51FA"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: "var(--pink-text)", fontSize: autoFitFontSize(fmt(exp)) } }, fmt(exp))), /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u7D50\u9918"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: inc - exp < 0 ? "var(--pink)" : inc - exp > 0 ? "var(--mint)" : "var(--text)", fontSize: autoFitFontSize(fmtSigned(inc - exp)) } }, fmtSigned(inc - exp)))));
+      }
+      if (blockKey === "list") {
+        return /* @__PURE__ */ React.createElement(Block, { key: "list", ...blockProps }, txns.length ? /* @__PURE__ */ React.createElement("div", { style: styles.txnList }, (() => {
+          let counted = 0;
+          const visibleGroups = [];
+          for (const date of groupKeys) {
+            if (counted >= visibleCount) break;
+            const remain = visibleCount - counted;
+            const all = groups[date];
+            const shown = all.length <= remain ? all : all.slice(0, remain);
+            visibleGroups.push({ date, items: shown });
+            counted += shown.length;
+          }
+          return visibleGroups.map(({ date, items }) => {
+            const dInc = items.filter((t) => isRealFlow(t) && t.type === "income").reduce((s, t) => s + t.amount, 0);
+            const dExp = items.filter((t) => isRealFlow(t) && t.type === "expense").reduce((s, t) => s + t.amount, 0);
+            const wd = ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][new Date(date).getDay()];
+            return /* @__PURE__ */ React.createElement(React.Fragment, { key: date }, /* @__PURE__ */ React.createElement("div", { style: styles.groupDate }, /* @__PURE__ */ React.createElement("span", null, date.replace(/-/g, "/"), " \xB7 \u9031", wd), /* @__PURE__ */ React.createElement("span", { style: styles.groupDateAmt }, dInc > 0 && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)" } }, "+", fmt(dInc), " "), dExp > 0 && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)" } }, "-", fmt(dExp)))), items.map((t) => /* @__PURE__ */ React.createElement(
+              TxnRow,
+              {
+                key: t.id,
+                txn: t,
+                state,
+                catIcon,
+                selectMode,
+                selected: selectedIds.has(t.id),
+                onClick: () => {
+                  if (editMode) return;
+                  if (selectMode) toggleSelect(t.id);
+                  else onClickTxn(t);
+                },
+                onLongPress: () => {
+                  if (editMode || selectMode) return;
+                  enterSelectModeWith(t.id);
+                }
+              }
+            )));
+          });
+        })(), visibleCount < txns.length && /* @__PURE__ */ React.createElement(
+          LoadMoreSentinel,
+          {
+            remain: txns.length - visibleCount,
+            onLoadMore: () => setVisibleCount((v) => Math.min(v + PAGE_SIZE, txns.length))
+          }
+        )) : /* @__PURE__ */ React.createElement("div", { style: styles.empty }, "\u9019\u6BB5\u671F\u9593\u9084\u6C92\u6709\u7D00\u9304"));
+      }
+      return null;
+    })),
+    selectMode && /* @__PURE__ */ React.createElement("div", { style: {
+      position: "fixed",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      maxWidth: 480,
+      margin: "0 auto",
+      padding: "10px 14px calc(12px + env(safe-area-inset-bottom, 0px))",
+      background: "rgba(20, 22, 25, 0.96)",
+      backdropFilter: "blur(20px)",
+      WebkitBackdropFilter: "blur(20px)",
+      borderTop: "1px solid var(--border)",
+      display: "flex",
+      gap: 8,
+      zIndex: 60,
+      boxShadow: "0 -12px 24px rgba(0,0,0,0.3)"
+    } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          flex: "0 0 auto",
+          padding: "10px 16px",
+          background: "var(--bg-card)",
+          color: "var(--text)",
+          border: "1px solid var(--border)",
+          borderRadius: 10,
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: 6
+        },
+        onClick: toggleAll,
+        disabled: selectableCount === 0
+      },
+      /* @__PURE__ */ React.createElement("div", { style: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        border: `1.5px solid ${allSelected ? "var(--mint)" : "var(--text-faint)"}`,
+        background: allSelected ? "var(--mint)" : "transparent",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      } }, allSelected && /* @__PURE__ */ React.createElement("svg", { width: "10", height: "10", viewBox: "0 0 24 24", fill: "none", stroke: "#1a1a1a", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "20 6 9 17 4 12" }))),
+      /* @__PURE__ */ React.createElement("span", null, allSelected ? "\u53D6\u6D88\u5168\u9078" : "\u5168\u9078")
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          flex: 1,
+          padding: "10px 16px",
+          background: selectedIds.size > 0 ? "var(--pink)" : "rgba(245, 181, 192, 0.25)",
+          color: selectedIds.size > 0 ? "#1a1a1a" : "var(--text-faint)",
+          border: "none",
+          borderRadius: 10,
+          fontSize: 14,
+          fontWeight: 700,
+          cursor: selectedIds.size > 0 ? "pointer" : "default",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          transition: "background 0.15s, color 0.15s"
+        },
+        onClick: () => selectedIds.size > 0 && doBatchDelete(),
+        disabled: selectedIds.size === 0
+      },
+      /* @__PURE__ */ React.createElement(TypeIcon, { name: "trash", size: 14, color: selectedIds.size > 0 ? "#1a1a1a" : "var(--text-faint)" }),
+      /* @__PURE__ */ React.createElement("span", null, "\u522A\u9664 ", selectedIds.size > 0 ? `(${selectedIds.size})` : "")
+    ))
+  );
+}
+function DayDetailSheet({ state, catIcon, date, onClose, onClickTxn, onAdd }) {
+  const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
+  const txns = state.transactions.filter((t) => t.date === date).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  let inc = 0, exp = 0;
+  for (const t of txns) {
+    if (!isRealFlow(t)) continue;
+    if (t.type === "income") inc += t.amount;
+    else if (t.type === "expense") exp += t.amount;
+  }
+  const d = new Date(date);
+  const wd = ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][d.getDay()];
+  const isToday = date === todayStr();
+  const [editMode, setEditMode] = React.useState(false);
+  const [blockOrder, setBlockOrder] = React.useState(() => {
+    const defaults = ["summary", "list"];
+    try {
+      const raw = localStorage.getItem("ledger_day_order");
+      if (raw) {
+        const saved = JSON.parse(raw);
+        const defSet = new Set(defaults);
+        const filtered = Array.isArray(saved) ? saved.filter((k) => defSet.has(k)) : [];
+        const missing = defaults.filter((k) => !filtered.includes(k));
+        return [...filtered, ...missing];
+      }
+    } catch {
+    }
+    return defaults;
+  });
+  React.useEffect(() => {
+    try {
+      localStorage.setItem("ledger_day_order", JSON.stringify(blockOrder));
+    } catch {
+    }
+  }, [blockOrder]);
+  const moveBlock = (key, dir) => {
+    setBlockOrder((prev) => {
+      const i = prev.indexOf(key);
+      if (i < 0) return prev;
+      const j = i + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  };
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-sheet": "true",
+      style: {
+        ...styles.sheet,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: { width: 50 } }), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, isToday ? "\u4ECA\u65E5\u660E\u7D30" : "\u7576\u65E5\u660E\u7D30"), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 50, display: "flex", justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode }))),
+    /* @__PURE__ */ React.createElement(EditModeBanner, { editMode, setEditMode }),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll, "data-scroll-container": true }, /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "var(--text-dim)", fontSize: 14, marginBottom: 14 } }, date.replace(/-/g, "/"), " \xB7 \u9031", wd), blockOrder.map((blockKey, idx) => {
+      const blockProps = {
+        blockKey,
+        editMode,
+        isFirst: idx === 0,
+        isLast: idx === blockOrder.length - 1,
+        onMoveUp: () => moveBlock(blockKey, -1),
+        onMoveDown: () => moveBlock(blockKey, 1),
+        onReorder: (newOrder) => setBlockOrder(newOrder),
+        inline: true
+      };
+      if (blockKey === "summary") {
+        return /* @__PURE__ */ React.createElement(Block, { key: "summary", ...blockProps }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryRow }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u6536\u5165"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: "var(--mint-text)", fontSize: autoFitFontSize(fmt(inc)) } }, fmt(inc))), /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u652F\u51FA"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: "var(--pink-text)", fontSize: autoFitFontSize(fmt(exp)) } }, fmt(exp))), /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u7D50\u9918"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: inc - exp < 0 ? "var(--pink)" : inc - exp > 0 ? "var(--mint)" : "var(--text)", fontSize: autoFitFontSize(fmtSigned(inc - exp)) } }, fmtSigned(inc - exp)))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 14 } }, /* @__PURE__ */ React.createElement("button", { style: styles.addIncBtn, onClick: () => !editMode && onAdd("income", date) }, "\uFF0B \u65B0\u589E\u6536\u5165"), /* @__PURE__ */ React.createElement("button", { style: styles.addExpBtn, onClick: () => !editMode && onAdd("expense", date) }, "\uFF0B \u65B0\u589E\u652F\u51FA")));
+      }
+      if (blockKey === "list") {
+        return /* @__PURE__ */ React.createElement(Block, { key: "list", ...blockProps }, txns.length ? /* @__PURE__ */ React.createElement("div", { style: styles.txnList }, txns.map((t) => /* @__PURE__ */ React.createElement(TxnRow, { key: t.id, txn: t, state, catIcon, onClick: () => !editMode && onClickTxn(t) }))) : /* @__PURE__ */ React.createElement("div", { style: styles.empty }, "\u9019\u5929\u9084\u6C92\u6709\u7D00\u9304", /* @__PURE__ */ React.createElement("br", null), "\u9EDE\u4E0A\u65B9\u6309\u9215\u8A18\u4E00\u7B46"));
+      }
+      return null;
+    }))
+  );
+}
+function CategoryManageSheet({ state, setState, toast, toastRich, catType, initialLabel, onClose, setConfirmDialog }) {
+  const list = state.categories[catType] || [];
+  const isNewMode = initialLabel === "__new__";
+  const initialIdx = !isNewMode && initialLabel ? list.findIndex((c) => c.label === initialLabel) : -1;
+  const [editingIdx, setEditingIdx] = useState(
+    isNewMode ? "new" : initialIdx >= 0 ? initialIdx : null
+  );
+  const commonIconsInit = catType === "income" ? "briefcase" : "plate";
+  const [label, setLabel] = useState(initialIdx >= 0 ? list[initialIdx].label : "");
+  const [nameLocked, setNameLocked] = useState(initialIdx >= 0);
+  const [iconLocked, setIconLocked] = useState(initialIdx >= 0);
+  const [icon, setIcon] = useState(
+    isNewMode ? commonIconsInit : initialIdx >= 0 ? list[initialIdx].icon : "note"
+  );
+  const [subInputMode, setSubInputMode] = useState(null);
+  const [subInputValue, setSubInputValue] = useState("");
+  const [subEditIdx, setSubEditIdx] = useState(null);
+  const [subInputLocked, setSubInputLocked] = useState(false);
+  const subInputSwipe = useSwipeToClose(() => setSubInputMode(null));
+  const [editMode, setEditMode] = useState(false);
+  const [subEditMode, setSubEditMode] = useState(false);
+  const subsSnapshotRef = React.useRef(null);
+  const [flashLabel, setFlashLabel] = useState(null);
+  const pendingFlashRef = React.useRef(null);
+  const scrollContainerRef = React.useRef(null);
+  const savedScrollTopRef = React.useRef(0);
+  const prevEditingIdxRef = React.useRef(editingIdx);
+  React.useEffect(() => {
+    const wasEditing = prevEditingIdxRef.current !== null;
+    const isEditing = editingIdx !== null;
+    if (wasEditing && !isEditing) {
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = savedScrollTopRef.current;
+        }
+        if (pendingFlashRef.current) {
+          setFlashLabel(pendingFlashRef.current);
+          pendingFlashRef.current = null;
+        }
+      });
+    }
+    prevEditingIdxRef.current = editingIdx;
+  }, [editingIdx]);
+  React.useEffect(() => {
+    if (!flashLabel) return;
+    const t = setTimeout(() => setFlashLabel(null), 1100);
+    return () => clearTimeout(t);
+  }, [flashLabel]);
+  const enterSubEditMode = () => {
+    if (editingIdx !== null && editingIdx !== "new") {
+      subsSnapshotRef.current = [...list[editingIdx].subs || []];
+    }
+    setSubEditMode(true);
+  };
+  const exitSubEditMode = (restore) => {
+    if (restore && subsSnapshotRef.current && editingIdx !== null && editingIdx !== "new") {
+      const snapshot = subsSnapshotRef.current;
+      setState((s) => {
+        const newCats = [...s.categories[catType]];
+        newCats[editingIdx] = { ...newCats[editingIdx], subs: snapshot };
+        return { ...s, categories: { ...s.categories, [catType]: newCats } };
+      });
+    }
+    subsSnapshotRef.current = null;
+    setSubEditMode(false);
+  };
+  const typeLabel = catType === "income" ? "\u6536\u5165" : "\u652F\u51FA";
+  const moveSub = (i, delta) => {
+    if (editingIdx === null || editingIdx === "new") return;
+    const subs = list[editingIdx].subs || [];
+    const newIdx = i + delta;
+    if (newIdx < 0 || newIdx >= subs.length) return;
+    setState((s) => {
+      const newCats = [...s.categories[catType]];
+      const arr = [...newCats[editingIdx].subs || []];
+      [arr[i], arr[newIdx]] = [arr[newIdx], arr[i]];
+      newCats[editingIdx] = { ...newCats[editingIdx], subs: arr };
+      return { ...s, categories: { ...s.categories, [catType]: newCats } };
+    });
+  };
+  const reorderSubs = (newOrder) => {
+    if (editingIdx === null || editingIdx === "new") return;
+    setState((s) => {
+      const newCats = [...s.categories[catType]];
+      const subs = newCats[editingIdx].subs || [];
+      const set = new Set(subs);
+      const reordered = newOrder.filter((x) => set.has(x));
+      subs.forEach((x) => {
+        if (!newOrder.includes(x)) reordered.push(x);
+      });
+      newCats[editingIdx] = { ...newCats[editingIdx], subs: reordered };
+      return { ...s, categories: { ...s.categories, [catType]: newCats } };
+    });
+  };
+  const commonIcons = catType === "income" ? ["briefcase", "salary", "bag", "cash", "gift", "chart", "bank", "card", "coin", "gem", "spark", "target", "home", "building", "cap", "book", "phone", "list", "calendar", "box", "note"] : ["plate", "cart", "shopping", "coffee", "home", "building", "car", "fuel", "bed", "bolt", "phone", "card", "hospital", "movie", "game", "music", "gift", "cap", "book", "paw", "note"];
+  const startAdd = () => {
+    setEditingIdx("new");
+    setLabel("");
+    setIcon(commonIcons[0]);
+    setNameLocked(false);
+    setIconLocked(false);
+  };
+  const startEdit = (i) => {
+    if (scrollContainerRef.current) {
+      savedScrollTopRef.current = scrollContainerRef.current.scrollTop;
+    }
+    setEditingIdx(i);
+    setLabel(list[i].label);
+    setIcon(list[i].icon);
+    setNameLocked(true);
+    setIconLocked(true);
+    setSubEditMode(false);
+  };
+  const cancel = (flashTarget = null) => {
+    if (flashTarget) pendingFlashRef.current = flashTarget;
+    setEditingIdx(null);
+    setLabel("");
+    setNameLocked(false);
+    setIconLocked(false);
+    setSubEditMode(false);
+  };
+  const swipeBack = () => {
+    const currentLabel = editingIdx !== null && editingIdx !== "new" && list[editingIdx] ? list[editingIdx].label : null;
+    if (subEditMode) {
+      exitSubEditMode(true);
+      cancel(currentLabel);
+      return;
+    }
+    if (editingIdx !== null) {
+      cancel(currentLabel);
+    } else {
+      onClose();
+    }
+  };
+  const swipe = useSwipeBack(swipeBack, { skipInPickerBackdrop: true, noDrag: editingIdx !== null || subEditMode });
+  const save = () => {
+    const t = label.trim();
+    if (!t) return alert("\u8ACB\u8F38\u5165\u5206\u985E\u540D\u7A31");
+    if (editingIdx === "new") {
+      setState((s) => ({
+        ...s,
+        categories: {
+          ...s.categories,
+          [catType]: [...s.categories[catType], { label: t, icon, subs: [] }]
+        }
+      }));
+      toastRich({
+        title: `\u5DF2\u65B0\u589E${typeLabel}\u5206\u985E`,
+        amount: "\u2713",
+        amountColor: "var(--mint)",
+        lines: [`\u300C${t}\u300D`]
+      });
+    } else {
+      const oldLabel = list[editingIdx].label;
+      const oldIcon = list[editingIdx].icon;
+      const oldSubs = list[editingIdx].subs || [];
+      const labelChanged = t !== oldLabel;
+      const iconChanged = icon !== oldIcon;
+      if (!labelChanged && !iconChanged) {
+        toastRich({
+          title: "\u6C92\u6709\u4EFB\u4F55\u8B8A\u66F4",
+          amount: "\u2713",
+          icon: "info",
+          amountColor: "var(--text-faint)",
+          lines: [`\u300C${oldLabel}\u300D\u8CC7\u6599\u672A\u8ABF\u6574`]
+        }, 1400);
+        cancel(oldLabel);
+        return;
+      }
+      setState((s) => {
+        const newCats = [...s.categories[catType]];
+        newCats[editingIdx] = { label: t, icon, subs: oldSubs };
+        const newTxns = labelChanged ? s.transactions.map(
+          (x) => x.type === catType && x.category === oldLabel ? { ...x, category: t } : x
+        ) : s.transactions;
+        return {
+          ...s,
+          categories: { ...s.categories, [catType]: newCats },
+          transactions: newTxns
+        };
+      });
+      toastRich(labelChanged ? {
+        titleSegments: [
+          "\u5DF2\u66F4\u65B0",
+          "\n",
+          typeLabel,
+          " ",
+          { text: "\u5927\u5206\u985E", color: "var(--blue)" },
+          " ",
+          "\u540D\u7A31"
+        ],
+        amount: "\u2713",
+        amountColor: "var(--mint)",
+        lines: [`\u300C${oldLabel}\u300D \u2192 \u300C${t}\u300D`]
+      } : {
+        title: `\u5DF2\u66F4\u65B0${typeLabel}\u5206\u985E`,
+        amount: "\u2713",
+        amountColor: "var(--mint)",
+        lines: [`\u300C${t}\u300D`]
+      }, labelChanged ? 3500 : 1180);
+      cancel(t);
+      return;
+    }
+    cancel(t);
+  };
+  const remove = (i) => {
+    const target = list[i].label;
+    const affected = state.transactions.filter((x) => x.type === catType && x.category === target).length;
+    if (setConfirmDialog) {
+      setConfirmDialog({
+        title: `\u522A\u9664 ${typeLabel}\u5206\u985E \u540D\u7A31`,
+        target: { label: "\u540D\u7A31", name: target },
+        message: affected > 0 ? `\u5C07\u5F71\u97FF ${affected} \u7B46 \u6536\u652F\u7D00\u9304
+\u4F46\u9019\u4E9B\u7D00\u9304\u4E0D\u6703\u88AB\u522A\u9664
+\u53EA\u6703\u6E05\u7A7A \u5927\u5206\u985E\u8207\u5B50\u5206\u985E\u6B04\u4F4D` : `\u76EE\u524D\u6C92\u6709\u7D00\u9304\u4F7F\u7528\u6B64\u5206\u985E`,
+        highlightWords: ["\u5927\u5206\u985E\u8207\u5B50\u5206\u985E\u6B04\u4F4D"],
+        confirmText: "\u522A\u9664",
+        danger: true,
+        onConfirm: () => {
+          setState((s) => ({
+            ...s,
+            categories: {
+              ...s.categories,
+              [catType]: s.categories[catType].filter((_, idx) => idx !== i)
+            }
+          }));
+          cancel();
+          toastRich({
+            title: `\u5DF2\u522A\u9664${typeLabel}\u5206\u985E`,
+            amount: "\u2713",
+            amountColor: "var(--pink)",
+            lines: [`\u300C${target}\u300D`, affected > 0 ? `${affected} \u7B46\u7D00\u9304\u5DF2\u6E05\u9664\u5206\u985E\u6B04\u4F4D` : null].filter(Boolean)
+          });
+        }
+      });
+    }
+  };
+  const moveCat = (i, delta) => {
+    const newIdx = i + delta;
+    if (newIdx < 0 || newIdx >= list.length) return;
+    setState((s) => {
+      const arr = [...s.categories[catType]];
+      [arr[i], arr[newIdx]] = [arr[newIdx], arr[i]];
+      return { ...s, categories: { ...s.categories, [catType]: arr } };
+    });
+  };
+  const reorderCats = (newLabelOrder) => {
+    setState((s) => {
+      const arr = s.categories[catType] || [];
+      const map = new Map(arr.map((c) => [c.label, c]));
+      const reordered = newLabelOrder.map((lbl) => map.get(lbl)).filter(Boolean);
+      arr.forEach((c) => {
+        if (!newLabelOrder.includes(c.label)) reordered.push(c);
+      });
+      return { ...s, categories: { ...s.categories, [catType]: reordered } };
+    });
+  };
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-sheet": "true",
+      style: {
+        ...styles.sheet,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: { width: 50 } }), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, editingIdx === null ? (
+      // 列表模式:支出/收入 大分類 管理
+      /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: catType === "income" ? "var(--mint)" : "var(--pink)" } }, typeLabel), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--blue)", marginLeft: 6, fontWeight: 600 } }, "\u5927\u5206\u985E"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", fontWeight: 500, marginLeft: 6 } }, "\u7BA1\u7406"))
+    ) : editingIdx === "new" ? (
+      // 新增模式
+      /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", fontWeight: 500 } }, "\u65B0\u589E"), /* @__PURE__ */ React.createElement("span", { style: { color: catType === "income" ? "var(--mint)" : "var(--pink)", marginLeft: 4 } }, typeLabel), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", fontWeight: 500, marginLeft: 2 } }, "\u5927\u5206\u985E"))
+    ) : (
+      // 編輯模式:編輯大分類:〈名稱〉
+      /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", fontWeight: 500 } }, "\u7DE8\u8F2F"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--blue)", marginLeft: 4, fontWeight: 600 } }, "\u5927\u5206\u985E"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text)", marginLeft: 6, fontWeight: 700 } }, list[editingIdx]?.label || ""))
+    )), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 50, display: "flex", justifyContent: "flex-end" } }, editingIdx === null && /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode }))),
+    /* @__PURE__ */ React.createElement(EditModeBanner, { editMode, setEditMode }),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll, "data-scroll-container": true, ref: scrollContainerRef }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        key: editingIdx === null ? "list" : `edit-${editingIdx}`,
+        style: {
+          animation: editingIdx === null ? "pushBack 0.32s ease-out" : "pushEnter 0.32s ease-out"
+        }
+      },
+      editingIdx !== null ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", null, "\u540D\u7A31"), editingIdx !== "new" && editingIdx !== null && /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          onClick: () => setNameLocked(!nameLocked),
+          style: { ...styles.lockRow, cursor: "pointer", userSelect: "none" }
+        },
+        /* @__PURE__ */ React.createElement("span", { style: { ...styles.lockLabel, color: nameLocked ? "var(--text-dim)" : "var(--mint)", display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: nameLocked ? "lock" : "unlock", size: 12, color: nameLocked ? "var(--text-dim)" : "var(--mint)" }), nameLocked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"),
+        /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            style: { ...styles.toggleTrack, background: nameLocked ? "var(--bg-card)" : "var(--mint)" }
+          },
+          /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: nameLocked ? "translateX(0)" : "translateX(18px)" } })
+        )
+      )), /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          type: "text",
+          style: {
+            ...styles.field,
+            opacity: nameLocked && editingIdx !== "new" && editingIdx !== null ? 0.55 : 1,
+            cursor: nameLocked && editingIdx !== "new" && editingIdx !== null ? "not-allowed" : "text"
+          },
+          value: label,
+          onChange: (e) => setLabel(e.target.value),
+          placeholder: "\u4F8B\u5982:\u98F2\u6599",
+          maxLength: 10,
+          disabled: nameLocked && editingIdx !== "new" && editingIdx !== null
+        }
+      ), /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", null, "\u5716\u793A"), editingIdx !== "new" && editingIdx !== null && /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          onClick: () => setIconLocked(!iconLocked),
+          style: { ...styles.lockRow, cursor: "pointer", userSelect: "none" }
+        },
+        /* @__PURE__ */ React.createElement("span", { style: { ...styles.lockLabel, color: iconLocked ? "var(--text-dim)" : "var(--mint)", display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: iconLocked ? "lock" : "unlock", size: 12, color: iconLocked ? "var(--text-dim)" : "var(--mint)" }), iconLocked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"),
+        /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            style: { ...styles.toggleTrack, background: iconLocked ? "var(--bg-card)" : "var(--mint)" }
+          },
+          /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: iconLocked ? "translateX(0)" : "translateX(18px)" } })
+        )
+      )), /* @__PURE__ */ React.createElement("div", { style: {
+        ...styles.iconGrid,
+        opacity: iconLocked && editingIdx !== "new" && editingIdx !== null ? 0.55 : 1,
+        pointerEvents: iconLocked && editingIdx !== "new" && editingIdx !== null ? "none" : "auto"
+      } }, commonIcons.map((ic) => {
+        const selected = icon === ic;
+        return /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            key: ic,
+            tabIndex: -1,
+            style: {
+              ...styles.iconCell,
+              ...selected ? { outline: "1.5px solid var(--mint)", outlineOffset: "-1.5px", background: "rgba(126, 224, 192, 0.1)" } : {}
+            },
+            onClick: () => setIcon(ic)
+          },
+          /* @__PURE__ */ React.createElement(TypeIcon, { name: ic, size: 24, color: selected ? "var(--mint)" : "var(--text-dim)" })
+        );
+      })), editingIdx !== "new" && editingIdx !== null && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, marginTop: 16, display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", null, "\u5B50\u5206\u985E"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, (list[editingIdx].subs || []).length > 1 && /* @__PURE__ */ React.createElement(EditOrderButton, { editMode: subEditMode, setEditMode: (v) => v ? enterSubEditMode() : exitSubEditMode(false) }), !subEditMode && /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          style: {
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 5,
+            padding: "5px 11px",
+            fontSize: 12,
+            fontWeight: 600,
+            color: "var(--mint)",
+            background: "rgba(126,224,192,0.10)",
+            border: "1px solid rgba(126,224,192,0.35)",
+            borderRadius: 999,
+            cursor: "pointer",
+            userSelect: "none",
+            transition: "background 0.15s, transform 0.1s",
+            WebkitTapHighlightColor: "transparent"
+          },
+          onClick: () => {
+            setSubInputMode("new");
+            setSubInputValue("");
+            setSubEditIdx(null);
+            setSubInputLocked(false);
+          }
+        },
+        /* @__PURE__ */ React.createElement("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round" }, /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "5", x2: "12", y2: "19" }), /* @__PURE__ */ React.createElement("line", { x1: "5", y1: "12", x2: "19", y2: "12" })),
+        "\u65B0\u589E"
+      ))), subEditMode && /* @__PURE__ */ React.createElement(EditModeBanner, { editMode: subEditMode, setEditMode: (v) => v ? enterSubEditMode() : exitSubEditMode(false) }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, (list[editingIdx].subs || []).length === 0 ? /* @__PURE__ */ React.createElement("div", { style: styles.pickerEmpty }, "\u5C1A\u672A\u5EFA\u7ACB\u5B50\u5206\u985E") : (list[editingIdx].subs || []).map((s, si) => {
+        const subs = list[editingIdx].subs || [];
+        return /* @__PURE__ */ React.createElement(
+          Block,
+          {
+            key: s + si,
+            blockKey: s,
+            editMode: subEditMode,
+            isFirst: si === 0,
+            isLast: si === subs.length - 1,
+            onMoveUp: () => moveSub(si, -1),
+            onMoveDown: () => moveSub(si, 1),
+            onReorder: (newOrder) => reorderSubs(newOrder),
+            inline: true,
+            compactInline: true
+          },
+          /* @__PURE__ */ React.createElement("div", { style: styles.subRow }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 14, color: "var(--text)" } }, s), !subEditMode && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: styles.subRowBtn,
+              onClick: () => {
+                setSubInputMode("edit");
+                setSubInputValue(s);
+                setSubEditIdx(si);
+                setSubInputLocked(true);
+              }
+            },
+            "\u7DE8\u8F2F"
+          ), /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: { ...styles.subRowBtn, color: "var(--pink-text)" },
+              onClick: () => {
+                if (setConfirmDialog) {
+                  const affected = state.transactions.filter(
+                    (x) => x.type === catType && x.category === list[editingIdx].label && x.subCategory === s
+                  ).length;
+                  const parentLabel = list[editingIdx].label;
+                  setConfirmDialog({
+                    title: "\u522A\u9664 \u5B50\u5206\u985E \u540D\u7A31",
+                    target: { label: "\u540D\u7A31", name: s },
+                    message: affected > 0 ? `\u5C07\u5F71\u97FF ${affected} \u7B46 \u6536\u652F\u7D00\u9304
+\u4F46\u9019\u4E9B\u7D00\u9304\u4E0D\u6703\u88AB\u522A\u9664
+\u53EA\u6703\u6E05\u7A7A \u5B50\u5206\u985E\u6B04\u4F4D` : `\u76EE\u524D\u6C92\u6709\u7D00\u9304\u4F7F\u7528\u6B64\u5B50\u5206\u985E`,
+                    highlightWords: ["\u5B50\u5206\u985E\u6B04\u4F4D"],
+                    confirmText: "\u522A\u9664",
+                    danger: true,
+                    onConfirm: () => {
+                      setState((st) => {
+                        const newCats = [...st.categories[catType]];
+                        newCats[editingIdx] = {
+                          ...newCats[editingIdx],
+                          subs: (newCats[editingIdx].subs || []).filter((_, idx) => idx !== si)
+                        };
+                        const newTxns = st.transactions.map(
+                          (x) => x.type === catType && x.category === list[editingIdx].label && x.subCategory === s ? { ...x, subCategory: "" } : x
+                        );
+                        return { ...st, categories: { ...st.categories, [catType]: newCats }, transactions: newTxns };
+                      });
+                      toastRich({
+                        title: "\u5DF2\u522A\u9664\u5B50\u5206\u985E",
+                        amount: "\u2713",
+                        amountColor: "var(--pink)",
+                        lines: [`\u300C${s}\u300D`, affected > 0 ? `${affected} \u7B46\u7D00\u9304\u5DF2\u6E05\u9664\u5B50\u5206\u985E\u6B04\u4F4D` : null].filter(Boolean)
+                      });
+                    }
+                  });
+                }
+              }
+            },
+            "\u522A\u9664"
+          )))
+        );
+      }))), /* @__PURE__ */ React.createElement("button", { style: { ...styles.saveBtn, background: "var(--mint)", color: "var(--on-mint)", marginTop: 16 }, onClick: save }, "\u5132\u5B58"), /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, marginTop: 6 }, onClick: () => cancel(editingIdx !== "new" && list[editingIdx] ? list[editingIdx].label : null) }, "\u53D6\u6D88"), editingIdx !== "new" && /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, marginTop: 6 }, onClick: () => remove(editingIdx) }, "\u522A\u9664\u6B64\u5206\u985E")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.txnList, gap: 4 } }, list.map((c, i) => /* @__PURE__ */ React.createElement(
+        Block,
+        {
+          key: c.label,
+          blockKey: c.label,
+          editMode,
+          isFirst: i === 0,
+          isLast: i === list.length - 1,
+          onMoveUp: () => moveCat(i, -1),
+          onMoveDown: () => moveCat(i, 1),
+          onReorder: (newOrder) => reorderCats(newOrder),
+          inline: true,
+          compactInline: true
+        },
+        /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            style: {
+              ...styles.txn,
+              border: "1px dashed var(--border)",
+              borderRadius: 10,
+              padding: "6px 10px",
+              ...flashLabel === c.label ? { animation: "returnFlash 0.9s ease" } : {}
+            }
+          },
+          /* @__PURE__ */ React.createElement("div", { style: styles.txnIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: c.icon, size: 22, color: "var(--text)" })),
+          /* @__PURE__ */ React.createElement("div", { style: styles.txnInfo, onClick: () => !editMode && startEdit(i) }, /* @__PURE__ */ React.createElement("div", { style: styles.txnCat }, c.label, c.subs?.length > 0 && /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, fontSize: 11, color: "var(--text-faint)", fontWeight: 400 } }, "\u5B50\u5206\u985E ", c.subs.length, " \u7B46"))),
+          /* @__PURE__ */ React.createElement("div", { style: { color: "var(--text-faint)", fontSize: 18, marginLeft: 4 }, onClick: () => !editMode && startEdit(i) }, "\u203A")
+        )
+      ))), !editMode && /* @__PURE__ */ React.createElement("div", { style: { height: 12 } }))
+    )),
+    editingIdx === null && !editMode && /* @__PURE__ */ React.createElement("div", { style: { ...styles.stickyFooterBar, padding: "6px 16px calc(16px + env(safe-area-inset-bottom, 0px))" } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          ...styles.saveBtn,
+          background: "var(--mint)",
+          color: "var(--on-mint)",
+          marginTop: 0,
+          width: "100%",
+          padding: "14px 0",
+          borderRadius: 12
+        },
+        onClick: startAdd
+      },
+      "\uFF0B \u65B0\u589E",
+      typeLabel,
+      "\u5206\u985E"
+    )),
+    subInputMode && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setSubInputMode(null) }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerCard, onClick: (e) => e.stopPropagation(), ...subInputSwipe }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.pickerTitle, fontSize: 17, fontWeight: 700, padding: "14px 16px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 } }, /* @__PURE__ */ React.createElement("span", null, subInputMode === "new" ? "\u65B0\u589E\u5B50\u5206\u985E" : "\u4FEE\u6539\u5B50\u5206\u985E\u540D\u7A31"), subInputMode === "edit" && /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick: () => setSubInputLocked((v) => !v),
+        style: { ...styles.lockRow, cursor: "pointer", userSelect: "none" }
+      },
+      /* @__PURE__ */ React.createElement("span", { style: { ...styles.lockLabel, color: subInputLocked ? "var(--text-dim)" : "var(--mint)", display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: subInputLocked ? "lock" : "unlock", size: 12, color: subInputLocked ? "var(--text-dim)" : "var(--mint)" }), subInputLocked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"),
+      /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: { ...styles.toggleTrack, background: subInputLocked ? "var(--bg-card)" : "var(--mint)" }
+        },
+        /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: subInputLocked ? "translateX(0)" : "translateX(18px)" } })
+      )
+    )), /* @__PURE__ */ React.createElement("div", { style: { padding: "14px 16px" } }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "text",
+        style: {
+          ...styles.field,
+          ...subInputLocked ? { opacity: 0.6, cursor: "not-allowed" } : {}
+        },
+        value: subInputValue,
+        onChange: (e) => setSubInputValue(e.target.value),
+        placeholder: "\u8ACB\u8F38\u5165\u5B50\u5206\u985E\u540D\u7A31",
+        maxLength: 20,
+        readOnly: subInputLocked
+      }
+    )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "0 16px 16px" } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: { ...styles.deleteBtn, flex: 1, marginTop: 0 },
+        onClick: () => setSubInputMode(null)
+      },
+      "\u53D6\u6D88"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          ...styles.saveBtn,
+          flex: 1,
+          background: "var(--mint)",
+          color: "var(--on-mint)",
+          marginTop: 0,
+          opacity: subInputLocked ? 0.4 : 1,
+          cursor: subInputLocked ? "not-allowed" : "pointer"
+        },
+        onClick: () => {
+          if (subInputLocked) {
+            toast("\u8ACB\u5148\u89E3\u9396\u624D\u80FD\u5132\u5B58");
+            return;
+          }
+          const val = subInputValue.trim();
+          if (!val) return alert("\u8ACB\u8F38\u5165\u540D\u7A31");
+          const currentSubs = list[editingIdx].subs || [];
+          if (subInputMode === "new") {
+            if (currentSubs.includes(val)) return alert("\u6B64\u5B50\u5206\u985E\u5DF2\u5B58\u5728");
+            setState((s) => {
+              const newCats = [...s.categories[catType]];
+              newCats[editingIdx] = { ...newCats[editingIdx], subs: [...newCats[editingIdx].subs || [], val] };
+              return { ...s, categories: { ...s.categories, [catType]: newCats } };
+            });
+            toastRich({
+              title: "\u5DF2\u65B0\u589E\u5B50\u5206\u985E",
+              amount: "\u2713",
+              amountColor: "var(--mint)",
+              lines: [`\u300C${val}\u300D`, list[editingIdx].label]
+            });
+          } else {
+            const oldVal = currentSubs[subEditIdx];
+            if (val === oldVal) {
+              setSubInputMode(null);
+              return;
+            }
+            if (currentSubs.includes(val)) return alert("\u6B64\u5B50\u5206\u985E\u5DF2\u5B58\u5728");
+            setState((st) => {
+              const newCats = [...st.categories[catType]];
+              const subs = [...newCats[editingIdx].subs || []];
+              subs[subEditIdx] = val;
+              newCats[editingIdx] = { ...newCats[editingIdx], subs };
+              const newTxns = st.transactions.map(
+                (x) => x.type === catType && x.category === list[editingIdx].label && x.subCategory === oldVal ? { ...x, subCategory: val } : x
+              );
+              return { ...st, categories: { ...st.categories, [catType]: newCats }, transactions: newTxns };
+            });
+            toastRich({
+              titleSegments: [
+                "\u5DF2\u66F4\u65B0",
+                "\n",
+                typeLabel,
+                " ",
+                { text: "\u5B50\u5206\u985E", color: "var(--blue)" },
+                " ",
+                "\u540D\u7A31"
+              ],
+              amount: "\u2713",
+              amountColor: "var(--mint)",
+              lines: [`\u300C${oldVal}\u300D \u2192 \u300C${val}\u300D`, list[editingIdx].label]
+            }, 3500);
+          }
+          setSubInputMode(null);
+        }
+      },
+      "\u78BA\u5B9A"
+    ))))
+  );
+}
+function AccountTypeManageSheet({ state, setState, toast, toastRich, onClose, setConfirmDialog }) {
+  const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
+  const list = state.accountTypes || [];
+  const [editingIdx, setEditingIdx] = useState(null);
+  const [label, setLabel] = useState("");
+  const [icon, setIcon] = useState(TYPE_ICONS[0]);
+  const [color, setColor] = useState(TYPE_COLORS[0]);
+  const [palette, setPalette] = useState("pastel");
+  const [shade, setShade] = useState(0);
+  const [editMode, setEditMode] = useState(false);
+  const [labelLocked, setLabelLocked] = useState(false);
+  const [iconLocked, setIconLocked] = useState(false);
+  const reorderTypes = (newValueOrder) => {
+    setState((s) => {
+      const arr = s.accountTypes || [];
+      const map = new Map(arr.map((t) => [t.value, t]));
+      const reordered = newValueOrder.map((v) => map.get(v)).filter(Boolean);
+      arr.forEach((t) => {
+        if (!newValueOrder.includes(t.value)) reordered.push(t);
+      });
+      return { ...s, accountTypes: reordered };
+    });
+  };
+  const startAdd = () => {
+    setEditingIdx("new");
+    setLabel("");
+    setIcon(TYPE_ICONS[0]);
+    setColor(TYPE_COLORS[0]);
+    setPalette("pastel");
+    setShade(0);
+    setLabelLocked(false);
+    setIconLocked(false);
+  };
+  const startEdit = (i) => {
+    setEditingIdx(i);
+    setLabel(list[i].label);
+    setIcon(list[i].icon || TYPE_ICONS[0]);
+    setColor(list[i].color || TYPE_COLORS[0]);
+    setPalette("pastel");
+    setShade(0);
+    setLabelLocked(true);
+    setIconLocked(true);
+  };
+  const cancel = () => {
+    setEditingIdx(null);
+    setLabel("");
+  };
+  const save = () => {
+    const t = label.trim();
+    if (!t) return alert("\u8ACB\u8F38\u5165\u985E\u578B\u540D\u7A31");
+    const finalColor = adjustShade(color, shade);
+    if (editingIdx === "new") {
+      const newValue = "type_" + Date.now().toString(36);
+      setState((s) => ({
+        ...s,
+        accountTypes: [...s.accountTypes, { value: newValue, label: t, icon, color: finalColor }]
+      }));
+      if (toastRich) {
+        toastRich({
+          title: "\u5DF2\u65B0\u589E\u985E\u578B",
+          amount: "\u2713",
+          amountColor: "var(--mint)",
+          lines: [`\u300C${t}\u300D`]
+        }, 1400);
+      } else {
+        toast("\u5DF2\u65B0\u589E");
+      }
+      cancel();
+      return;
+    }
+    const original = list[editingIdx];
+    if (!original) {
+      cancel();
+      return;
+    }
+    const labelChanged = t !== original.label;
+    const iconChanged = icon !== (original.icon || TYPE_ICONS[0]);
+    const colorChanged = finalColor !== (original.color || TYPE_COLORS[0]);
+    if (!labelChanged && !iconChanged && !colorChanged) {
+      if (toastRich) {
+        toastRich({
+          title: "\u6C92\u6709\u4EFB\u4F55\u8B8A\u66F4",
+          amount: "\u2713",
+          icon: "info",
+          amountColor: "var(--text-faint)",
+          lines: [`\u300C${original.label}\u300D\u8CC7\u6599\u672A\u8ABF\u6574`]
+        }, 1400);
+      } else {
+        toast("\u6C92\u6709\u4EFB\u4F55\u8B8A\u66F4");
+      }
+      cancel();
+      return;
+    }
+    setState((s) => {
+      const arr = [...s.accountTypes];
+      arr[editingIdx] = { ...arr[editingIdx], label: t, icon, color: finalColor };
+      return { ...s, accountTypes: arr };
+    });
+    const changedParts = [];
+    if (labelChanged) changedParts.push("\u540D\u7A31");
+    if (iconChanged) changedParts.push("\u5716\u793A");
+    if (colorChanged) changedParts.push("\u984F\u8272");
+    if (toastRich) {
+      toastRich(labelChanged ? {
+        titleSegments: [
+          "\u5DF2\u66F4\u65B0",
+          "\n",
+          { text: "\u5E33\u6236\u985E\u578B", color: "var(--blue)" },
+          " ",
+          changedParts.join("\u3001")
+        ],
+        amount: "\u2713",
+        amountColor: "var(--mint)",
+        lines: [`\u300C${original.label}\u300D \u2192 \u300C${t}\u300D`]
+      } : {
+        title: `\u5DF2\u66F4\u65B0 ${changedParts.join("\u3001")}`,
+        amount: "\u2713",
+        amountColor: "var(--mint)",
+        lines: [`\u300C${t}\u300D`]
+      }, labelChanged ? 3500 : 1400);
+    } else {
+      toast(`\u5DF2\u66F4\u65B0 ${changedParts.join("\u3001")}`);
+    }
+    cancel();
+  };
+  const remove = (i) => {
+    const target = list[i];
+    const used = state.accounts.some((a) => a.type === target.value);
+    const msg = used ? `\u6709\u5E33\u6236\u6B63\u5728\u4F7F\u7528\u300C${target.label}\u300D\u985E\u578B\uFF0C\u522A\u9664\u5F8C\u90A3\u4E9B\u5E33\u6236\u7684\u985E\u578B\u6703\u8B8A\u6210\u7A7A\u3002\u78BA\u5B9A\u522A\u9664\uFF1F` : `\u78BA\u5B9A\u522A\u9664\u300C${target.label}\u300D\u985E\u578B\uFF1F`;
+    if (setConfirmDialog) {
+      setConfirmDialog({
+        title: "\u522A\u9664\u5E33\u6236\u985E\u578B",
+        message: msg,
+        confirmText: "\u522A\u9664",
+        danger: true,
+        onConfirm: () => {
+          setState((s) => ({
+            ...s,
+            accountTypes: s.accountTypes.filter((_, idx) => idx !== i)
+          }));
+          cancel();
+          toast("\u5DF2\u522A\u9664");
+        }
+      });
+    }
+  };
+  const moveType = (i, delta) => {
+    const newIdx = i + delta;
+    if (newIdx < 0 || newIdx >= list.length) return;
+    setState((s) => {
+      const arr = [...s.accountTypes];
+      [arr[i], arr[newIdx]] = [arr[newIdx], arr[i]];
+      return { ...s, accountTypes: arr };
+    });
+  };
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-sheet": "true",
+      style: {
+        ...styles.sheet,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: { width: 50 } }), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, "\u5E33\u6236\u985E\u578B\u7BA1\u7406"), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 50, display: "flex", justifyContent: "flex-end" } }, editingIdx === null && /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode }))),
+    /* @__PURE__ */ React.createElement(EditModeBanner, { editMode, setEditMode }),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll, "data-scroll-container": true }, editingIdx !== null ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", null, "\u985E\u578B\u540D\u7A31"), /* @__PURE__ */ React.createElement("div", { style: styles.lockRow }, /* @__PURE__ */ React.createElement("span", { style: { ...styles.lockLabel, color: labelLocked ? "var(--text-dim)" : "var(--mint)", display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: labelLocked ? "lock" : "unlock", size: 12, color: labelLocked ? "var(--text-dim)" : "var(--mint)" }), labelLocked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: { ...styles.toggleTrack, background: labelLocked ? "var(--bg-card)" : "var(--mint)" },
+        onClick: () => setLabelLocked((v) => !v)
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: labelLocked ? "translateX(0)" : "translateX(18px)" } })
+    ))), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "text",
+        style: { ...styles.field, opacity: labelLocked ? 0.55 : 1 },
+        value: label,
+        onChange: (e) => setLabel(e.target.value),
+        placeholder: "\u4F8B\u5982\uFF1A\u80A1\u7968\u3001\u57FA\u91D1\u3001\u52A0\u5BC6\u8CA8\u5E63",
+        readOnly: labelLocked,
+        maxLength: 10
+      }
+    ), /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", null, "\u5716\u793A"), /* @__PURE__ */ React.createElement("div", { style: styles.lockRow }, /* @__PURE__ */ React.createElement("span", { style: { ...styles.lockLabel, color: iconLocked ? "var(--text-dim)" : "var(--mint)", display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: iconLocked ? "lock" : "unlock", size: 12, color: iconLocked ? "var(--text-dim)" : "var(--mint)" }), iconLocked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: { ...styles.toggleTrack, background: iconLocked ? "var(--bg-card)" : "var(--mint)" },
+        onClick: () => setIconLocked((v) => !v)
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: iconLocked ? "translateX(0)" : "translateX(18px)" } })
+    ))), /* @__PURE__ */ React.createElement("div", { style: { ...styles.iconGrid, opacity: iconLocked ? 0.55 : 1, pointerEvents: iconLocked ? "none" : "auto" } }, TYPE_ICONS.map((ic) => {
+      const selected = icon === ic;
+      const finalColor = adjustShade(color, shade);
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: ic,
+          tabIndex: -1,
+          style: {
+            ...styles.iconCell,
+            ...selected ? { background: finalColor, outline: "2px solid #fff", outlineOffset: "-2px" } : {}
+          },
+          onClick: () => setIcon(ic)
+        },
+        /* @__PURE__ */ React.createElement(TypeIcon, { name: ic, size: 36, color: selected ? "#fff" : "var(--text-dim)" })
+      );
+    })), /* @__PURE__ */ React.createElement("div", { style: { ...styles.sectionLabel, marginTop: 14 } }, /* @__PURE__ */ React.createElement("span", null, "\u984F\u8272"), /* @__PURE__ */ React.createElement("div", { style: styles.colorTargetSwitch }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          ...styles.colorTargetBtn,
+          ...palette === "pastel" ? styles.colorTargetBtnActive : {}
+        },
+        onClick: () => setPalette("pastel")
+      },
+      "\u67D4\u548C"
+    ), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          ...styles.colorTargetBtn,
+          ...palette === "solid" ? styles.colorTargetBtnActive : {}
+        },
+        onClick: () => setPalette("solid")
+      },
+      "\u7D14\u8272"
+    ))), /* @__PURE__ */ React.createElement("div", { style: styles.colorGrid }, (palette === "pastel" ? TYPE_COLORS : SOLID_COLORS).map((co) => {
+      const isSelected = color === co;
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: co,
+          tabIndex: -1,
+          style: {
+            ...styles.colorCell,
+            background: co,
+            ...isSelected ? { outline: "2px solid #fff", outlineOffset: "-2px", transform: "scale(1.1)" } : {}
+          },
+          onClick: () => setColor(co)
+        }
+      );
+    })), /* @__PURE__ */ React.createElement("div", { style: { ...styles.sectionLabel, marginTop: 14, marginBottom: 6 } }, /* @__PURE__ */ React.createElement("span", null, "\u6DF1\u6DFA"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "var(--text-faint)" } }, shade > 0 ? `\u4EAE +${shade}%` : shade < 0 ? `\u6697 ${shade}%` : "\u539F\u8272")), /* @__PURE__ */ React.createElement("div", { style: styles.shadeRow, onTouchStart: (e) => e.stopPropagation(), onTouchMove: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("span", { style: styles.shadeLabelDim }, "\u6697"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "range",
+        min: "-100",
+        max: "100",
+        step: "2",
+        value: shade,
+        onChange: (e) => {
+          const v = parseInt(e.target.value);
+          if (v !== shade && navigator.vibrate) navigator.vibrate(3);
+          setShade(v);
+        },
+        onTouchStart: (e) => e.stopPropagation(),
+        onTouchMove: (e) => e.stopPropagation(),
+        style: { ...styles.shadeSlider, accentColor: adjustShade(color, shade) }
+      }
+    ), /* @__PURE__ */ React.createElement("span", { style: styles.shadeLabelDim }, "\u4EAE")), /* @__PURE__ */ React.createElement("button", { style: { ...styles.saveBtn, background: "var(--mint)", color: "var(--on-mint)", marginTop: 20 }, onClick: save }, "\u5132\u5B58"), /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, marginTop: 6 }, onClick: cancel }, "\u53D6\u6D88"), editingIdx !== "new" && /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, marginTop: 6 }, onClick: () => remove(editingIdx) }, "\u522A\u9664\u6B64\u985E\u578B")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: styles.txnList }, list.map((t, i) => /* @__PURE__ */ React.createElement(
+      Block,
+      {
+        key: t.value,
+        blockKey: t.value,
+        editMode,
+        isFirst: i === 0,
+        isLast: i === list.length - 1,
+        onMoveUp: () => moveType(i, -1),
+        onMoveDown: () => moveType(i, 1),
+        onReorder: (newOrder) => reorderTypes(newOrder),
+        inline: true
+      },
+      /* @__PURE__ */ React.createElement("div", { style: styles.txn }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.acctListIcon, background: t.color || "#f5c29c" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: t.icon || "box", size: 22, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: styles.txnInfo, onClick: () => !editMode && startEdit(i) }, /* @__PURE__ */ React.createElement("div", { style: styles.txnCat }, t.label)), /* @__PURE__ */ React.createElement("div", { style: { color: "var(--text-faint)", fontSize: 18, marginLeft: 4 }, onClick: () => !editMode && startEdit(i) }, "\u203A"))
+    ))), !editMode && /* @__PURE__ */ React.createElement("div", { style: { height: 12 } }))),
+    editingIdx === null && !editMode && /* @__PURE__ */ React.createElement("div", { style: styles.stickyFooterBar }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          ...styles.saveBtn,
+          background: "var(--mint)",
+          color: "var(--on-mint)",
+          marginTop: 0,
+          width: "100%",
+          padding: "14px 0",
+          borderRadius: 12
+        },
+        onClick: startAdd
+      },
+      "\uFF0B \u65B0\u589E\u5E33\u6236\u985E\u578B"
+    ))
+  );
+}
+function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSell, onBuyHolding, onSellHolding, onUpdateMarketValue, onOpenHolding }) {
+  const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
+  const [currentMonth, setCurrentMonth] = useState(todayStr().slice(0, 7));
+  const [showFilter, setShowFilter] = useState(false);
+  const filterSwipe = useSwipeToClose(() => setShowFilter(false));
+  const [filterMode, setFilterMode] = useState(false);
+  const [fStart, setFStart] = useState(todayStr().slice(0, 7) + "-01");
+  const [fEnd, setFEnd] = useState(todayStr());
+  const [fType, setFType] = useState("all");
+  const [fKeyword, setFKeyword] = useState("");
+  const PAGE_SIZE = 150;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  React.useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [filterMode, fStart, fEnd, fType, fKeyword, currentMonth, account?.id]);
+  const shiftMonth = (delta) => {
+    const [y, m] = currentMonth.split("-").map(Number);
+    let ny = y, nm = m + delta;
+    if (nm < 1) {
+      nm = 12;
+      ny -= 1;
+    }
+    if (nm > 12) {
+      nm = 1;
+      ny += 1;
+    }
+    setCurrentMonth(`${ny}-${String(nm).padStart(2, "0")}`);
+  };
+  const typeMeta = state.accountTypes.find((t) => t.value === account.type) || { label: "\u5176\u4ED6", icon: "box", color: "#f5c29c" };
+  const balance = calcBalance(account, state.transactions);
+  const isInvest = account.type === "invest";
+  let txns;
+  if (isInvest) {
+    txns = state.transactions.filter((t) => t.accountId === account.id).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+  } else if (filterMode) {
+    txns = state.transactions.filter((t) => t.accountId === account.id).filter((t) => t.date >= fStart && t.date <= fEnd).filter((t) => {
+      if (fType === "all") return true;
+      if (fType === "stock") return !!(t.tradeId || t.settleId);
+      return t.type === fType;
+    }).filter((t) => {
+      if (!fKeyword.trim()) return true;
+      const kw = fKeyword.trim().toLowerCase();
+      return (t.category || "").toLowerCase().includes(kw) || (t.note || "").toLowerCase().includes(kw);
+    }).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+  } else {
+    txns = txnsInMonth(account, state.transactions, currentMonth);
+  }
+  const sumIncome = txns.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
+  const sumExpense = txns.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+  const applyFilter = () => {
+    setFilterMode(true);
+    setShowFilter(false);
+  };
+  const clearFilter = () => {
+    setFilterMode(false);
+    setShowFilter(false);
+  };
+  const [editMode, setEditMode] = useState(false);
+  const [blockOrder, setBlockOrder] = useState(() => {
+    const defaults = isInvest ? ["hero", "holdings", "list"] : ["hero", "monthBar", "summary", "list"];
+    const blockOrderKey = isInvest ? "ledger_invest_account_order" : "ledger_account_order";
+    try {
+      const raw = localStorage.getItem(blockOrderKey);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        const defSet = new Set(defaults);
+        const filtered = Array.isArray(saved) ? saved.filter((k) => defSet.has(k)) : [];
+        const missing = defaults.filter((k) => !filtered.includes(k));
+        if (missing.length === 0) return filtered;
+        const result = [...filtered];
+        for (const miss of missing) {
+          const defIdx = defaults.indexOf(miss);
+          let nextKey = null;
+          for (let i = defIdx + 1; i < defaults.length; i++) {
+            if (result.includes(defaults[i])) {
+              nextKey = defaults[i];
+              break;
+            }
+          }
+          if (nextKey) {
+            const insertAt = result.indexOf(nextKey);
+            result.splice(insertAt, 0, miss);
+          } else {
+            result.push(miss);
+          }
+        }
+        return result;
+      }
+    } catch {
+    }
+    return defaults;
+  });
+  React.useEffect(() => {
+    const blockOrderKey = isInvest ? "ledger_invest_account_order" : "ledger_account_order";
+    try {
+      localStorage.setItem(blockOrderKey, JSON.stringify(blockOrder));
+    } catch {
+    }
+  }, [blockOrder, isInvest]);
+  const moveBlock = (key, dir) => {
+    setBlockOrder((prev) => {
+      const i = prev.indexOf(key);
+      if (i < 0) return prev;
+      const j = i + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  };
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-sheet": "true",
+      style: {
+        ...styles.sheet,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: { minWidth: 70 } }), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, account.name), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4, minWidth: 70, justifyContent: "flex-end" } }, !editMode && account.type !== "invest" && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          ...styles.editOrderBtn,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        },
+        onClick: () => setShowFilter(true),
+        "aria-label": "\u641C\u5C0B"
+      },
+      /* @__PURE__ */ React.createElement(TypeIcon, { name: "search", size: 16, color: "var(--text-dim)" })
+    ), /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode }))),
+    /* @__PURE__ */ React.createElement(EditModeBanner, { editMode, setEditMode }),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll, "data-scroll-container": true }, blockOrder.map((blockKey, idx) => {
+      const blockProps = {
+        blockKey,
+        editMode,
+        isFirst: idx === 0,
+        isLast: idx === blockOrder.length - 1,
+        onMoveUp: () => moveBlock(blockKey, -1),
+        onMoveDown: () => moveBlock(blockKey, 1),
+        onReorder: (newOrder) => setBlockOrder(newOrder),
+        inline: true
+      };
+      if (blockKey === "hero") {
+        if (isInvest) {
+          const summary = investAccountSummary(account, state.holdings, state.trades);
+          const totalMarket = summary ? summary.totalMarket : 0;
+          const totalCost = summary ? summary.totalCost : 0;
+          const totalPnl = summary ? summary.totalPnl : 0;
+          const pnlPct = totalCost > 0 ? totalPnl / totalCost * 100 : 0;
+          const pnlColor = totalPnl >= 0 ? "var(--mint-text)" : "var(--pink-text)";
+          const hasData = totalMarket > 0 || totalCost > 0;
+          return /* @__PURE__ */ React.createElement(Block, { key: "hero", ...blockProps }, /* @__PURE__ */ React.createElement("div", { style: {
+            background: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            borderRadius: 16,
+            padding: "20px 18px 18px",
+            textAlign: "center"
+          } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", letterSpacing: 1, marginBottom: 6 } }, "\u7E3D\u5E02\u503C"), /* @__PURE__ */ React.createElement("div", { style: {
+            fontSize: 34,
+            fontWeight: 800,
+            letterSpacing: 0.5,
+            fontFamily: "var(--num-font)",
+            lineHeight: 1.1
+          } }, fmt(totalMarket)), hasData && /* @__PURE__ */ React.createElement("div", { style: {
+            marginTop: 8,
+            display: "inline-flex",
+            alignItems: "baseline",
+            gap: 8,
+            color: pnlColor,
+            fontWeight: 700
+          } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, fontFamily: "var(--num-font)" } }, totalPnl >= 0 ? "+" : "", fmt(totalPnl)), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, fontFamily: "var(--num-font)" } }, "(", totalPnl >= 0 ? "+" : "", pnlPct.toFixed(2), "%)")), /* @__PURE__ */ React.createElement("div", { style: {
+            marginTop: 14,
+            paddingTop: 12,
+            borderTop: "1px solid var(--border)",
+            display: "flex",
+            justifyContent: "space-around",
+            fontSize: 12,
+            color: "var(--text-dim)"
+          } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginBottom: 2 } }, "\u6295\u5165\u6210\u672C"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "var(--text)", fontFamily: "var(--num-font)" } }, fmt(totalCost))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginBottom: 2 } }, "\u6301\u80A1"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "var(--text)", fontFamily: "var(--num-font)" } }, state.holdings.filter((h) => h.accountId === account.id && holdingShares(h, state.trades) > 0).length, " \u6A94")))));
+        }
+        return /* @__PURE__ */ React.createElement(Block, { key: "hero", ...blockProps }, /* @__PURE__ */ React.createElement("div", { style: styles.acctHeroCard }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.acctListIcon, background: typeMeta.color || "#f5c29c", width: 52, height: 52 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: typeMeta.icon || "box", size: 26, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.acctHeroMeta }, typeMeta.label), /* @__PURE__ */ React.createElement("div", { style: styles.acctHeroBalance }, balance.toLocaleString()), /* @__PURE__ */ React.createElement("div", { style: styles.acctHeroInit }, "\u521D\u59CB ", (() => {
+          const ia = account.initAmount || 0;
+          return ia.toLocaleString();
+        })()))));
+      }
+      if (blockKey === "holdings" && account.type === "invest" && (account.investSubType || "stock") === "stock") {
+        const myHoldings = state.holdings.filter((h) => h.accountId === account.id);
+        const activeHoldings = myHoldings.filter((h) => holdingShares(h, state.trades) > 0);
+        return /* @__PURE__ */ React.createElement(Block, { key: "holdings", ...blockProps }, /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 13,
+          color: "var(--text-dim)",
+          fontWeight: 500,
+          marginBottom: 8,
+          paddingLeft: 4
+        } }, "\u6301\u80A1"), activeHoldings.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: {
+          padding: "24px 16px",
+          textAlign: "center",
+          color: "var(--text-faint)",
+          fontSize: 13
+        } }, "\u5C1A\u672A\u6301\u6709\u4EFB\u4F55\u80A1\u7968") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, activeHoldings.map((h) => {
+          const shares = holdingShares(h, state.trades);
+          const cost = holdingCost(h, state.trades);
+          const market = h.marketValue || 0;
+          const pnl = market - cost;
+          const pnlPct = cost > 0 ? pnl / cost * 100 : 0;
+          const avgPrice = shares > 0 ? cost / shares : 0;
+          const hasMarket = market > 0;
+          const pnlColor = pnl >= 0 ? "var(--mint-text)" : "var(--pink-text)";
+          return /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              key: h.id,
+              onClick: () => onOpenHolding && onOpenHolding(h),
+              style: {
+                padding: "14px 16px",
+                borderRadius: 14,
+                background: "var(--bg-card)",
+                border: "1px solid var(--border)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 12
+              }
+            },
+            /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: {
+              fontSize: 18,
+              fontWeight: 800,
+              letterSpacing: 0.3,
+              lineHeight: 1.15
+            } }, h.symbol), h.name && /* @__PURE__ */ React.createElement("div", { style: {
+              fontSize: 12,
+              color: "var(--text-dim)",
+              marginTop: 2,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap"
+            } }, h.name), /* @__PURE__ */ React.createElement("div", { style: {
+              fontSize: 11,
+              color: "var(--text-faint)",
+              marginTop: 6,
+              fontFamily: "var(--num-font)"
+            } }, shares.toLocaleString(), " \u80A1 \xB7 \u5747\u50F9 ", avgPrice >= 100 ? fmt(Math.round(avgPrice)) : avgPrice.toFixed(2))),
+            /* @__PURE__ */ React.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, hasMarket ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: {
+              fontSize: 17,
+              fontWeight: 700,
+              fontFamily: "var(--num-font)",
+              lineHeight: 1.15
+            } }, fmt(market)), /* @__PURE__ */ React.createElement("div", { style: {
+              marginTop: 4,
+              fontSize: 12,
+              fontWeight: 700,
+              color: pnlColor,
+              fontFamily: "var(--num-font)"
+            } }, pnl >= 0 ? "+" : "", fmt(pnl), " (", pnl >= 0 ? "+" : "", pnlPct.toFixed(2), "%)")) : /* @__PURE__ */ React.createElement("div", { style: {
+              fontSize: 12,
+              color: "var(--mint-text)",
+              fontWeight: 600
+            } }, "\u9EDE\u6B64\u8A2D\u5B9A\u5E02\u503C"))
+          );
+        })), /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: () => onBuyHolding && onBuyHolding(account, null),
+            style: {
+              marginTop: 12,
+              width: "100%",
+              padding: "12px",
+              background: "var(--mint)",
+              color: "#fff",
+              border: "none",
+              borderRadius: 12,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer"
+            }
+          },
+          "+ \u8CB7\u9032\u80A1\u7968"
+        ));
+      }
+      if (blockKey === "monthBar") {
+        return /* @__PURE__ */ React.createElement(Block, { key: "monthBar", ...blockProps }, filterMode ? /* @__PURE__ */ React.createElement("div", { style: styles.filterBadge }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)" } }, "\u7BE9\u9078\u7D50\u679C"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text)" } }, fStart.replace(/-/g, "/"), " ~ ", fEnd.replace(/-/g, "/"), fType !== "all" && ` \xB7 ${fType === "income" ? "\u6536\u5165" : fType === "expense" ? "\u652F\u51FA" : "\u80A1\u7968"}`, fKeyword && ` \xB7 "${fKeyword}"`)), /* @__PURE__ */ React.createElement("div", { style: styles.filterClearBtn, onClick: () => !editMode && clearFilter() }, "\u2715")) : /* @__PURE__ */ React.createElement("div", { style: styles.acctMonthBar }, /* @__PURE__ */ React.createElement("div", { style: styles.dpNav, onClick: () => !editMode && shiftMonth(-1) }, "\u2039"), /* @__PURE__ */ React.createElement("div", { style: styles.dpMonthTitle }, currentMonth.slice(0, 4), " \u5E74 ", parseInt(currentMonth.slice(5, 7)), " \u6708"), /* @__PURE__ */ React.createElement("div", { style: styles.dpNav, onClick: () => !editMode && shiftMonth(1) }, "\u203A")));
+      }
+      if (blockKey === "summary") {
+        return /* @__PURE__ */ React.createElement(Block, { key: "summary", ...blockProps }, /* @__PURE__ */ React.createElement("div", { style: styles.acctMonthSummary }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: styles.acctSumLabel }, "\u6536\u5165"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.acctSumVal, color: "var(--mint-text)" } }, "+", sumIncome.toLocaleString())), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: styles.acctSumLabel }, "\u652F\u51FA"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.acctSumVal, color: "var(--pink-text)" } }, "\u2212", sumExpense.toLocaleString())), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: styles.acctSumLabel }, "\u6DE8\u984D"), /* @__PURE__ */ React.createElement("div", { style: styles.acctSumVal }, sumIncome - sumExpense >= 0 ? "+" : "", (sumIncome - sumExpense).toLocaleString()))));
+      }
+      if (blockKey === "list") {
+        const emptyText = isInvest ? "\u5C1A\u7121\u76F8\u95DC\u4EA4\u6613\u7D00\u9304" : filterMode ? "\u7121\u7B26\u5408\u689D\u4EF6\u7684\u4EA4\u6613" : "\u672C\u6708\u66AB\u7121\u4EA4\u6613";
+        return /* @__PURE__ */ React.createElement(Block, { key: "list", ...blockProps }, isInvest && /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 13,
+          color: "var(--text-dim)",
+          fontWeight: 500,
+          marginBottom: 8,
+          paddingLeft: 4
+        } }, "\u4EA4\u6613\u7D00\u9304"), txns.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: styles.emptyAccountHint }, emptyText) : /* @__PURE__ */ React.createElement("div", { style: styles.txnList }, txns.slice(0, visibleCount).map((t) => /* @__PURE__ */ React.createElement(
+          TxnRow,
+          {
+            key: t.id,
+            txn: t,
+            state,
+            catIcon,
+            onClick: () => !editMode && onClickTxn(t)
+          }
+        )), visibleCount < txns.length && /* @__PURE__ */ React.createElement(
+          LoadMoreSentinel,
+          {
+            remain: txns.length - visibleCount,
+            onLoadMore: () => setVisibleCount((v) => Math.min(v + PAGE_SIZE, txns.length))
+          }
+        )));
+      }
+      return null;
+    })),
+    showFilter && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.actionMenuBackdrop, onClick: () => setShowFilter(false), ...filterSwipe }, /* @__PURE__ */ React.createElement("div", { style: styles.filterCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.actionMenuTitle }, "\u7BE9\u9078\u689D\u4EF6"), /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u8D77\u59CB\u65E5\u671F"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "date",
+        style: styles.field,
+        value: fStart,
+        onChange: (e) => setFStart(e.target.value)
+      }
+    ), /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u7D50\u675F\u65E5\u671F"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "date",
+        style: styles.field,
+        value: fEnd,
+        onChange: (e) => setFEnd(e.target.value)
+      }
+    ), /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u985E\u578B"), /* @__PURE__ */ React.createElement("div", { style: styles.typeToggle }, [
+      { v: "expense", l: "\u652F\u51FA" },
+      { v: "income", l: "\u6536\u5165" },
+      { v: "stock", l: "\u80A1\u7968" },
+      { v: "all", l: "\u5168\u90E8" }
+    ].map((opt) => /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: opt.v,
+        onClick: () => {
+          setFType(opt.v);
+          if (opt.v === "stock") {
+            setFCategory("all");
+            setFSubCategory("all");
+          }
+        },
+        style: {
+          ...styles.typeBtn,
+          ...fType === opt.v ? opt.v === "income" ? { background: "var(--mint)", color: "var(--on-mint)" } : opt.v === "expense" ? { background: "var(--pink)", color: "var(--on-pink)" } : opt.v === "stock" ? { background: "var(--accent)", color: "#fff" } : { background: "var(--text-dim)", color: "#fff" } : {}
+        }
+      },
+      opt.l
+    ))), /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u95DC\u9375\u5B57\uFF08\u975E\u5FC5\u586B\uFF09"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "text",
+        style: styles.field,
+        value: fKeyword,
+        onChange: (e) => setFKeyword(e.target.value),
+        placeholder: "\u641C\u5C0B\u5206\u985E\u6216\u5099\u8A3B"
+      }
+    ), /* @__PURE__ */ React.createElement("button", { style: { ...styles.saveBtn, background: "var(--mint)", color: "var(--on-mint)", marginTop: 20 }, onClick: applyFilter }, "\u5957\u7528"), /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, marginTop: 6 }, onClick: () => setShowFilter(false) }, "\u53D6\u6D88")))
+  );
+}
+function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEditId, onOpenDetail, setConfirmDialog, fadingAccountIds: fadingProp, setFadingAccountIds: setFadingProp }) {
+  const [localFading, setLocalFading] = useState(() => /* @__PURE__ */ new Set());
+  const fadingAccountIds = fadingProp || localFading;
+  const setFadingAccountIds = setFadingProp || setLocalFading;
+  const wantNew = initialEditId === "__new__";
+  const initial = !wantNew && initialEditId ? state.accounts.find((a) => a.id === initialEditId) : null;
+  const isEmpty = state.accounts.length === 0;
+  const firstType = state.accountTypes[0]?.value || "cash";
+  const [editingId, setEditingId] = useState(wantNew ? "new" : initial ? initial.id : isEmpty ? "new" : null);
+  const [name, setName] = useState(initial ? initial.name : "");
+  const [type, setType] = useState(initial ? initial.type : firstType);
+  const [initAmount, setInitAmount] = useState(initial && initial.initAmount != null ? String(initial.initAmount) : "");
+  const [showInitCalc, setShowInitCalc] = useState(false);
+  const [virtual, setVirtual] = useState(initial ? !!initial.virtual : false);
+  const [investSubType, setInvestSubType] = useState(initial ? initial.investSubType || "stock" : "stock");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showTypeManage, setShowTypeManage] = useState(false);
+  const [actionMenu, setActionMenu] = useState(null);
+  const [deleteModeChoice, setDeleteModeChoice] = useState(null);
+  const [deleteModeLocked, setDeleteModeLocked] = useState(true);
+  const [editMode, setEditMode] = useState(false);
+  const actionMenuSwipe = useSwipeToClose(() => setActionMenu(null));
+  const scrollContainerRef = React.useRef(null);
+  const savedScrollTopRef = React.useRef(0);
+  const prevEditingIdRef = React.useRef(editingId);
+  React.useEffect(() => {
+    const wasEditing = prevEditingIdRef.current;
+    const isEditing = editingId;
+    if (wasEditing && !isEditing && scrollContainerRef.current) {
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = savedScrollTopRef.current;
+        }
+      });
+    }
+    prevEditingIdRef.current = editingId;
+  }, [editingId]);
+  const [nameLocked, setNameLocked] = useState(() => !!initial);
+  const [amountLocked, setAmountLocked] = useState(() => !!initial);
+  const [typeLocked, setTypeLocked] = useState(() => !!initial);
+  const [subTypeLocked, setSubTypeLocked] = useState(() => !!initial);
+  const [virtualLocked, setVirtualLocked] = useState(() => !!initial);
+  const reorderAccounts = (newIdOrder) => {
+    setState((s) => {
+      const map = new Map(s.accounts.map((a) => [a.id, a]));
+      const reordered = newIdOrder.map((id) => map.get(id)).filter(Boolean);
+      s.accounts.forEach((a) => {
+        if (!newIdOrder.includes(a.id)) reordered.push(a);
+      });
+      return { ...s, accounts: reordered };
+    });
+  };
+  const moveAccount = (id, dir) => {
+    setState((s) => {
+      const i = s.accounts.findIndex((a) => a.id === id);
+      if (i < 0) return s;
+      const j = i + dir;
+      if (j < 0 || j >= s.accounts.length) return s;
+      const next = [...s.accounts];
+      [next[i], next[j]] = [next[j], next[i]];
+      return { ...s, accounts: next };
+    });
+  };
+  const startAdd = () => {
+    setEditingId("new");
+    setName("");
+    setType(firstType);
+    setInitAmount("");
+    setVirtual(false);
+    setInvestSubType("stock");
+    setNameLocked(false);
+    setAmountLocked(false);
+    setTypeLocked(false);
+    setSubTypeLocked(false);
+    setVirtualLocked(false);
+  };
+  const startEdit = (a) => {
+    if (scrollContainerRef.current) {
+      savedScrollTopRef.current = scrollContainerRef.current.scrollTop;
+    }
+    setEditingId(a.id);
+    setName(a.name);
+    setType(a.type);
+    setInitAmount(a.initAmount != null ? String(a.initAmount) : "");
+    setVirtual(!!a.virtual);
+    setInvestSubType(a.investSubType || "stock");
+    setNameLocked(true);
+    setAmountLocked(true);
+    setTypeLocked(true);
+    setSubTypeLocked(true);
+    setVirtualLocked(true);
+  };
+  const cancel = () => {
+    if (state.accounts.length === 0) {
+      onClose();
+      return;
+    }
+    setEditingId(null);
+    setName("");
+  };
+  const save = () => {
+    if (!name.trim()) return alert("\u8ACB\u8F38\u5165\u5E33\u6236\u540D\u7A31");
+    const amt = initAmount.trim() === "" ? 0 : parseFloat(initAmount);
+    let initAmt = isNaN(amt) ? 0 : amt;
+    if (type === "debt" && initAmt !== 0) {
+      initAmt = -Math.abs(initAmt);
+    }
+    const trimmedName = name.trim();
+    const dupAcct = state.accounts.find((a) => a.name === trimmedName && a.id !== editingId && !a.isSystem);
+    if (dupAcct) {
+      if (toastRich) {
+        toastRich({
+          title: "\u540D\u7A31\u5DF2\u88AB\u4F7F\u7528",
+          amount: "\u2713",
+          // 觸發 checkmark badge 模式;實際 icon 由 icon prop 決定
+          icon: "warn",
+          amountColor: "var(--pink)",
+          lines: [`\u300C${trimmedName}\u300D`, "\u8ACB\u6539\u7528\u5176\u4ED6\u540D\u7A31"]
+        }, 1800);
+      } else {
+        alert(`\u540D\u7A31\u300C${trimmedName}\u300D\u5DF2\u88AB\u4F7F\u7528`);
+      }
+      return;
+    }
+    if (editingId === "new") {
+      const newAcct = { id: "a_" + uid().slice(2, 10), name: trimmedName, type, initAmount: initAmt, createdAt: Date.now() };
+      if (virtual) newAcct.virtual = true;
+      if (type === "invest") newAcct.investSubType = investSubType;
+      setState((s) => ({ ...s, accounts: [...s.accounts, newAcct] }));
+      if (toastRich) {
+        toastRich({
+          title: "\u5DF2\u65B0\u589E\u5E33\u6236",
+          amount: "\u2713",
+          amountColor: "var(--mint)",
+          lines: [`\u300C${trimmedName}\u300D`]
+        }, 1400);
+      } else {
+        toast("\u5DF2\u65B0\u589E");
+      }
+      cancel();
+      return;
+    }
+    const original = state.accounts.find((a) => a.id === editingId);
+    if (!original) {
+      cancel();
+      return;
+    }
+    const newName = name.trim();
+    const nameChanged = newName !== original.name;
+    const typeChanged = type !== original.type;
+    const initAmtChanged = initAmt !== (original.initAmount || 0);
+    const subTypeChanged = type === "invest" && investSubType !== (original.investSubType || "stock");
+    const virtualChanged = !!virtual !== !!original.virtual;
+    if (!nameChanged && !typeChanged && !initAmtChanged && !subTypeChanged && !virtualChanged) {
+      if (toastRich) {
+        toastRich({
+          title: "\u6C92\u6709\u4EFB\u4F55\u8B8A\u66F4",
+          amount: "\u2713",
+          // 觸發徽章模式
+          icon: "info",
+          // 但用 ⓘ 圖示取代勾勾
+          amountColor: "var(--text-faint)",
+          lines: [`\u300C${original.name}\u300D\u8CC7\u6599\u672A\u8ABF\u6574`]
+        }, 1400);
+      } else {
+        toast("\u6C92\u6709\u4EFB\u4F55\u8B8A\u66F4");
+      }
+      cancel();
+      return;
+    }
+    const relatedTxnCount = state.transactions.filter((t) => t.accountId === editingId).length;
+    const doSave = () => {
+      setState((s) => ({
+        ...s,
+        accounts: s.accounts.map((a) => {
+          if (a.id !== editingId) return a;
+          const updated = { ...a, name: newName, type, initAmount: initAmt };
+          if (type === "invest") {
+            updated.investSubType = investSubType;
+          } else {
+            delete updated.investSubType;
+          }
+          if (virtual) {
+            updated.virtual = true;
+          } else {
+            delete updated.virtual;
+          }
+          return updated;
+        })
+      }));
+      const changedParts = [];
+      if (nameChanged) changedParts.push("\u540D\u7A31");
+      if (typeChanged) changedParts.push("\u985E\u578B");
+      if (initAmtChanged) changedParts.push("\u521D\u59CB\u91D1\u984D");
+      if (subTypeChanged) changedParts.push("\u6295\u8CC7\u6A21\u5F0F");
+      if (virtualChanged) changedParts.push("\u865B\u64EC\u6A19\u7C64");
+      if (toastRich) {
+        toastRich(nameChanged ? {
+          titleSegments: [
+            "\u5DF2\u66F4\u65B0",
+            "\n",
+            { text: "\u5E33\u6236", color: "var(--blue)" },
+            " ",
+            changedParts.join("\u3001")
+          ],
+          amount: "\u2713",
+          amountColor: "var(--mint)",
+          lines: [`\u300C${original.name}\u300D \u2192 \u300C${newName}\u300D`]
+        } : {
+          title: `\u5DF2\u66F4\u65B0 ${changedParts.join("\u3001")}`,
+          amount: "\u2713",
+          amountColor: "var(--mint)",
+          lines: [`\u300C${newName}\u300D`]
+        }, nameChanged ? 3500 : 1400);
+      } else {
+        toast(`\u5DF2\u66F4\u65B0 ${changedParts.join("\u3001")}`);
+      }
+      cancel();
+    };
+    if (initAmtChanged && setConfirmDialog) {
+      const oldAmt = original.initAmount || 0;
+      const diff = initAmt - oldAmt;
+      const diffStr = diff >= 0 ? `+${fmt(diff)}` : `-${fmt(diff)}`;
+      const hl = (txt) => /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontWeight: 700 } }, txt);
+      const items = [
+        // 第 1 行:原始金額變更(只強化新金額,差額弱化)
+        /* @__PURE__ */ React.createElement("span", { key: "amt" }, "\u539F\u59CB\u91D1\u984D ", fmt(oldAmt), " \u2192 ", hl(fmt(initAmt)), " ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", fontSize: 13 } }, "(\u5DEE\u984D ", diffStr, ")"))
+      ];
+      if (relatedTxnCount > 0) {
+        items.push(
+          /* @__PURE__ */ React.createElement("span", { key: "txn-untouched", style: { color: "var(--text-dim)" } }, "\u6B64\u5E33\u6236 ", relatedTxnCount, " \u7B46\u6536\u652F\u7D00\u9304(\u4E0D\u6703\u5F71\u97FF)")
+        );
+        items.push(
+          /* @__PURE__ */ React.createElement("span", { key: "bal-update" }, "\u53EA\u6709\u7576\u524D\u9918\u984D\u6703\u52A0\u4E0A\u5DEE\u984D ", hl(diffStr))
+        );
+      } else {
+        items.push(
+          /* @__PURE__ */ React.createElement("span", { key: "no-txn" }, "\u6B64\u5E33\u6236\u76EE\u524D\u6C92\u6709\u6536\u652F\u7D00\u9304,\u8B8A\u66F4\u5F8C\u76F4\u63A5\u53CD\u6620\u5728\u9918\u984D")
+        );
+      }
+      setConfirmDialog({
+        title: "\u8B8A\u66F4 \u521D\u59CB\u91D1\u984D",
+        target: { label: "\u5E33\u6236", name: original.name },
+        messageList: {
+          before: `\u78BA\u5B9A\u8981\u8B8A\u66F4\u300C${original.name}\u300D\u7684\u521D\u59CB\u91D1\u984D?`,
+          items
+        },
+        warning: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F",
+        confirmText: "\u78BA\u5B9A\u8B8A\u66F4",
+        danger: true,
+        onConfirm: doSave
+      });
+      return;
+    }
+    doSave();
+  };
+  const remove = (id) => {
+    const acct = state.accounts.find((a) => a.id === id);
+    const acctName = acct ? acct.name : "\u6B64\u5E33\u6236";
+    const isVirtual = !!acct?.virtual;
+    const balance = acct ? calcBalance(acct, state.transactions) : 0;
+    const directTxns = state.transactions.filter((t) => t.accountId === id);
+    const transferIds = new Set(directTxns.filter((t) => t.transferId).map((t) => t.transferId));
+    const allRelatedTxnIds = new Set(directTxns.map((t) => t.id));
+    state.transactions.forEach((t) => {
+      if (t.transferId && transferIds.has(t.transferId)) {
+        allRelatedTxnIds.add(t.id);
+      }
+    });
+    const expenseCount = directTxns.filter((t) => t.type === "expense" && !t.transferId).length;
+    const incomeCount = directTxns.filter((t) => t.type === "income" && !t.transferId).length;
+    const transferGroups = transferIds.size;
+    if (!setConfirmDialog) {
+      setState((s) => ({
+        ...s,
+        accounts: s.accounts.filter((a) => a.id !== id),
+        transactions: s.transactions.filter((t) => !allRelatedTxnIds.has(t.id))
+      }));
+      cancel();
+      toast("\u5DF2\u522A\u9664");
+      return;
+    }
+    if (directTxns.length === 0) {
+      setConfirmDialog({
+        title: "\u522A\u9664\u5E33\u6236",
+        message: `\u78BA\u5B9A\u522A\u9664\u300C${acctName}\u300D?
+
+\u2022 \u6B64\u5E33\u6236\u76EE\u524D\u6C92\u6709\u4EFB\u4F55\u7D00\u9304
+\u2022 \u8D77\u59CB\u9918\u984D ${fmt(acct?.initAmount || 0)} \u4E5F\u6703\u4E00\u4F75\u79FB\u9664
+\u2022 \u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F`,
+        confirmText: "\u522A\u9664",
+        danger: true,
+        onConfirm: () => {
+          setState((s) => ({ ...s, accounts: s.accounts.filter((a) => a.id !== id) }));
+          cancel();
+          toast("\u5DF2\u522A\u9664");
+        },
+        beforeConfirm: () => {
+          setFadingAccountIds((prev) => {
+            const next = new Set(prev);
+            next.add(id);
+            return next;
+          });
+          return new Promise((resolve) => setTimeout(resolve, 280));
+        }
+      });
+    } else {
+      const accountHoldings = state.holdings.filter((h) => h.accountId === id);
+      const accountHoldingIds = new Set(accountHoldings.map((h) => h.id));
+      const accountTrades = state.trades.filter((t) => accountHoldingIds.has(t.holdingId));
+      setDeleteModeLocked(true);
+      setDeleteModeChoice({
+        acct,
+        acctName,
+        expenseCount,
+        incomeCount,
+        transferGroups,
+        balance,
+        allRelatedTxnIds,
+        directCount: directTxns.length,
+        holdingsCount: accountHoldings.length,
+        tradesCount: accountTrades.length,
+        id
+      });
+    }
+  };
+  const performFullDelete = (info) => {
+    const { id, allRelatedTxnIds } = info;
+    setDeleteModeChoice(null);
+    setFadingAccountIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    setTimeout(() => {
+      setState((s) => {
+        const accountHoldingIds = new Set(s.holdings.filter((h) => h.accountId === id).map((h) => h.id));
+        return {
+          ...s,
+          accounts: s.accounts.filter((a) => a.id !== id),
+          transactions: s.transactions.filter((t) => !allRelatedTxnIds.has(t.id)),
+          holdings: s.holdings.filter((h) => h.accountId !== id),
+          trades: s.trades.filter((t) => !accountHoldingIds.has(t.holdingId))
+        };
+      });
+      cancel();
+      toast("\u5DF2\u522A\u9664\u5E33\u6236\u8207\u76F8\u95DC\u7D00\u9304");
+    }, 280);
+  };
+  const performKeepRecordsDelete = (info) => {
+    const { id, acctName, acct } = info;
+    setDeleteModeChoice(null);
+    setFadingAccountIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    setTimeout(() => {
+      setState((s) => {
+        const acctCreatedAt = acct?.createdAt || null;
+        const newTxns = s.transactions.map((t) => {
+          if (t.accountId === id) {
+            const patched = {
+              ...t,
+              _deletedAccountName: acctName,
+              ...acctCreatedAt ? { _deletedAccountCreatedAt: acctCreatedAt } : {}
+            };
+            if (acct?.virtual) {
+              patched._deletedAccountVirtual = true;
+            } else {
+              delete patched._deletedAccountVirtual;
+            }
+            return patched;
+          }
+          if (t.transferId && t.transferPeer) {
+            if (t.transferPeer.fromId === id || t.transferPeer.toId === id) {
+              const patched = {
+                ...t,
+                _deletedPeerName: acctName,
+                ...acctCreatedAt ? { _deletedPeerCreatedAt: acctCreatedAt } : {}
+              };
+              if (acct?.virtual) {
+                patched._deletedPeerVirtual = true;
+              } else {
+                delete patched._deletedPeerVirtual;
+              }
+              return patched;
+            }
+          }
+          return t;
+        });
+        return {
+          ...s,
+          accounts: s.accounts.filter((a) => a.id !== id),
+          transactions: newTxns,
+          // 即使「保留歷史紀錄」也要清掉此帳戶的 holdings/trades:
+          // 因為 holding 物件依附在帳戶上(accountId),帳戶刪了 holding 就無法顯示。
+          // 主帳本上對應的轉帳/配息紀錄已被保留(烙印「帳號已刪」),投資歷史不丟失。
+          holdings: s.holdings.filter((h) => h.accountId !== id),
+          trades: s.trades.filter((t) => {
+            const h = s.holdings.find((hh) => hh.id === t.holdingId);
+            return !h || h.accountId !== id;
+          })
+        };
+      });
+      cancel();
+      if (toastRich) {
+        toastRich({
+          title: "\u5DF2\u522A\u9664\u5E33\u6236",
+          amount: "\u2713",
+          amountColor: "var(--mint)",
+          lines: [`\u300C${acctName}\u300D`, "\u6B77\u53F2\u7D00\u9304\u5DF2\u4FDD\u7559"]
+        }, 1800);
+      } else {
+        toast("\u5DF2\u522A\u9664,\u7D00\u9304\u4FDD\u7559");
+      }
+    }, 280);
+  };
+  const moveAcct = (i, delta) => {
+    const newIdx = i + delta;
+    if (newIdx < 0 || newIdx >= state.accounts.length) return;
+    setState((s) => {
+      const arr = [...s.accounts];
+      [arr[i], arr[newIdx]] = [arr[newIdx], arr[i]];
+      return { ...s, accounts: arr };
+    });
+  };
+  const swipeBack = () => {
+    if (editingId !== null) {
+      cancel();
+    } else {
+      onClose();
+    }
+  };
+  const swipe = useSwipeBack(swipeBack, { skipInPickerBackdrop: true, noDrag: editingId !== null });
+  if (showTypeManage) {
+    return /* @__PURE__ */ React.createElement(
+      AccountTypeManageSheet,
+      {
+        state,
+        setState,
+        toast,
+        toastRich,
+        onClose: () => setShowTypeManage(false),
+        setConfirmDialog
+      }
+    );
+  }
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-sheet": "true",
+      style: {
+        ...styles.sheet,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: { width: 50 } }), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, "\u5E33\u6236\u7BA1\u7406"), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 50, display: "flex", justifyContent: "flex-end" } }, !editingId && /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode }))),
+    /* @__PURE__ */ React.createElement(EditModeBanner, { editMode, setEditMode }),
+    !editingId && (() => {
+      let totalAssets = 0, totalDebt = 0;
+      state.accounts.forEach((a) => {
+        const isStockInvest = a.type === "invest" && (a.investSubType || "stock") === "stock";
+        const investSummary = isStockInvest ? investAccountSummary(a, state.holdings, state.trades) : null;
+        const bal = investSummary && investSummary.totalCost > 0 ? investSummary.totalMarket : calcBalance(a, state.transactions);
+        if (bal < 0) {
+          totalDebt += Math.abs(bal);
+        } else {
+          totalAssets += bal;
+        }
+      });
+      const net = totalAssets - totalDebt;
+      return /* @__PURE__ */ React.createElement("div", { style: styles.assetSummary }, /* @__PURE__ */ React.createElement("div", { style: styles.assetSumBox }, /* @__PURE__ */ React.createElement("div", { style: styles.assetSumLabel }, "\u7E3D\u8CC7\u7522"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.assetSumValue, color: "var(--mint-text)", fontSize: autoFitFontSize(totalAssets.toLocaleString()) } }, totalAssets.toLocaleString())), /* @__PURE__ */ React.createElement("div", { style: styles.assetSumDivider }), /* @__PURE__ */ React.createElement("div", { style: styles.assetSumBox }, /* @__PURE__ */ React.createElement("div", { style: styles.assetSumLabel }, "\u7E3D\u8CA0\u50B5"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.assetSumValue, color: "var(--pink-text)", fontSize: autoFitFontSize(totalDebt.toLocaleString()) } }, totalDebt.toLocaleString())), /* @__PURE__ */ React.createElement("div", { style: styles.assetSumDivider }), /* @__PURE__ */ React.createElement("div", { style: styles.assetSumBox }, /* @__PURE__ */ React.createElement("div", { style: styles.assetSumLabel }, "\u6DE8\u8CC7\u7522"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.assetSumValue, color: net < 0 ? "var(--pink)" : "var(--text)", fontSize: autoFitFontSize(net.toLocaleString()) } }, net.toLocaleString())));
+    })(),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll, "data-scroll-container": true, ref: scrollContainerRef }, editingId ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.block, padding: "10px 12px", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.sectionLabel, marginTop: 0, display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", null, "\u5E33\u6236\u985E\u578B"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("span", { style: styles.gearBtn, onClick: () => setShowTypeManage(true) }, "\u2699\uFE0F"), /* @__PURE__ */ React.createElement("div", { style: styles.lockRow }, /* @__PURE__ */ React.createElement("span", { style: { ...styles.lockLabel, color: typeLocked ? "var(--text-dim)" : "var(--mint)", display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: typeLocked ? "lock" : "unlock", size: 12, color: typeLocked ? "var(--text-dim)" : "var(--mint)" }), typeLocked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: { ...styles.toggleTrack, background: typeLocked ? "var(--bg-card)" : "var(--mint)" },
+        onClick: () => setTypeLocked((v) => !v)
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: typeLocked ? "translateX(0)" : "translateX(18px)" } })
+    )))), /* @__PURE__ */ React.createElement("div", { style: { ...styles.acctTypeGrid, opacity: typeLocked ? 0.55 : 1, pointerEvents: typeLocked ? "none" : "auto" } }, state.accountTypes.map((t) => {
+      const selected = type === t.value;
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: t.value,
+          tabIndex: -1,
+          style: {
+            ...styles.acctTypeCell,
+            ...selected ? { outline: `1.5px solid ${t.color || "var(--mint)"}`, outlineOffset: "-1.5px", background: "rgba(126, 224, 192, 0.08)" } : {}
+          },
+          onClick: () => setType(t.value)
+        },
+        /* @__PURE__ */ React.createElement("div", { style: { ...styles.acctTypeIconBox, background: t.color || "var(--bg)" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: t.icon || "box", size: 16, color: "#fff" })),
+        /* @__PURE__ */ React.createElement("div", { style: styles.acctTypeLabel }, t.label)
+      );
+    }))), /* @__PURE__ */ React.createElement("div", { style: { ...styles.block, padding: "10px 12px", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 0 } }, /* @__PURE__ */ React.createElement("span", null, "\u5E33\u6236\u540D\u7A31"), /* @__PURE__ */ React.createElement("div", { style: styles.lockRow }, /* @__PURE__ */ React.createElement("span", { style: { ...styles.lockLabel, color: nameLocked ? "var(--text-dim)" : "var(--mint)", display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: nameLocked ? "lock" : "unlock", size: 12, color: nameLocked ? "var(--text-dim)" : "var(--mint)" }), nameLocked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: { ...styles.toggleTrack, background: nameLocked ? "var(--bg-card)" : "var(--mint)" },
+        onClick: () => setNameLocked((v) => !v)
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: nameLocked ? "translateX(0)" : "translateX(18px)" } })
+    ))), /* @__PURE__ */ React.createElement("div", { style: { position: "relative", width: "100%" } }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "text",
+        style: { ...styles.field, opacity: nameLocked ? 0.55 : 1 },
+        value: name,
+        onChange: (e) => setName(e.target.value),
+        readOnly: nameLocked,
+        placeholder: type === "bank" ? "\u4F8B\u5982\uFF1A\u7389\u5C71\u9280\u884C\u3001\u53F0\u65B0\u6D3B\u5B58" : type === "card" ? "\u4F8B\u5982:\u4E2D\u4FE1\u5361\u3001\u7389\u5C71\u73FE\u91D1\u56DE\u994B" : type === "cash" ? "\u4F8B\u5982:\u73FE\u91D1\u3001\u96F6\u7528\u91D1" : type === "epay" ? "\u4F8B\u5982:\u8857\u53E3\u652F\u4ED8\u3001LINE Pay" : type === "invest" ? "\u4F8B\u5982:\u5143\u5927\u8B49\u5238\u3001\u5B9A\u5B58" : "\u8ACB\u8F38\u5165\u5E33\u6236\u540D\u7A31",
+        maxLength: 20
+      }
+    ), name.length > 0 && !nameLocked && /* @__PURE__ */ React.createElement("div", { style: {
+      position: "absolute",
+      bottom: 4,
+      right: 10,
+      fontSize: 10,
+      color: name.length >= 18 ? "var(--pink)" : "var(--text-faint)",
+      pointerEvents: "none",
+      fontVariantNumeric: "tabular-nums",
+      fontWeight: name.length >= 18 ? 600 : 400
+    } }, name.length, " / 20"))), /* @__PURE__ */ React.createElement("div", { style: { ...styles.block, padding: "10px 12px", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 0 } }, /* @__PURE__ */ React.createElement("span", null, "\u521D\u59CB\u91D1\u984D"), /* @__PURE__ */ React.createElement("div", { style: styles.lockRow }, /* @__PURE__ */ React.createElement("span", { style: { ...styles.lockLabel, color: amountLocked ? "var(--text-dim)" : "var(--mint)", display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: amountLocked ? "lock" : "unlock", size: 12, color: amountLocked ? "var(--text-dim)" : "var(--mint)" }), amountLocked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: { ...styles.toggleTrack, background: amountLocked ? "var(--bg-card)" : "var(--mint)" },
+        onClick: () => setAmountLocked((v) => !v)
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: amountLocked ? "translateX(0)" : "translateX(18px)" } })
+    ))), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick: () => {
+          if (!amountLocked) setShowInitCalc(true);
+        },
+        style: {
+          ...styles.field,
+          opacity: amountLocked ? 0.55 : 1,
+          cursor: amountLocked ? "not-allowed" : "pointer",
+          display: "flex",
+          alignItems: "center",
+          userSelect: "none",
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      initAmount !== "" ? /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text)" } }, (() => {
+        const n = Number(initAmount);
+        return !isNaN(n) && initAmount.match(/^-?\d+(\.\d+)?$/) ? n.toLocaleString("en-US") : initAmount;
+      })()) : /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "\u81EA\u884C\u8F38\u5165\u91D1\u984D(\u53EF\u7559\u7A7A)")
+    )), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick: () => setShowAdvanced((v) => !v),
+        style: {
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "10px 12px",
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent",
+          userSelect: "none"
+        }
+      },
+      /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "var(--text-dim)", fontWeight: 500 } }, "\u9032\u968E\u9078\u9805"),
+      /* @__PURE__ */ React.createElement("span", { style: {
+        fontSize: 12,
+        color: "var(--text-faint)",
+        transform: showAdvanced ? "rotate(180deg)" : "rotate(0deg)",
+        transition: "transform 0.2s",
+        display: "inline-block"
+      } }, "\u25BE")
+    ), showAdvanced && /* @__PURE__ */ React.createElement("div", { style: { ...styles.block, padding: "10px 12px", marginTop: 4, display: "flex", flexDirection: "column", gap: 12 } }, type === "invest" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "var(--text)" } }, "\u6295\u8CC7\u6A21\u5F0F"), /* @__PURE__ */ React.createElement("div", { style: styles.lockRow }, /* @__PURE__ */ React.createElement("span", { style: { ...styles.lockLabel, color: subTypeLocked ? "var(--text-dim)" : "var(--mint)", display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: subTypeLocked ? "lock" : "unlock", size: 12, color: subTypeLocked ? "var(--text-dim)" : "var(--mint)" }), subTypeLocked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: { ...styles.toggleTrack, background: subTypeLocked ? "var(--bg-card)" : "var(--mint)" },
+        onClick: () => setSubTypeLocked((v) => !v)
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: subTypeLocked ? "translateX(0)" : "translateX(18px)" } })
+    ))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, opacity: subTypeLocked ? 0.55 : 1, pointerEvents: subTypeLocked ? "none" : "auto" } }, [
+      { value: "stock", label: "\u80A1\u7968\u6A21\u5F0F" },
+      { value: "general", label: "\u4E00\u822C\u6A21\u5F0F" }
+    ].map((opt) => /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        key: opt.value,
+        onClick: () => {
+          if (!subTypeLocked) setInvestSubType(opt.value);
+        },
+        style: {
+          flex: 1,
+          textAlign: "center",
+          padding: "10px 12px",
+          borderRadius: 10,
+          fontSize: 14,
+          fontWeight: 600,
+          background: investSubType === opt.value ? "var(--mint)" : "var(--bg-card)",
+          color: investSubType === opt.value ? "#fff" : "var(--text-dim)",
+          border: `1.5px solid ${investSubType === opt.value ? "var(--mint)" : "var(--border)"}`,
+          cursor: subTypeLocked ? "not-allowed" : "pointer",
+          userSelect: "none",
+          transition: "all 0.15s"
+        }
+      },
+      opt.label
+    )))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "var(--text)" } }, "\u865B\u64EC\u6A19\u7C64"), /* @__PURE__ */ React.createElement("div", { style: styles.lockRow }, /* @__PURE__ */ React.createElement("span", { style: { ...styles.lockLabel, color: virtualLocked ? "var(--text-dim)" : "var(--mint)", display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: virtualLocked ? "lock" : "unlock", size: 12, color: virtualLocked ? "var(--text-dim)" : "var(--mint)" }), virtualLocked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: { ...styles.toggleTrack, background: virtualLocked ? "var(--bg-card)" : "var(--mint)" },
+        onClick: () => setVirtualLocked((v) => !v)
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: virtualLocked ? "translateX(0)" : "translateX(18px)" } })
+    ))), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 10,
+          cursor: virtualLocked ? "not-allowed" : "pointer",
+          userSelect: "none",
+          WebkitTapHighlightColor: "transparent",
+          opacity: virtualLocked ? 0.55 : 1
+        },
+        onClick: () => {
+          if (!virtualLocked) setVirtual((v) => !v);
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: {
+        width: 20,
+        height: 20,
+        borderRadius: 5,
+        border: `2px solid ${virtual ? "var(--mint)" : "var(--border)"}`,
+        background: virtual ? "var(--mint)" : "transparent",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        marginTop: 2,
+        transition: "all 0.15s"
+      } }, virtual && /* @__PURE__ */ React.createElement("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "var(--on-mint)", strokeWidth: "3.5", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "5 12 10 17 19 8" }))),
+      /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: "var(--text)" } }, "\u8A2D\u70BA\u865B\u64EC\u5E33\u6236"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 4, lineHeight: 1.6 } }, "\u6A19\u793A\u70BA\u300C\u865B\u64EC\u300D,\u63D0\u9192\u9019\u500B\u9918\u984D\u4E0D\u662F\u73FE\u91D1,\u800C\u662F\u80FD\u7528\u5728\u4EE3\u588A\u3001\u66AB\u6642\u6536\u652F\u7B49\u6982\u5FF5\u6027\u91D1\u6D41\u3002\u9069\u5408\u300C\u66AB\u6642\u652F\u51FA\u4F46\u6703\u56DE\u6536\u300D\u7684\u9322,\u907F\u514D\u5FD8\u8A18\u5B83\u7684\u5B58\u5728\u3002"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 6, lineHeight: 1.5 } }, "\u4F8B\u5982:\u5E6B\u670B\u53CB\u5237\u5361\u8CB7\u624B\u6A5F,\u7B49\u4ED6\u9084\u9322"))
+    )))), /* @__PURE__ */ React.createElement("button", { style: { ...styles.addIncBtn, width: "100%", marginTop: 20 }, onClick: save }, "\u5132\u5B58"), editingId !== "new" ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8 } }, /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, flex: 1, marginTop: 0 }, onClick: () => remove(editingId) }, "\u522A\u9664\u5E33\u6236"), /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, flex: 1, marginTop: 0 }, onClick: cancel }, "\u53D6\u6D88")) : /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, marginTop: 8 }, onClick: cancel }, "\u53D6\u6D88")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } }, state.accounts.map((a, i) => {
+      const typeMeta = state.accountTypes.find((t) => t.value === a.type) || { label: "\u5176\u4ED6", icon: "box", color: "#f5c29c" };
+      const isStockInvest = a.type === "invest" && (a.investSubType || "stock") === "stock";
+      const investSummary = isStockInvest ? investAccountSummary(a, state.holdings, state.trades) : null;
+      const bal = investSummary && investSummary.totalCost > 0 ? investSummary.totalMarket : calcBalance(a, state.transactions);
+      const balColor = bal < 0 ? "var(--pink)" : bal > 0 ? "var(--mint)" : "var(--text-faint)";
+      const balDisplay = bal.toLocaleString();
+      const isFading = fadingAccountIds.has(a.id);
+      const blockEl = /* @__PURE__ */ React.createElement(
+        Block,
+        {
+          blockKey: a.id,
+          editMode,
+          isFirst: i === 0,
+          isLast: i === state.accounts.length - 1,
+          onMoveUp: () => moveAccount(a.id, -1),
+          onMoveDown: () => moveAccount(a.id, 1),
+          onReorder: (newOrder) => reorderAccounts(newOrder),
+          inline: true,
+          compactInline: true
+        },
+        /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            style: {
+              ...styles.txn,
+              border: "1px dashed var(--border)",
+              borderRadius: 14,
+              padding: "10px 12px",
+              minHeight: 60,
+              boxSizing: "border-box"
+            },
+            onClick: () => !editMode && setActionMenu(a)
+          },
+          /* @__PURE__ */ React.createElement("div", { style: { ...styles.acctListIcon, width: 36, height: 36, borderRadius: 10, background: typeMeta.color || "#f5c29c" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: typeMeta.icon || "box", size: 18, color: "#fff" })),
+          /* @__PURE__ */ React.createElement("div", { style: styles.txnInfo }, /* @__PURE__ */ React.createElement("div", { style: styles.txnCat }, a.name, a.virtual && /* @__PURE__ */ React.createElement("span", { style: {
+            color: "var(--mint)",
+            fontSize: 11,
+            fontWeight: 500,
+            marginLeft: 8,
+            padding: "1px 6px",
+            borderRadius: 4,
+            background: "rgba(126, 224, 192, 0.12)",
+            verticalAlign: "middle"
+          } }, "\u865B\u64EC"), isStockInvest && /* @__PURE__ */ React.createElement("span", { style: {
+            color: "var(--blue)",
+            fontSize: 11,
+            fontWeight: 500,
+            marginLeft: 6,
+            padding: "1px 6px",
+            borderRadius: 4,
+            background: "rgba(91, 143, 217, 0.12)",
+            verticalAlign: "middle"
+          } }, "\u80A1\u7968")), /* @__PURE__ */ React.createElement("div", { style: styles.txnMeta }, typeMeta.label, " \xB7 \u9918\u984D ", /* @__PURE__ */ React.createElement("span", { style: { color: balColor, fontWeight: bal !== 0 ? 600 : 400 } }, balDisplay), investSummary && investSummary.totalCost > 0 && /* @__PURE__ */ React.createElement("span", { style: {
+            marginLeft: 8,
+            color: investSummary.totalPnl >= 0 ? "var(--mint-text)" : "var(--pink-text)",
+            fontWeight: 500
+          } }, investSummary.totalPnl >= 0 ? "+" : "", (investSummary.totalPnl / investSummary.totalCost * 100).toFixed(1), "%"))),
+          /* @__PURE__ */ React.createElement("div", { style: { color: "var(--text-faint)", fontSize: 18, marginLeft: 4 } }, "\u203A")
+        )
+      );
+      if (isFading) {
+        return /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            key: a.id,
+            style: {
+              opacity: 0,
+              transform: "translateX(40px) scale(0.96)",
+              maxHeight: 0,
+              marginTop: 0,
+              marginBottom: 0,
+              overflow: "hidden",
+              transition: "opacity 0.25s ease-out, transform 0.25s ease-out, max-height 0.28s ease-out, margin 0.28s ease-out",
+              pointerEvents: "none"
+            }
+          },
+          blockEl
+        );
+      }
+      return blockEl;
+    })), !editMode && /* @__PURE__ */ React.createElement("div", { style: { height: 12 } }))),
+    !editingId && !editMode && /* @__PURE__ */ React.createElement("div", { style: styles.stickyFooterBar }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          ...styles.addIncBtn,
+          width: "100%",
+          padding: "14px 0",
+          borderRadius: 12
+        },
+        onClick: startAdd
+      },
+      "\uFF0B \u65B0\u589E\u5E33\u6236"
+    )),
+    deleteModeChoice && (() => {
+      const info = deleteModeChoice;
+      const balanceText = info.balance !== 0 ? fmtSigned(info.balance) : "0";
+      const fullDeleteParts = [];
+      if (info.expenseCount > 0) fullDeleteParts.push(`\u652F\u51FA ${info.expenseCount} \u7B46`);
+      if (info.incomeCount > 0) fullDeleteParts.push(`\u6536\u5165 ${info.incomeCount} \u7B46`);
+      if (info.transferGroups > 0) fullDeleteParts.push(`\u8F49\u5E33 ${info.transferGroups} \u7B46`);
+      const fullDeleteFirstBullet = `${fullDeleteParts.join("\u3001")} \u7D00\u9304\u6C38\u4E45\u6D88\u5931`;
+      const commonFactStyle = {
+        padding: "8px 12px",
+        background: "transparent",
+        fontSize: 12,
+        color: "var(--text-dim)",
+        marginTop: 10,
+        marginBottom: 8
+      };
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          "data-picker-backdrop": "true",
+          style: styles.pickerBackdrop,
+          onClick: () => setDeleteModeChoice(null)
+        },
+        /* @__PURE__ */ React.createElement("div", { style: styles.pickerCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: {
+          ...styles.pickerTitle,
+          fontSize: 17,
+          fontWeight: 700,
+          padding: "14px 18px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          borderBottom: "1px solid var(--border)"
+        } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, textAlign: "left" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink)", marginRight: 6 } }, "\u522A\u9664"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text)" } }, "\u5E33\u6236")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: { ...styles.lockLabel, color: deleteModeLocked ? "var(--text-dim)" : "var(--pink)", display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: deleteModeLocked ? "lock" : "unlock", size: 12, color: deleteModeLocked ? "var(--text-dim)" : "var(--pink)" }), deleteModeLocked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            style: { ...styles.toggleTrack, background: deleteModeLocked ? "var(--bg-card)" : "var(--pink)" },
+            onClick: () => setDeleteModeLocked((v) => !v)
+          },
+          /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: deleteModeLocked ? "translateX(0)" : "translateX(18px)" } })
+        ))), /* @__PURE__ */ React.createElement("div", { style: {
+          margin: "8px 16px 8px",
+          padding: "10px 14px",
+          background: "rgba(245, 181, 192, 0.10)",
+          border: "1px solid rgba(245, 181, 192, 0.25)",
+          borderRadius: 10,
+          display: "flex",
+          alignItems: "center",
+          gap: 10
+        } }, /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 11,
+          color: "var(--pink)",
+          fontWeight: 600,
+          letterSpacing: 0.5,
+          flexShrink: 0,
+          lineHeight: 1
+        } }, "\u540D\u7A31"), /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 15,
+          color: "var(--text)",
+          fontWeight: 600,
+          flex: 1,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          lineHeight: 1
+        } }, info.acctName)), /* @__PURE__ */ React.createElement("div", { style: { padding: "0 14px 6px", display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            disabled: deleteModeLocked,
+            onClick: () => {
+              setConfirmDialog && setConfirmDialog({
+                title: "\u78BA\u8A8D \u4FDD\u7559\u6B77\u53F2\u7D00\u9304",
+                target: { label: "\u540D\u7A31", name: info.acctName },
+                message: `\u5C07\u4EE5\u300C\u4FDD\u7559\u6B77\u53F2\u7D00\u9304\u300D\u65B9\u5F0F\u522A\u9664\u5E33\u6236\u3002
+
+\u2022 \u5E33\u6236\u5F9E\u6E05\u55AE\u79FB\u9664
+\u2022 \u6536\u652F\u7D00\u9304\u5B8C\u6574\u4FDD\u7559\u4E26\u6A19\u793A\u300C\u5E33\u865F\u5DF2\u522A\u300D
+\u2022 \u7D71\u8A08\u6578\u5B57\u4E0D\u53D7\u5F71\u97FF${info.balance !== 0 ? `
+\u2022 \u5E33\u6236\u9918\u984D ${balanceText} \u5F9E\u7E3D\u8CC7\u7522\u6263\u9664` : ""}
+
+\u78BA\u5B9A\u8981\u7E7C\u7E8C\u55CE?`,
+                confirmText: "\u78BA\u8A8D\u522A\u9664",
+                danger: true,
+                onConfirm: () => performKeepRecordsDelete(info)
+              });
+            },
+            style: {
+              width: "100%",
+              border: "none",
+              background: "rgba(126, 224, 192, 0.10)",
+              borderLeft: "3px solid var(--mint)",
+              borderRadius: 10,
+              padding: "14px 16px",
+              textAlign: "left",
+              cursor: deleteModeLocked ? "not-allowed" : "pointer",
+              opacity: deleteModeLocked ? 0.5 : 1,
+              WebkitTapHighlightColor: "transparent",
+              fontFamily: "inherit",
+              transition: "opacity 0.2s"
+            }
+          },
+          /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: "var(--mint-text)" } }, "\u4FDD\u7559\u6B77\u53F2\u7D00\u9304"), /* @__PURE__ */ React.createElement("span", { style: {
+            fontSize: 10,
+            fontWeight: 700,
+            color: "#fff",
+            background: "var(--mint)",
+            padding: "2px 7px",
+            borderRadius: 10,
+            letterSpacing: "0.3px"
+          } }, "\u63A8\u85A6")),
+          /* @__PURE__ */ React.createElement("div", { style: commonFactStyle }, "\u5E33\u6236\u5F9E\u300C\u5E33\u6236\u6E05\u55AE\u300D\u79FB\u9664"),
+          /* @__PURE__ */ React.createElement("ul", { style: {
+            margin: 0,
+            paddingLeft: 16,
+            fontSize: 12,
+            color: "var(--text-dim)",
+            lineHeight: 1.7,
+            listStyle: "disc"
+          } }, /* @__PURE__ */ React.createElement("li", null, "\u6536\u652F\u7D00\u9304\u4FDD\u7559,\u4E26\u6A19\u793A\u300C\u5E33\u865F\u5DF2\u522A\u300D"), /* @__PURE__ */ React.createElement("li", null, "\u7D71\u8A08\u6578\u5B57\u4E0D\u53D7\u5F71\u97FF"), info.balance !== 0 && /* @__PURE__ */ React.createElement("li", null, "\u5E33\u6236\u9918\u984D ", balanceText, " \u5F9E\u7E3D\u8CC7\u7522\u6263\u9664"), (info.holdingsCount > 0 || info.tradesCount > 0) && /* @__PURE__ */ React.createElement("li", null, "\u6301\u80A1 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontWeight: 600 } }, info.holdingsCount), " \u6A94\u3001 \u8CB7\u8CE3 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontWeight: 600 } }, info.tradesCount), " \u7B46 \u4E00\u4F75\u6D88\u5931(\u4E3B\u5E33\u672C\u4E0A\u7684\u7D00\u9304\u4ECD\u4FDD\u7559)"))
+        ), /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            disabled: deleteModeLocked,
+            onClick: () => {
+              setConfirmDialog && setConfirmDialog({
+                title: "\u78BA\u8A8D \u5B8C\u6574\u522A\u9664",
+                target: { label: "\u540D\u7A31", name: info.acctName },
+                message: `\u5C07\u4EE5\u300C\u5B8C\u6574\u522A\u9664\u300D\u65B9\u5F0F\u79FB\u9664\u5E33\u6236\u3002
+
+\u2022 \u5E33\u6236\u8207\u6240\u6709 ${info.directCount} \u7B46\u7D00\u9304\u6C38\u4E45\u6D88\u5931
+\u2022 \u7D71\u8A08\u9801\u7684\u6B77\u53F2\u6536\u652F\u6703\u8DDF\u8457\u7E2E\u6C34
+\u2022 \u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F
+
+\u78BA\u5B9A\u8981\u7E7C\u7E8C\u55CE?`,
+                confirmText: "\u78BA\u8A8D\u522A\u9664",
+                danger: true,
+                onConfirm: () => performFullDelete(info)
+              });
+            },
+            style: {
+              width: "100%",
+              border: "none",
+              background: "rgba(217, 104, 121, 0.08)",
+              borderLeft: "3px solid var(--pink)",
+              borderRadius: 10,
+              padding: "14px 16px",
+              textAlign: "left",
+              cursor: deleteModeLocked ? "not-allowed" : "pointer",
+              opacity: deleteModeLocked ? 0.5 : 1,
+              WebkitTapHighlightColor: "transparent",
+              fontFamily: "inherit",
+              transition: "opacity 0.2s"
+            }
+          },
+          /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: "var(--pink-text)" } }, "\u5B8C\u6574\u522A\u9664")),
+          /* @__PURE__ */ React.createElement("div", { style: commonFactStyle }, "\u5E33\u6236\u5F9E\u300C\u5E33\u6236\u6E05\u55AE\u300D\u79FB\u9664"),
+          /* @__PURE__ */ React.createElement("ul", { style: {
+            margin: 0,
+            paddingLeft: 16,
+            fontSize: 12,
+            color: "var(--text-dim)",
+            lineHeight: 1.7,
+            listStyle: "disc"
+          } }, /* @__PURE__ */ React.createElement("li", null, fullDeleteFirstBullet), (info.holdingsCount > 0 || info.tradesCount > 0) && /* @__PURE__ */ React.createElement("li", null, "\u6301\u80A1 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontWeight: 600 } }, info.holdingsCount), " \u6A94\u3001 \u8CB7\u8CE3 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontWeight: 600 } }, info.tradesCount), " \u7B46 \u4E00\u4F75\u6D88\u5931"), /* @__PURE__ */ React.createElement("li", null, "\u7D71\u8A08\u9801\u7684\u6B77\u53F2\u6536\u652F\u6703\u8DDF\u8457\u7E2E\u6C34"), /* @__PURE__ */ React.createElement("li", null, "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F"))
+        )), /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            onClick: () => setDeleteModeChoice(null),
+            style: {
+              padding: "14px",
+              textAlign: "center",
+              fontSize: 14,
+              fontWeight: 500,
+              color: "var(--text-dim)",
+              cursor: "pointer",
+              borderTop: "1px solid var(--border)",
+              WebkitTapHighlightColor: "transparent"
+            }
+          },
+          "\u53D6\u6D88"
+        ))
+      );
+    })(),
+    actionMenu && (() => {
+      const typeMeta = state.accountTypes.find((t) => t.value === actionMenu.type) || { label: "\u5176\u4ED6", icon: "box", color: "#f5c29c" };
+      const bal = calcBalance(actionMenu, state.transactions);
+      const balColor = bal < 0 ? "var(--pink)" : bal > 0 ? "var(--mint)" : "var(--text-faint)";
+      const balDisplay = bal.toLocaleString();
+      return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: () => setActionMenu(null), ...actionMenuSwipe }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogHeader }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogHeaderName }, actionMenu.name), /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogHeaderMeta }, typeMeta.label, " \xB7 \u9918\u984D ", /* @__PURE__ */ React.createElement("span", { style: { color: balColor, fontWeight: bal !== 0 ? 600 : 400 } }, balDisplay))), /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogDivider }), /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: styles.centerDialogItem,
+          onClick: () => {
+            const acct = actionMenu;
+            setActionMenu(null);
+            if (onOpenDetail) onOpenDetail(acct);
+          }
+        },
+        /* @__PURE__ */ React.createElement("span", { style: styles.actionMenuIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "barchart", size: 20, color: "var(--mint-text)" })),
+        /* @__PURE__ */ React.createElement("span", null, "\u67E5\u8A62\u5E33\u6236\u660E\u7D30")
+      ), /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogDivider }), /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: styles.centerDialogItem,
+          onClick: () => {
+            const acct = actionMenu;
+            setActionMenu(null);
+            startEdit(acct);
+          }
+        },
+        /* @__PURE__ */ React.createElement("span", { style: styles.actionMenuIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "pencil", size: 20, color: "var(--accent-text)" })),
+        /* @__PURE__ */ React.createElement("span", null, "\u7DE8\u8F2F\u5E33\u6236\u8CC7\u6599")
+      ), /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogDivider }), /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: { ...styles.centerDialogItem, color: "var(--pink-text)" },
+          onClick: () => {
+            const acct = actionMenu;
+            setActionMenu(null);
+            remove(acct.id);
+          }
+        },
+        /* @__PURE__ */ React.createElement("span", { style: styles.actionMenuIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "trash", size: 20, color: "var(--pink-text)" })),
+        /* @__PURE__ */ React.createElement("span", null, "\u522A\u9664\u9019\u500B\u5E33\u6236")
+      )));
+    })(),
+    showInitCalc && /* @__PURE__ */ React.createElement(
+      CalculatorSheet,
+      {
+        expr: initAmount === "0" ? "" : initAmount,
+        onChange: (v) => setInitAmount(v),
+        mainColor: "var(--mint)",
+        onMainColor: "#1a1a1a",
+        onClose: () => setShowInitCalc(false)
+      }
+    )
+  );
+}
+function Style({ theme = "dark", numFont = DEFAULT_NUM_FONT }) {
+  const dark = `
+        --bg: #141619;
+        --bg-card: #1d1f24;
+        --bg-elevated: #272a31;
+        --bg-input: #2a2d34;
+        --border: #33363e;
+        --border-soft: #2a2d32;
+        --text: #eff1f3;
+        --text-dim: #9ba0a9;
+        --text-faint: #5b6068;
+        --mint: #7ee0c0;
+        --mint-bg: rgba(126, 224, 192, 0.14);
+        --pink: #f5b5c0;
+        --pink-bg: rgba(245, 181, 192, 0.14);
+        --blue: #a8c8f5;
+        --accent: #8f7ff0;
+        --accent-dim: rgba(143, 127, 240, 0.14);
+        --dash: #e8b947;
+        --highlight: #f5d84a;
+        --on-highlight: #1a1a1a;
+        --on-mint: #1a1a1a;
+        --on-pink: #1a1a1a;
+        --on-accent: #1a1a1a;
+        --mint-text: #7ee0c0;
+        --pink-text: #f5b5c0;
+        --accent-text: #8f7ff0;
+        --bottomnav-bg: rgba(20, 22, 25, 0.92);
+        --toast-rich-bg: linear-gradient(180deg, #1e2024 0%, #16181b 100%);
+        --toast-rich-shadow: 0 20px 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(126,224,192,0.18), 0 0 40px rgba(126,224,192,0.08);
+        --toast-backdrop: rgba(0,0,0,0.65);`;
+  const light = `
+        --bg: #f5f6f8;
+        --bg-card: #ffffff;
+        --bg-elevated: #ffffff;
+        --bg-input: #eef0f3;
+        --border: #dfe2e6;
+        --border-soft: #e7e9ec;
+        --text: #1a1c20;
+        --text-dim: #5b6470;
+        --text-faint: #9ca3af;
+        --mint: #2faa83;
+        --mint-bg: rgba(47, 170, 131, 0.14);
+        --pink: #d96877;
+        --pink-bg: rgba(217, 104, 119, 0.12);
+        --blue: #5b8fd9;
+        --accent: #6b5fd9;
+        --accent-dim: rgba(107, 95, 217, 0.12);
+        --dash: #c9962d;
+        --highlight: #b25d00;
+        --on-highlight: #ffffff;
+        --on-mint: #ffffff;
+        --on-pink: #ffffff;
+        --on-accent: #ffffff;
+        --mint-text: #2faa83;
+        --pink-text: #d96877;
+        --accent-text: #6b5fd9;
+        --bottomnav-bg: rgba(255, 255, 255, 0.92);
+        --toast-rich-bg: linear-gradient(180deg, #ffffff 0%, #f5f6f8 100%);
+        --toast-rich-shadow: 0 20px 60px rgba(0,0,0,0.18), 0 0 0 1px rgba(47,170,131,0.25), 0 0 40px rgba(47,170,131,0.1);
+        --toast-backdrop: rgba(0,0,0,0.35);`;
+  return /* @__PURE__ */ React.createElement("style", null, `
+      @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
+      :root {${theme === "light" ? light : dark}
+        --num-font: ${NUM_FONT_STACKS[numFont] || NUM_FONT_STACKS[DEFAULT_NUM_FONT]};
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-focus-ring-color: transparent !important;
+        scrollbar-width: none; /* Firefox */
+        -ms-overflow-style: none; /* IE/Edge */
+      }
+      *::-webkit-scrollbar {
+        display: none; /* Chrome/Safari */
+        width: 0;
+        height: 0;
+      }
+      html, body, #root {
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Noto Sans TC', -apple-system, sans-serif;
+        font-size: 15px;
+        line-height: 1.5;
+        min-height: 100vh;
+      }
+      input, textarea { -webkit-user-select: text; user-select: text; }
+      button { font-family: inherit; cursor: pointer; border: none; background: none; }
+      input, select, textarea { font-family: inherit; }
+      /* \u53EA\u91DD\u5C0D\u8868\u55AE\u5143\u7D20\u8207 button \u6E05 outline\uFF0C\u4E0D\u52D5 div */
+      button, input, select, textarea {
+        outline: none !important;
+        -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
+      }
+      button:focus, button:active, button:focus-visible,
+      input:focus, select:focus, textarea:focus {
+        outline: none !important;
+        box-shadow: none !important;
+      }
+      input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.6); }
+      /* \u96B1\u85CF number input \u7684\u4E0A\u4E0B\u7BAD\u982D */
+      input[type="number"]::-webkit-inner-spin-button,
+      input[type="number"]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      input[type="number"] { -moz-appearance: textfield; }
+      @keyframes wiggle {
+        0%, 100% { transform: translate(0, 0) rotate(0deg); }
+        25% { transform: translate(-1px, 0) rotate(-0.3deg); }
+        75% { transform: translate(1px, 0) rotate(0.3deg); }
+      }
+      @keyframes toastSlideIn {
+        from { opacity: 0; transform: translate(-50%, -50%) scale(0.92); }
+        to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      }
+      @keyframes dpSlideRight {
+        from { opacity: 0.4; transform: translateX(18px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes dpSlideLeft {
+        from { opacity: 0.4; transform: translateX(-18px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+      /* \u9032\u5165\u52D5\u756B:\u6DE1\u5165 + \u5F9E\u4E0B\u65B9\u8F15\u63A8\u4E0A\u4F86(\u5C64\u7D1A\u5207\u63DB\u7684\u7D30\u7DFB\u611F) */
+      @keyframes pushEnter {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      /* \u8FD4\u56DE\u52D5\u756B:\u6DE1\u5165 + \u5F9E\u4E0B\u65B9\u8F15\u63A8\u4E0A\u4F86(\u540C\u6A23\u65B9\u5F0F,\u56E0\u70BA\u90FD\u662F\u300C\u9032\u5165\u65B0\u5C64\u300D) */
+      @keyframes pushBack {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      /* \u5F9E\u7DE8\u8F2F\u8FD4\u56DE\u6642\u5C0D\u61C9 row \u6DE1\u9EC3\u9583\u720D(\u7D50\u5C3E\u56DE\u5230 bg-card \u907F\u514D\u7070\u968E\u904E\u6E21) */
+      @keyframes returnFlash {
+        0% { background: rgba(245, 220, 100, 0.32); }
+        100% { background: var(--bg-card); }
+      }
+      /* \u8A08\u7B97\u6A5F\u958B\u555F\u3001\u91D1\u984D\u9084\u6C92\u8F38\u5165\u6642,\u6578\u5B57\u6162\u901F\u8108\u52D5,\u63D0\u793A\u300C\u6E96\u5099\u8F38\u5165\u300D */
+      @keyframes amountPulse {
+        0%, 100% { opacity: 0.35; }
+        50% { opacity: 1; }
+      }
+      .dp-nav-btn { border: none; padding: 0; transition: transform 0.1s, background 0.15s; -webkit-tap-highlight-color: transparent; }
+      .dp-nav-btn:active { transform: scale(0.85); background: var(--mint-bg) !important; color: var(--mint-text) !important; }
+      /* Picker \u5217\u9805\u5167\u7E2E\u5206\u9694\u7DDA(iOS Settings \u98A8\u683C)\u2014 \u5F9E icon \u5F8C\u5C0D\u9F4A,\u6700\u5F8C\u4E00\u5217\u81EA\u52D5\u7121\u7DDA */
+      .picker-item { position: relative; }
+      .picker-item:not(:last-child)::after {
+        content: '';
+        position: absolute;
+        left: 54px; right: 16px; bottom: 0;
+        height: 1px;
+        background: var(--border);
+        opacity: 0.6;
+        pointer-events: none;
+      }
+      @keyframes toastBackdropFade {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes toastBadgePop {
+        0% { transform: scale(0.3); opacity: 0; }
+        50% { transform: scale(1.15); opacity: 1; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      @keyframes toastBadgeRing {
+        0% { transform: scale(0.6); opacity: 0.6; }
+        100% { transform: scale(2.0); opacity: 0; }
+      }
+      @keyframes toastInfoSlideIn {
+        0% { transform: translateY(8px); opacity: 0; }
+        100% { transform: translateY(0); opacity: 1; }
+      }
+      @keyframes toastInfoBarGrow {
+        0% { transform: scaleY(0); }
+        100% { transform: scaleY(1); }
+      }
+      @keyframes toastInfoTitleRise {
+        0% { transform: translateY(4px); opacity: 0; }
+        100% { transform: translateY(0); opacity: 1; }
+      }
+      @keyframes toastInfoAmountFade {
+        0% { opacity: 0; }
+        60% { opacity: 0; }
+        100% { opacity: 0.85; }
+      }
+      @keyframes toastDeletedFadeOut {
+        0%   { opacity: 1; transform: scale(1); filter: blur(0px); color: var(--pink-text); letter-spacing: -0.8px; }
+        20%  { opacity: 1; transform: scale(1); filter: blur(0px); color: var(--pink-text); letter-spacing: -0.8px; }
+        100% { opacity: 0; transform: scale(0.85); filter: blur(3px); color: var(--text-faint); letter-spacing: 2px; }
+      }
+      /* \u6539\u540D\u52D5\u756B:\u820A\u540D\u5283\u7D05\u7DDA\u5F8C\u5411\u4E0A\u98C4\u8D70 */
+      @keyframes toastRenameOldFly {
+        0%   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0px); }
+        45%  { opacity: 1; transform: translateY(0) scale(1); filter: blur(0px); }
+        100% { opacity: 0; transform: translateY(-22px) scale(0.85); filter: blur(2.5px); }
+      }
+      /* \u6539\u540D\u52D5\u756B:\u7D05\u7DDA\u5F9E\u5DE6\u5230\u53F3\u5283\u904E */
+      @keyframes toastRenameStrike {
+        0%   { width: 0%; opacity: 0; }
+        10%  { opacity: 1; }
+        50%  { width: 100%; opacity: 1; }
+        90%  { width: 100%; opacity: 1; }
+        100% { width: 100%; opacity: 0; }
+      }
+      /* \u6539\u540D\u52D5\u756B:\u65B0\u540D\u5F9E\u4E0B\u65B9\u6DE1\u5165\u98C4\u4E0A */
+      @keyframes toastRenameNewFloat {
+        0%   { opacity: 0; transform: translateY(14px) scale(0.92); }
+        100% { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      @keyframes slideUp {
+        from { transform: translateY(100%); }
+        to { transform: translateY(0); }
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes centerAlertPop {
+        0% { transform: scale(0.7); opacity: 0; }
+        50% { transform: scale(1.05); opacity: 1; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      /* \u8A08\u7B97\u6A5F\u6309\u9375\u6309\u4E0B\u8996\u89BA\u53CD\u994B */
+      .calc-btn:active {
+        transform: scale(0.92);
+        background: rgba(255,255,255,0.08) !important;
+      }
+      .calc-btn-op:active {
+        background: rgba(255,255,255,0.12) !important;
+      }
+      .calc-btn-fn:active {
+        background: rgba(255,255,255,0.06) !important;
+      }
+      .calc-btn-eq:active {
+        filter: brightness(0.85);
+      }
+      .block-edit-anim { animation: wiggle 0.4s ease-in-out infinite; }
+      .page-fade {
+        background: var(--bg);
+        min-height: 100vh;
+        padding-bottom: 80px;
+      }
+
+      input::placeholder,
+      textarea::placeholder {
+        color: var(--text-faint);
+        opacity: 1;
+      }
+
+      input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        background: transparent;
+        touch-action: pan-x;
+      }
+      input[type="range"]::-webkit-slider-runnable-track {
+        height: 6px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 3px;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 22px;
+        height: 22px;
+        background: #fff;
+        border-radius: 50%;
+        margin-top: -8px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        cursor: pointer;
+      }
+      input[type="range"]::-moz-range-track {
+        height: 6px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 3px;
+      }
+      input[type="range"]::-moz-range-thumb {
+        width: 22px;
+        height: 22px;
+        background: #fff;
+        border-radius: 50%;
+        border: none;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        cursor: pointer;
+      }
+    `);
+}
+const styles = {
+  root: {
+    maxWidth: 480,
+    margin: "0 auto",
+    position: "relative",
+    minHeight: "100vh",
+    background: "var(--bg)",
+    color: "var(--text)"
+  },
+  page: {
+    padding: "10px 14px 0",
+    display: "flex",
+    flexDirection: "column",
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 64,
+    // 底部 tab bar 高度
+    maxWidth: 480,
+    margin: "0 auto",
+    overflow: "hidden"
+  },
+  pageScroll: {
+    flex: 1,
+    overflowY: "auto",
+    minHeight: 0,
+    paddingBottom: 20,
+    WebkitOverflowScrolling: "touch",
+    overscrollBehavior: "contain"
+  },
+  stickySummary: {
+    position: "sticky",
+    top: 0,
+    zIndex: 10,
+    background: "var(--bg)",
+    paddingBottom: 4,
+    marginBottom: -4
+  },
+  pageHeader: {
+    padding: "2px 0 8px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  pageTitle: { fontSize: 24, fontWeight: 700, margin: 0 },
+  // 區塊通用
+  block: {
+    border: "1px solid rgba(255, 255, 255, 0.06)",
+    borderRadius: 14,
+    padding: "4px 8px",
+    marginBottom: 8,
+    transition: "border-color 0.15s, border-style 0.15s"
+  },
+  blockEdit: {
+    border: "1.5px dashed rgba(232, 185, 71, 0.55)",
+    padding: "5.5px 7.5px"
+    // 補回因 border 變 1.5px 的偏移
+  },
+  blockHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "8px 4px 6px",
+    fontSize: 12,
+    color: "var(--text-dim)",
+    fontWeight: 500
+  },
+  blockTitle: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6
+  },
+  blockHandle: {
+    color: "var(--dash)",
+    fontSize: 14,
+    fontWeight: 700
+  },
+  blockMoveBtns: {
+    display: "flex",
+    gap: 4
+  },
+  moveBtn: {
+    background: "var(--bg-card)",
+    border: "1px solid var(--border)",
+    borderRadius: 8,
+    width: 30,
+    height: 28,
+    color: "var(--text)",
+    fontSize: 14,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  // 頂部：app 名 + 日期靠右 + 版本號
+  topBar: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "2px 0 8px",
+    gap: 10
+  },
+  topBarMain: {
+    flex: 1,
+    minWidth: 0
+  },
+  appName: { fontSize: 24, fontWeight: 700, color: "var(--text)" },
+  editOrderBtn: {
+    background: "var(--bg-card)",
+    color: "var(--text-dim)",
+    border: "1px solid var(--border)",
+    borderRadius: 16,
+    padding: "6px 12px",
+    fontSize: 12,
+    fontWeight: 500,
+    cursor: "pointer"
+  },
+  editModeBannerFloat: {
+    position: "fixed",
+    top: 12,
+    left: "50%",
+    transform: "translateX(-50%)",
+    background: "var(--bg-card)",
+    color: "var(--mint-text)",
+    border: "1.5px solid var(--mint)",
+    borderRadius: 22,
+    padding: "5px 5px 5px 16px",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 10,
+    fontSize: 14,
+    fontWeight: 600,
+    letterSpacing: 0.3,
+    zIndex: 150,
+    boxShadow: "0 4px 14px rgba(0, 0, 0, 0.15), 0 0 0 4px rgba(126, 224, 192, 0.08)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)"
+  },
+  editDoneBtn: {
+    background: "var(--mint)",
+    color: "var(--on-mint)",
+    border: "none",
+    borderRadius: 16,
+    padding: "5px 14px",
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: "pointer",
+    letterSpacing: 0.3
+  },
+  versionFooter: {
+    textAlign: "center",
+    fontSize: 11,
+    color: "var(--text-faint)",
+    fontFamily: "var(--num-font)",
+    padding: "20px 0 12px",
+    letterSpacing: "0.5px"
+  },
+  // 月份切換（僅明細/統計頁用）
+  monthHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 24,
+    margin: "8px 0 4px"
+  },
+  monthNav: {
+    width: 30,
+    height: 30,
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "var(--text-dim)",
+    fontSize: 20,
+    cursor: "pointer"
+  },
+  monthTitle: { fontSize: 15, fontWeight: 600 },
+  // 收支三卡
+  summaryRow: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 },
+  summaryBox: {
+    background: "var(--bg-card)",
+    borderRadius: 14,
+    padding: "9px 10px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center"
+  },
+  summaryLabel: { fontSize: 11, color: "var(--text-dim)", marginBottom: 3 },
+  summaryValue: { fontSize: 17, fontWeight: 700, fontFamily: "var(--num-font)", letterSpacing: "-0.5px" },
+  // 日期橫條（前3天 + 今天 + 後3天）
+  dateStripCard: {
+    background: "var(--bg-card)",
+    borderRadius: 18,
+    padding: "9px 8px",
+    marginBottom: 10
+  },
+  dateStripRow: {
+    display: "grid",
+    gridTemplateColumns: "repeat(7, 1fr)",
+    gap: 3
+  },
+  dateCell: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "6px 0",
+    borderRadius: 12,
+    cursor: "pointer",
+    border: "1.5px solid transparent",
+    gap: 3
+  },
+  dateCellWeekday: {
+    fontSize: 10,
+    color: "var(--text-faint)",
+    fontWeight: 500
+  },
+  dateCellDay: {
+    fontSize: 15,
+    fontWeight: 500,
+    color: "var(--text)",
+    fontFamily: "var(--num-font)",
+    lineHeight: 1,
+    fontVariantNumeric: "tabular-nums",
+    fontFeatureSettings: '"tnum" 1',
+    minWidth: "1.8em",
+    textAlign: "center",
+    display: "inline-block"
+  },
+  dateCellToday: {
+    background: "rgba(126, 224, 192, 0.14)"
+  },
+  dateCellSelected: {
+    border: "1.5px solid var(--text-dim)"
+  },
+  dateCellTodaySelected: {
+    background: "rgba(126, 224, 192, 0.14)",
+    border: "1.5px solid var(--mint)"
+  },
+  dateCellDots: {
+    display: "flex",
+    gap: 3,
+    height: 6,
+    alignItems: "center"
+  },
+  dateCellDotsPlaceholder: {
+    height: 6
+  },
+  dot: { width: 5, height: 5, borderRadius: "50%" },
+  // 新增按鈕（收入 / 帳戶 / 支出）
+  addRow: { display: "grid", gridTemplateColumns: "2.2fr 1fr", gap: 6 },
+  recordBtn: {
+    background: "#f5a04a",
+    color: "#1a1a1a",
+    border: "none",
+    padding: "22px 0",
+    borderRadius: 12,
+    fontSize: 15,
+    fontWeight: 700,
+    lineHeight: 1,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    cursor: "pointer"
+  },
+  recordBtnIcon: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    lineHeight: 0
+  },
+  addIncBtn: {
+    background: "var(--mint)",
+    color: "var(--on-mint)",
+    border: "none",
+    padding: "11px 0",
+    borderRadius: 12,
+    fontSize: 14,
+    fontWeight: 700
+  },
+  addAcctBtn: {
+    background: "var(--bg-card)",
+    color: "var(--text)",
+    border: "1px solid var(--border)",
+    padding: "20px 0",
+    borderRadius: 12,
+    fontSize: 13,
+    fontWeight: 600,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    cursor: "pointer"
+  },
+  addExpBtn: {
+    background: "var(--pink)",
+    color: "var(--on-pink)",
+    border: "none",
+    padding: "11px 0",
+    borderRadius: 12,
+    fontSize: 14,
+    fontWeight: 700
+  },
+  // 期間花費卡
+  periodCard: {
+    background: "var(--bg-card)",
+    borderRadius: 14,
+    overflow: "hidden"
+  },
+  periodRow: {
+    display: "flex",
+    alignItems: "center",
+    padding: "10px 14px",
+    gap: 10,
+    cursor: "pointer"
+  },
+  periodLeft: { flex: 1, minWidth: 0 },
+  periodLabel: { fontSize: 13, color: "var(--text)", fontWeight: 500, marginBottom: 2 },
+  periodRange: { fontSize: 11, color: "var(--text-faint)", fontFamily: "var(--num-font)" },
+  periodRight: { textAlign: "right", display: "flex", flexDirection: "column", gap: 2 },
+  periodIncAmt: { fontSize: 12, fontWeight: 600, color: "var(--mint-text)", fontFamily: "var(--num-font)" },
+  periodExpAmt: { fontSize: 12, fontWeight: 600, color: "var(--pink-text)", fontFamily: "var(--num-font)" },
+  periodArrow: { color: "var(--text-faint)", fontSize: 16, marginLeft: 4 },
+  linkMint: { color: "var(--mint-text)", fontSize: 13, fontWeight: 500, cursor: "pointer" },
+  // 最近紀錄：篩選膠囊列
+  recentFilterBar: {
+    display: "flex",
+    gap: 4,
+    background: "var(--bg)",
+    borderRadius: 20,
+    padding: 3
+  },
+  recentFilterChip: {
+    fontSize: 11,
+    padding: "6px 10px",
+    borderRadius: 16,
+    color: "var(--text-dim)",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+    transition: "background 0.15s, color 0.15s",
+    userSelect: "none",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    lineHeight: 1
+  },
+  recentFilterChipActive: {
+    background: "var(--mint)",
+    color: "var(--on-mint)",
+    fontWeight: 600
+  },
+  // 交易列表
+  txnList: { display: "flex", flexDirection: "column", gap: 5 },
+  txn: {
+    background: "var(--bg-card)",
+    borderRadius: 14,
+    padding: "10px 12px",
+    minHeight: 60,
+    boxSizing: "border-box",
+    // 拆 border 屬性,避免跟 borderColor 高亮衝突(React inline style 的 shorthand 處理在某些瀏覽器不穩)
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "transparent",
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    cursor: "pointer"
+  },
+  txnIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: "50%",
+    background: "var(--bg-elevated)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 16,
+    flexShrink: 0
+  },
+  txnInfo: { flex: 1, minWidth: 0 },
+  txnCat: {
+    fontSize: 14,
+    fontWeight: 500,
+    marginBottom: 2,
+    // 強制單行 + ellipsis,避免長帳戶名 + 膠囊 + 動詞換行讓 row 高度跳動
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis"
+  },
+  txnMeta: { fontSize: 12, color: "var(--text-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  txnAmt: { fontSize: 16, fontWeight: 600, whiteSpace: "nowrap", fontFamily: "var(--num-font)" },
+  empty: {
+    textAlign: "center",
+    padding: "32px 20px",
+    color: "var(--text-faint)",
+    fontSize: 13,
+    lineHeight: 1.8
+  },
+  groupDate: {
+    fontSize: 12,
+    color: "var(--text-faint)",
+    margin: "14px 4px 4px",
+    fontWeight: 500,
+    display: "flex",
+    justifyContent: "space-between",
+    fontFamily: "var(--num-font)"
+  },
+  groupDateAmt: { fontSize: 12 },
+  // 統計
+  scopeToggle: {
+    display: "flex",
+    background: "var(--bg-card)",
+    borderRadius: 22,
+    padding: 4,
+    marginBottom: 14
+  },
+  scopeBtn: {
+    flex: 1,
+    padding: "12px 0",
+    border: "none",
+    background: "transparent",
+    color: "var(--text-dim)",
+    fontSize: 15,
+    fontWeight: 500,
+    borderRadius: 18,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    lineHeight: 1
+  },
+  scopeBtnActive: { background: "var(--mint)", color: "var(--on-mint)", fontWeight: 600 },
+  legendList: { display: "flex", flexDirection: "column", gap: 12, marginTop: 8 },
+  legendRow: { display: "flex", alignItems: "center", gap: 8, fontSize: 14 },
+  // 統計頁：對比卡片
+  compareRow: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr 1fr",
+    gap: 8,
+    padding: "4px 0"
+  },
+  compareBox: {
+    background: "var(--bg)",
+    borderRadius: 12,
+    padding: "10px 8px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 4
+  },
+  compareLabel: {
+    fontSize: 11,
+    color: "var(--text-faint)"
+  },
+  compareVal: {
+    fontSize: 15,
+    fontWeight: 600,
+    color: "var(--text)",
+    fontFamily: "var(--num-font)",
+    textAlign: "center"
+  },
+  legendDot: { width: 12, height: 12, borderRadius: 3, flexShrink: 0 },
+  legendIcon: { fontSize: 18 },
+  legendName: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  legendPct: { color: "var(--text-dim)", fontSize: 13, minWidth: 48, textAlign: "right" },
+  legendAmt: { minWidth: 64, textAlign: "right", fontFamily: "var(--num-font)", fontSize: 13, fontWeight: 500 },
+  // 設定
+  settingsGroup: { marginBottom: 22 },
+  // 備份提醒卡
+  // 帳戶頁總覽卡(本月收支風格:3 個獨立卡片)
+  assetSummary: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: 6,
+    marginBottom: 8
+  },
+  assetSumBox: {
+    background: "var(--bg-card)",
+    borderRadius: 14,
+    padding: "9px 10px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 3,
+    minWidth: 0
+  },
+  assetSumDivider: {
+    display: "none"
+  },
+  assetSumLabel: {
+    fontSize: 11,
+    color: "var(--text-dim)"
+  },
+  assetSumValue: {
+    fontSize: 17,
+    fontWeight: 700,
+    fontFamily: "var(--num-font)",
+    letterSpacing: "-0.5px",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    maxWidth: "100%"
+  },
+  backupReminder: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: "14px 16px",
+    background: "linear-gradient(135deg, rgba(245, 160, 74, 0.15) 0%, rgba(245, 183, 108, 0.08) 100%)",
+    border: "1px solid rgba(245, 160, 74, 0.3)",
+    borderRadius: 14,
+    marginBottom: 18,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent"
+  },
+  settingsGroupTitle: {
+    fontSize: 12,
+    color: "var(--text-dim)",
+    padding: "0 4px 8px",
+    fontWeight: 500
+  },
+  settingsItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: "14px 16px",
+    background: "var(--bg-card)",
+    borderRadius: 14,
+    marginBottom: 6,
+    cursor: "pointer",
+    border: "1px solid transparent"
+  },
+  settingsIcon: {
+    width: 26,
+    height: 26,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  settingsLabel: { flex: 1, fontSize: 14, fontWeight: 500 },
+  settingsArrow: { color: "var(--text-faint)", fontSize: 18 },
+  // 釘在 sheet 底部的功能按鈕容器(例如「＋新增帳戶」)
+  stickyFooterBar: {
+    flexShrink: 0,
+    padding: "14px 16px calc(16px + env(safe-area-inset-bottom, 0px))",
+    background: "var(--bg)",
+    position: "relative",
+    zIndex: 2,
+    // 上方漸層淡出,避免硬邊界
+    boxShadow: "0 -18px 18px -6px var(--bg)"
+  },
+  // 資料統計專用(僅供查看,字體/高度縮小)
+  statItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "7px 14px",
+    background: "var(--bg-card)",
+    borderRadius: 10,
+    marginBottom: 4,
+    cursor: "default"
+  },
+  statIcon: {
+    width: 20,
+    height: 20,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    opacity: 0.8
+  },
+  statLabel: { flex: 1, fontSize: 12, fontWeight: 500, color: "var(--text-dim)" },
+  statValue: { fontSize: 12, color: "var(--text)", fontFamily: "var(--num-font)", fontVariantNumeric: "tabular-nums" },
+  // 第三方連結卡
+  thirdPartyCard: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: "14px 14px",
+    background: "var(--bg-card)",
+    borderRadius: 14,
+    cursor: "pointer",
+    border: "1px solid var(--border)",
+    WebkitTapHighlightColor: "transparent"
+  },
+  thirdPartyLogo: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0
+  },
+  thirdPartyName: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: "var(--text)",
+    marginBottom: 2
+  },
+  thirdPartyDesc: {
+    fontSize: 12,
+    color: "var(--text-faint)",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap"
+  },
+  thirdPartyBadge: {
+    fontSize: 11,
+    color: "var(--text-faint)",
+    background: "rgba(255,255,255,0.05)",
+    padding: "4px 8px",
+    borderRadius: 6,
+    flexShrink: 0
+  },
+  // 底部 nav
+  bottomnav: {
+    position: "fixed",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    maxWidth: 480,
+    margin: "0 auto",
+    background: "var(--bottomnav-bg)",
+    backdropFilter: "blur(20px)",
+    WebkitBackdropFilter: "blur(20px)",
+    borderTop: "1px solid var(--border)",
+    display: "flex",
+    padding: "8px 4px",
+    zIndex: 50
+  },
+  navItem: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 2,
+    padding: "6px 0",
+    fontSize: 11,
+    cursor: "pointer"
+  },
+  navIcon: { fontSize: 22, lineHeight: 1 },
+  // Sheet
+  backdrop: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100 },
+  sheet: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    maxWidth: 480,
+    margin: "0 auto",
+    background: "var(--bg)",
+    padding: "16px 16px 0",
+    zIndex: 200,
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+    willChange: "transform"
+    // 提示瀏覽器使用 GPU 圖層,讓滑動更順
+  },
+  sheetScroll: {
+    flex: 1,
+    overflowY: "auto",
+    minHeight: 0,
+    paddingBottom: "calc(16px + env(safe-area-inset-bottom, 0px))",
+    WebkitOverflowScrolling: "touch",
+    // iOS 慣性滾動
+    overscrollBehavior: "contain"
+    // 避免滾動穿透到底層
+  },
+  sheetHead: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "2px 0 8px"
+  },
+  sheetClose: { color: "var(--text-dim)", fontSize: 14, cursor: "pointer", minWidth: 50 },
+  sheetTitle: {
+    fontSize: 17,
+    fontWeight: 700,
+    letterSpacing: 0.3,
+    flex: 1,
+    textAlign: "center",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    padding: "0 4px"
+  },
+  // FilterDeleteSheet 用
+  selectInput: {
+    width: "100%",
+    padding: "12px 14px",
+    borderRadius: 10,
+    border: "1px solid var(--border)",
+    background: "var(--bg-card)",
+    color: "var(--text)",
+    fontSize: 14,
+    appearance: "none",
+    WebkitAppearance: "none",
+    cursor: "pointer",
+    boxSizing: "border-box"
+  },
+  textInput: {
+    width: "100%",
+    padding: "12px 14px",
+    borderRadius: 10,
+    border: "1px solid var(--border)",
+    background: "var(--bg-card)",
+    color: "var(--text)",
+    fontSize: 14,
+    boxSizing: "border-box",
+    fontFamily: "inherit"
+  },
+  // 緊湊金額（橫排）
+  amountBoxCompact: {
+    background: "var(--bg-card)",
+    borderRadius: 12,
+    padding: "0 14px",
+    height: 120,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    border: "1px solid var(--border)",
+    boxSizing: "border-box"
+  },
+  // inline Block（標題在左，內容在右）
+  blockInline: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    background: "transparent",
+    marginBottom: 6,
+    padding: "0 2px"
+  },
+  blockInlineTitle: {
+    fontSize: 13,
+    color: "var(--text-dim)",
+    fontWeight: 500,
+    minWidth: 58,
+    flexShrink: 0
+  },
+  blockInlineContent: {
+    flex: 1,
+    minWidth: 0
+  },
+  blockInlineRight: {
+    flexShrink: 0,
+    display: "flex",
+    alignItems: "center"
+  },
+  // 緊湊選擇欄位（inline 用）
+  selectFieldCompact: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    background: "var(--bg-card)",
+    borderRadius: 10,
+    padding: "0 10px",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+    border: "1px solid var(--border)",
+    height: 44,
+    boxSizing: "border-box"
+  },
+  selectFieldIconSm: {
+    width: 26,
+    height: 26,
+    borderRadius: 7,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0
+  },
+  selectFieldLabelCompact: {
+    flex: 1,
+    fontSize: 14,
+    color: "var(--text)",
+    fontWeight: 500,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis"
+  },
+  selectFieldSubInline: {
+    fontSize: 12,
+    color: "var(--text-faint)",
+    fontFamily: "var(--num-font)",
+    flexShrink: 0
+  },
+  typeToggle: {
+    display: "flex",
+    background: "var(--bg-card)",
+    borderRadius: 14,
+    padding: 4
+  },
+  typeBtn: {
+    flex: 1,
+    padding: 11,
+    border: "none",
+    background: "transparent",
+    color: "var(--text-dim)",
+    fontSize: 14,
+    fontWeight: 600,
+    borderRadius: 10
+  },
+  fieldLabel: {
+    fontSize: 13,
+    color: "var(--text-dim)",
+    marginBottom: 8,
+    marginTop: 16,
+    fontWeight: 500
+  },
+  sectionLabel: {
+    fontSize: 13,
+    color: "var(--text-dim)",
+    marginTop: 12,
+    marginBottom: 8,
+    padding: "0 4px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    fontWeight: 500
+  },
+  gearBtn: {
+    fontSize: 16,
+    cursor: "pointer",
+    padding: "4px 6px",
+    borderRadius: 8
+  },
+  lockRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8
+  },
+  lockLabel: {
+    fontSize: 12,
+    fontWeight: 500,
+    transition: "color 0.15s",
+    minWidth: 42,
+    textAlign: "right"
+  },
+  toggleTrack: {
+    width: 40,
+    height: 22,
+    borderRadius: 11,
+    padding: 2,
+    cursor: "pointer",
+    transition: "background 0.2s",
+    userSelect: "none",
+    WebkitTapHighlightColor: "transparent",
+    boxSizing: "border-box",
+    border: "1px solid var(--border)"
+  },
+  toggleThumb: {
+    width: 16,
+    height: 16,
+    borderRadius: "50%",
+    background: "#fff",
+    transition: "transform 0.2s",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.3)"
+  },
+  // 單行選擇欄位
+  selectFieldPlaceholder: {
+    flex: 1,
+    fontSize: 14,
+    color: "var(--text-faint)"
+  },
+  selectFieldArrow: {
+    color: "var(--text-faint)",
+    fontSize: 20,
+    paddingRight: 4
+  },
+  // 選單 picker（彈出式列表）
+  pickerBackdrop: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: "rgba(0,0,0,0.5)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 300,
+    padding: 16
+  },
+  pickerCard: {
+    background: "var(--bg-card)",
+    borderRadius: 18,
+    width: "100%",
+    maxWidth: 380,
+    maxHeight: "85vh",
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+    boxShadow: "0 10px 40px rgba(0,0,0,0.5)"
+  },
+  datePickerCard: {
+    background: "var(--bg-card)",
+    borderRadius: 18,
+    width: "92%",
+    maxWidth: 440,
+    minWidth: 300,
+    maxHeight: "90vh",
+    padding: "8px 14px 16px",
+    overflow: "auto",
+    boxShadow: "0 10px 40px rgba(0,0,0,0.5)"
+  },
+  pickerTitle: {
+    fontSize: 15,
+    fontWeight: 700,
+    color: "var(--text)",
+    padding: "15px 16px 14px",
+    textAlign: "center",
+    borderBottom: "1px solid var(--border)",
+    letterSpacing: "0.3px"
+  },
+  pickerList: {
+    flex: 1,
+    overflowY: "auto",
+    padding: "2px 0"
+  },
+  pickerItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "12px 16px",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent"
+  },
+  pickerItemIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0
+  },
+  pickerItemLabel: {
+    flex: 1,
+    fontSize: 14,
+    color: "var(--text)",
+    display: "flex",
+    flexDirection: "column",
+    gap: 1
+  },
+  pickerItemSub: {
+    fontSize: 11,
+    color: "var(--text-faint)",
+    fontFamily: "var(--num-font)"
+  },
+  pickerEmpty: {
+    padding: "16px 20px",
+    textAlign: "center",
+    fontSize: 12,
+    color: "var(--text-faint)"
+  },
+  // 子分類行
+  subRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    background: "var(--bg-card)",
+    borderRadius: 10,
+    padding: "10px 14px",
+    border: "1px solid var(--border)"
+  },
+  subRowBtn: {
+    fontSize: 13,
+    color: "var(--text-dim)",
+    cursor: "pointer",
+    padding: "2px 8px",
+    WebkitTapHighlightColor: "transparent"
+  },
+  iconGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(7, 1fr)",
+    gap: 4
+  },
+  iconCell: {
+    background: "var(--bg-card)",
+    borderRadius: 12,
+    aspectRatio: "1 / 1",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+    transition: "background 0.15s"
+  },
+  shadeRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    background: "var(--bg-card)",
+    borderRadius: 14,
+    padding: "10px 14px"
+  },
+  shadeLabelDim: {
+    fontSize: 11,
+    color: "var(--text-faint)",
+    minWidth: 14,
+    textAlign: "center"
+  },
+  shadeSlider: {
+    flex: 1,
+    height: 6,
+    background: "var(--bg)",
+    borderRadius: 3,
+    WebkitAppearance: "none",
+    outline: "none"
+  },
+  colorTargetSwitch: {
+    display: "inline-flex",
+    background: "var(--bg-card)",
+    borderRadius: 18,
+    padding: 3,
+    gap: 2
+  },
+  colorTargetBtn: {
+    padding: "4px 12px",
+    fontSize: 12,
+    color: "var(--text-dim)",
+    borderRadius: 16,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+    userSelect: "none"
+  },
+  colorTargetBtnActive: {
+    background: "var(--mint)",
+    color: "var(--on-mint)",
+    fontWeight: 600
+  },
+  acctTypeGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, 1fr)",
+    gap: 6
+  },
+  acctTypeCell: {
+    background: "var(--bg-card)",
+    borderRadius: 10,
+    padding: "8px 2px 6px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 4,
+    cursor: "pointer",
+    border: "none",
+    WebkitTapHighlightColor: "transparent",
+    userSelect: "none"
+  },
+  acctTypeIconBox: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.2)"
+  },
+  acctTypeLabel: { fontSize: 11, fontWeight: 500, color: "var(--text)" },
+  acctListIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 22,
+    flexShrink: 0,
+    boxShadow: "0 2px 6px rgba(0,0,0,0.2)"
+  },
+  colorGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(6, 1fr)",
+    gap: 8,
+    justifyItems: "center"
+  },
+  colorCell: {
+    width: "82%",
+    aspectRatio: "1 / 1",
+    borderRadius: "50%",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+    transition: "transform 0.1s"
+  },
+  emptyAccountHint: {
+    background: "var(--bg-card)",
+    border: "1.5px dashed var(--border)",
+    borderRadius: 14,
+    padding: "16px 14px",
+    color: "var(--text-dim)",
+    fontSize: 13,
+    textAlign: "center",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent"
+  },
+  field: {
+    background: "var(--bg-card)",
+    border: "none",
+    borderRadius: 12,
+    padding: "13px 14px",
+    color: "var(--text)",
+    fontSize: 14,
+    width: "100%",
+    outline: "none"
+  },
+  // DatePicker 樣式
+  dpMonthBar: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "10px 6px",
+    marginBottom: 6
+  },
+  dpMonthTitle: {
+    fontSize: 16,
+    fontWeight: 600,
+    color: "var(--text)",
+    fontFamily: "var(--num-font)"
+  },
+  dpNav: {
+    width: 34,
+    height: 34,
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "var(--bg-card)",
+    color: "var(--text-dim)",
+    fontSize: 18,
+    cursor: "pointer"
+  },
+  dpWeekRow: {
+    display: "grid",
+    gridTemplateColumns: "repeat(7, 1fr)",
+    gap: 2,
+    marginBottom: 4
+  },
+  dpWeekLabel: {
+    textAlign: "center",
+    fontSize: 11,
+    color: "var(--text-faint)",
+    padding: "6px 0",
+    fontWeight: 500
+  },
+  dpGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(7, 1fr)",
+    gap: 2
+  },
+  dpDay: {
+    aspectRatio: "1 / 1",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 14,
+    color: "var(--text)",
+    fontWeight: 500,
+    borderRadius: "50%",
+    cursor: "pointer",
+    fontFamily: "var(--num-font)",
+    WebkitTapHighlightColor: "transparent",
+    transition: "background 0.15s"
+  },
+  // AccountDetailSheet 樣式
+  acctHeroCard: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    background: "var(--bg-card)",
+    borderRadius: 18,
+    padding: "14px 16px",
+    marginBottom: 12
+  },
+  acctHeroMeta: {
+    fontSize: 12,
+    color: "var(--text-dim)",
+    marginBottom: 2
+  },
+  acctHeroBalance: {
+    fontSize: 24,
+    fontWeight: 700,
+    color: "var(--text)",
+    fontFamily: "var(--num-font)",
+    letterSpacing: "-0.5px"
+  },
+  acctHeroInit: {
+    fontSize: 11,
+    color: "var(--text-faint)",
+    marginTop: 2
+  },
+  acctMonthBar: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "4px 6px",
+    marginBottom: 8
+  },
+  acctMonthSummary: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: 8,
+    background: "var(--bg-card)",
+    borderRadius: 14,
+    padding: "12px 14px",
+    marginBottom: 12
+  },
+  acctSumLabel: {
+    fontSize: 11,
+    color: "var(--text-faint)",
+    marginBottom: 2
+  },
+  acctSumVal: {
+    fontSize: 15,
+    fontWeight: 600,
+    color: "var(--text)",
+    fontFamily: "var(--num-font)"
+  },
+  // 動作選單
+  actionMenuBackdrop: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: "rgba(0,0,0,0.5)",
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "center",
+    zIndex: 200
+  },
+  actionMenuTitle: {
+    fontSize: 19,
+    fontWeight: 800,
+    color: "var(--text)",
+    letterSpacing: 0.5,
+    padding: "16px 20px 14px",
+    borderBottom: "1px solid var(--border)",
+    marginBottom: 14,
+    position: "sticky",
+    top: -20,
+    marginTop: -20,
+    marginLeft: -20,
+    marginRight: -20,
+    background: "var(--bg)",
+    zIndex: 2
+  },
+  actionMenuIcon: {
+    width: 24,
+    height: 24,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  // 置中懸浮對話框
+  centerDialogBackdrop: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: "rgba(0,0,0,0.55)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 300,
+    padding: 20
+  },
+  centerDialogCard: {
+    background: "var(--bg-card)",
+    borderRadius: 18,
+    width: "100%",
+    maxWidth: 340,
+    overflow: "hidden",
+    boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+    border: "1px solid var(--border)"
+  },
+  centerDialogHeader: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+    padding: "14px 20px 12px"
+  },
+  centerDialogHeaderName: {
+    fontSize: 13,
+    fontWeight: 500,
+    color: "var(--text-dim)",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis"
+  },
+  centerDialogHeaderMeta: {
+    fontSize: 11,
+    color: "var(--text-faint)"
+  },
+  centerDialogItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: 14,
+    padding: "16px 20px",
+    fontSize: 15,
+    color: "var(--text)",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent"
+  },
+  centerDialogDivider: {
+    height: 1,
+    background: "var(--border)",
+    margin: "0 20px"
+  },
+  // 篩選卡片
+  filterCard: {
+    background: "var(--bg)",
+    borderRadius: 18,
+    padding: "20px",
+    width: "100%",
+    maxWidth: 380,
+    maxHeight: "85vh",
+    overflowY: "auto",
+    boxShadow: "0 10px 40px rgba(0,0,0,0.5)"
+  },
+  filterBadge: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    background: "var(--bg-card)",
+    border: "1.5px solid var(--accent)",
+    borderRadius: 14,
+    padding: "8px 12px",
+    marginBottom: 12
+  },
+  filterClearBtn: {
+    width: 24,
+    height: 24,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "50%",
+    background: "var(--bg)",
+    color: "var(--text-dim)",
+    fontSize: 14,
+    cursor: "pointer"
+  },
+  saveBtn: {
+    width: "100%",
+    border: "none",
+    borderRadius: 12,
+    padding: "12px 0",
+    fontSize: 15,
+    fontWeight: 600
+  },
+  deleteBtn: {
+    width: "100%",
+    background: "transparent",
+    color: "var(--pink-text)",
+    border: "1px solid var(--pink)",
+    padding: 12,
+    borderRadius: 14,
+    fontSize: 14,
+    marginTop: 12
+  },
+  toast: {
+    position: "fixed",
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%, -50%)",
+    background: "var(--bg-elevated)",
+    padding: "14px 22px",
+    borderRadius: 24,
+    fontSize: 15,
+    fontWeight: 600,
+    zIndex: 400,
+    pointerEvents: "none",
+    maxWidth: "90%",
+    textAlign: "center",
+    color: "var(--text)",
+    border: "1px solid rgba(245, 181, 192, 0.3)",
+    boxShadow: "0 8px 24px rgba(0,0,0,0.5), 0 0 24px rgba(245, 181, 192, 0.12)",
+    animation: "toastSlideIn 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)"
+  },
+  centerAlertBackdrop: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.45)",
+    backdropFilter: "blur(3px)",
+    WebkitBackdropFilter: "blur(3px)",
+    zIndex: 500,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    pointerEvents: "auto",
+    cursor: "pointer",
+    animation: "fadeIn 0.15s ease-out"
+  },
+  centerAlertCard: {
+    background: "linear-gradient(180deg, #1f1d1f 0%, #181618 100%)",
+    border: "1.5px solid var(--pink)",
+    borderRadius: 18,
+    padding: "24px 28px",
+    minWidth: 220,
+    maxWidth: "80%",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 12,
+    boxShadow: "0 20px 60px rgba(0,0,0,0.7), 0 0 50px rgba(245, 181, 192, 0.25), 0 0 0 1px rgba(245, 181, 192, 0.15)",
+    animation: "centerAlertPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)"
+  },
+  centerAlertIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: "50%",
+    background: "rgba(245, 181, 192, 0.12)",
+    border: "1.5px solid var(--pink)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  centerAlertText: {
+    fontSize: 17,
+    fontWeight: 700,
+    color: "#eff1f3",
+    textAlign: "center",
+    letterSpacing: "0.5px"
+  },
+  toastRich: {
+    position: "fixed",
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%, -50%)",
+    background: "var(--toast-rich-bg)",
+    padding: "22px 24px 18px",
+    borderRadius: 20,
+    zIndex: 401,
+    pointerEvents: "none",
+    maxWidth: "92%",
+    minWidth: 240,
+    boxShadow: "var(--toast-rich-shadow)",
+    animation: "toastSlideIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)",
+    textAlign: "center"
+  },
+  toastBackdrop: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: "var(--toast-backdrop)",
+    zIndex: 400,
+    pointerEvents: "auto",
+    animation: "toastBackdropFade 0.2s ease-out",
+    backdropFilter: "blur(2px)",
+    WebkitBackdropFilter: "blur(2px)",
+    touchAction: "none"
+  },
+  toastRichTitle: {
+    fontSize: 13,
+    fontWeight: 500,
+    color: "var(--text-dim)",
+    marginBottom: 8,
+    letterSpacing: "0.5px"
+  },
+  toastRichAmount: {
+    fontSize: 26,
+    fontWeight: 700,
+    fontFamily: "var(--num-font)",
+    letterSpacing: "-0.5px",
+    marginBottom: 10,
+    lineHeight: 1
+  },
+  toastRichLines: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+    marginTop: 0
+  },
+  toastRichLine: {
+    fontSize: 13,
+    color: "var(--text-dim)",
+    lineHeight: 1.5,
+    letterSpacing: "0.2px"
+  }
+};
+const _container = document.getElementById("root");
+if (_container) {
+  const _root = ReactDOM.createRoot(_container);
+  _root.render(React.createElement(App));
+}
