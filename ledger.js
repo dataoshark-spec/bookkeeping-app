@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515BE";
+const APP_VERSION = "1150515BG";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -33,7 +33,7 @@ const GDRIVE_EMAIL_KEY = "ledger_gdrive_email_v1";
 const GDRIVE_AUTO_KEY = "ledger_gdrive_auto_v1";
 const GDRIVE_LASTSYNC_KEY = "ledger_gdrive_lastsync_v1";
 const GDRIVE_REMIND_DAYS_KEY = "ledger_gdrive_remind_days_v1";
-const GDRIVE_MAX_BACKUPS = 20;
+const GDRIVE_MAX_BACKUPS = 100;
 const driveLastSyncListeners = /* @__PURE__ */ new Set();
 const broadcastDriveLastSync = (ts) => {
   driveLastSyncListeners.forEach((cb) => {
@@ -9169,14 +9169,17 @@ function SettingsPage({
       danger: true,
       onConfirm: async () => {
         setDriveSyncing(true);
+        let text = null;
         try {
           const token = await GDrive.ensureToken();
-          const text = await GDrive.downloadBackup(token, fileId);
-          applyImportFromText(text);
+          text = await GDrive.downloadBackup(token, fileId);
         } catch (e) {
           toastRich({ title: "\u9084\u539F\u5931\u6557", amount: "\u2713", amountColor: "var(--pink)", icon: "warn", lines: [cloudErrText(e && e.message)] }, 2200);
           setDriveSyncing(false);
+          return;
         }
+        setDriveSyncing(false);
+        applyImportFromText(text);
       }
     });
   };
@@ -9517,7 +9520,7 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
       } }, snapshots.length, " / ", SNAPSHOT_MAX), /* @__PURE__ */ React.createElement("span", { style: { ...styles.settingsArrow, lineHeight: 1 } }, "\u203A"))));
     }
     if (blockKey === "backup-ext") {
-      return /* @__PURE__ */ React.createElement(Block, { key: "backup-ext", ...blockProps, title: "\u5916\u5B58\u5099\u4EFD" }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && doExport() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "download", size: 20, color: "var(--accent-text)" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u532F\u51FA\u5099\u4EFD\u6A94"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, "\u76F4\u63A5\u5B58 JSON\u6A94 \u5230\u624B\u6A5F\u300C \u4E0B\u8F09\uFF0Fdownload \u300D\u8CC7\u6599\u593E")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && doImport() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "folder", size: 20, color: "#a8c8f5" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u532F\u5165\u5099\u4EFD\u6A94"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, "\u7528 JSON\u6A94 \u9084\u539F\u8CC7\u6599 ( \u6703\u8986\u84CB\u73FE\u6709 )")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && doCopyJSON() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "clipboard", size: 20, color: "var(--mint-text)" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u8907\u88FD JSON \u4EE3\u78BC"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, "\u62F7\u8C9D\u6587\u5B57\u4EE3\u78BC\u8CC7\u6599")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && setShowPasteImport(true) }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "edit", size: 20, color: "#a8c8f5" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u8CBC\u4E0A JSON \u4EE3\u78BC"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, "\u9084\u539F\u6587\u5B57\u4EE3\u78BC\u8CC7\u6599 ( \u6703\u8986\u84CB\u73FE\u6709 )")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), /* @__PURE__ */ React.createElement("input", { ref: fileInputRef, type: "file", accept: ".json,application/json", style: { display: "none" }, onChange: handleFileImport }));
+      return /* @__PURE__ */ React.createElement(Block, { key: "backup-ext", ...blockProps, title: "\u5916\u5B58\u5099\u4EFD" }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && doExport() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "download", size: 20, color: "var(--accent-text)" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u532F\u51FA\u5099\u4EFD\u6A94"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, "\u76F4\u63A5\u5B58 JSON\u6A94 \u5230\u624B\u6A5F\u300C \u4E0B\u8F09\uFF0Fdownload \u300D\u8CC7\u6599\u593E")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && doImport() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "folder", size: 20, color: "#a8c8f5" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u532F\u5165\u5099\u4EFD\u6A94"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, "\u7528 JSON\u6A94 \u9084\u539F\u8CC7\u6599 ( \u6703\u8986\u84CB\u73FE\u6709 )")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && doCopyJSON() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "clipboard", size: 20, color: "var(--mint-text)" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u8907\u88FD JSON \u4EE3\u78BC"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, "\u62F7\u8C9D\u6587\u5B57\u4EE3\u78BC\u8CC7\u6599")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && setShowPasteImport(true) }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "pencil", size: 20, color: "#a8c8f5" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u8CBC\u4E0A JSON \u4EE3\u78BC"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, "\u9084\u539F\u6587\u5B57\u4EE3\u78BC\u8CC7\u6599 ( \u6703\u8986\u84CB\u73FE\u6709 )")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), /* @__PURE__ */ React.createElement("input", { ref: fileInputRef, type: "file", accept: ".json,application/json", style: { display: "none" }, onChange: handleFileImport }));
     }
     if (blockKey === "drive") {
       return null;
