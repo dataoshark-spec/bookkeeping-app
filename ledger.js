@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515BA";
+const APP_VERSION = "1150515BB";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -291,6 +291,14 @@ const GDrive = {
     } catch {
     }
   }
+};
+const cloudErrText = (msg) => {
+  const m = String(msg || "");
+  if (/逾時/.test(m)) return "\u9023\u7DDA\u903E\u6642,\u8ACB\u6AA2\u67E5\u7DB2\u8DEF\u5F8C\u91CD\u8A66";
+  if (/401|403|token|未載入|過期/.test(m)) return "\u9023\u7DDA\u904E\u671F,\u8ACB\u91CD\u65B0\u9023\u7D50 Google Drive";
+  if (/404/.test(m)) return "\u627E\u4E0D\u5230\u9019\u4EFD\u5099\u4EFD,\u53EF\u80FD\u5DF2\u88AB\u522A\u9664";
+  if (/網路|失敗/.test(m)) return "\u9023\u7DDA\u5931\u6557,\u8ACB\u6AA2\u67E5\u7DB2\u8DEF\u5F8C\u91CD\u8A66";
+  return "\u64CD\u4F5C\u5931\u6557,\u8ACB\u7A0D\u5F8C\u518D\u8A66";
 };
 const getLendBucketAccount = (accounts) => accounts.find((a) => a.name === LEND_BUCKET_ACCOUNT_NAME && a.isSystem === "lend_bucket");
 const DEFAULT_CATEGORIES = {
@@ -8950,7 +8958,7 @@ function SettingsPage({
       }
       setDriveLinked(true);
       setDriveEmail(email);
-      toast("\u5DF2\u9023\u7D50 Google Drive");
+      toastRich({ title: "\u5DF2\u9023\u7D50 Google Drive", amount: "\u2713", amountColor: "var(--mint)", lines: [email] }, 1600);
     } catch (e) {
       const msg = e && e.message || "\u672A\u77E5\u932F\u8AA4";
       const cancelled = /CANCELLED|popup_closed|popup_failed_to_open|access_denied|user_cancel/i.test(msg);
@@ -8980,7 +8988,7 @@ function SettingsPage({
         setDriveLinked(false);
         setDriveEmail("");
         setDriveLastSync(0);
-        toast("\u5DF2\u89E3\u9664 Google Drive \u9023\u7D50");
+        toastRich({ title: "\u5DF2\u89E3\u9664\u9023\u7D50", amount: "\u2713", amountColor: "var(--text-faint)", icon: "minus", lines: ["\u96F2\u7AEF\u5099\u4EFD\u4ECD\u4FDD\u7559"] }, 1600);
       }
     });
   };
@@ -8999,13 +9007,15 @@ function SettingsPage({
       } catch {
       }
       setDriveLastSync(now);
-      if (!silent) toast("\u5DF2\u5099\u4EFD\u5230 Google Drive");
+      if (!silent) {
+        const t = /* @__PURE__ */ new Date();
+        const hhmm = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
+        toastRich({ title: "\u5DF2\u5099\u4EFD\u5230\u96F2\u7AEF", amount: "\u2713", amountColor: "var(--mint)", lines: [`Google Drive \xB7 ${hhmm}`] }, 1600);
+      }
     } catch (e) {
       const msg = e && e.message || "\u672A\u77E5\u932F\u8AA4";
-      if (msg.includes("401") || msg.includes("token") || msg.includes("\u672A\u8F09\u5165")) {
-        if (!silent) toast("\u9023\u7DDA\u904E\u671F,\u8ACB\u91CD\u65B0\u9023\u7D50 Google Drive");
-      } else {
-        if (!silent) toast("\u5099\u4EFD\u5931\u6557:" + msg);
+      if (!silent) {
+        toastRich({ title: "\u5099\u4EFD\u5931\u6557", amount: "\u2713", amountColor: "var(--pink)", icon: "warn", lines: [cloudErrText(msg)] }, 2200);
       }
     } finally {
       setDriveSyncing(false);
@@ -9033,23 +9043,58 @@ function SettingsPage({
       const token = await GDrive.ensureToken();
       const files = await GDrive.listBackups(token);
       setDriveBackupList(files);
-      if (files.length === 0) toast("\u96F2\u7AEF\u5C1A\u7121\u5099\u4EFD\u6A94");
+      if (files.length === 0) toastRich({ title: "\u96F2\u7AEF\u5C1A\u7121\u5099\u4EFD\u6A94", amount: "\u2713", amountColor: "var(--text-faint)", icon: "info", lines: ["\u5148\u7528\u300C\u7ACB\u5373\u5099\u4EFD\u5230\u96F2\u7AEF\u300D\u4E0A\u50B3\u4E00\u4EFD"] }, 2e3);
     } catch (e) {
-      toast("\u8B80\u53D6\u6E05\u55AE\u5931\u6557:" + (e && e.message || "\u672A\u77E5\u932F\u8AA4"));
+      toastRich({ title: "\u8B80\u53D6\u5099\u4EFD\u6E05\u55AE\u5931\u6557", amount: "\u2713", amountColor: "var(--pink)", icon: "warn", lines: [cloudErrText(e && e.message)] }, 2200);
       setDriveBackupList(null);
     } finally {
       setDriveSyncing(false);
     }
   };
+  const driveDeleteBackup = (fileId, displayTime) => {
+    setConfirmDialog({
+      title: "\u522A\u9664\u9019\u4EFD\u5099\u4EFD",
+      messageList: {
+        styled: true,
+        before: "\u5C07\u5F9E Google Drive \u522A\u9664\u9019\u4EFD\u5099\u4EFD\uFF1A",
+        items: [
+          { text: displayTime, card: true },
+          "\u26A0 \u522A\u9664\u5F8C \u7121\u6CD5\u5FA9\u539F"
+        ],
+        after: "\u5176\u4ED6\u5099\u4EFD\u4E0D\u53D7\u5F71\u97FF\u3002\u78BA\u5B9A\u522A\u9664\u55CE\uFF1F"
+      },
+      highlightWords: ["\u7121\u6CD5\u5FA9\u539F"],
+      confirmText: "\u522A\u9664",
+      danger: true,
+      onConfirm: async () => {
+        setDriveSyncing(true);
+        try {
+          const token = await GDrive.ensureToken();
+          await GDrive.deleteBackup(token, fileId);
+          const files = await GDrive.listBackups(token);
+          setDriveBackupList(files);
+          toastRich({ title: "\u5DF2\u522A\u9664\u9019\u4EFD\u5099\u4EFD", amount: "\u2713", amountColor: "var(--text-faint)", icon: "minus", lines: ["\u5176\u4ED6\u5099\u4EFD\u4E0D\u53D7\u5F71\u97FF"] }, 1500);
+        } catch (e) {
+          toastRich({ title: "\u522A\u9664\u5931\u6557", amount: "\u2713", amountColor: "var(--pink)", icon: "warn", lines: [cloudErrText(e && e.message)] }, 2200);
+        } finally {
+          setDriveSyncing(false);
+        }
+      }
+    });
+  };
   const driveRestoreFrom = async (fileId, fileName) => {
     setConfirmDialog({
       title: "\u5F9E\u96F2\u7AEF\u9084\u539F",
-      message: `\u5C07\u7528\u9019\u4EFD Google Drive \u96F2\u7AEF\u5099\u4EFD\u8986\u84CB\u76EE\u524D\u7684\u8CC7\u6599:
-\u300C${fileName}\u300D
-
-\u26A0 \u76EE\u524D\u7684\u672C\u6A5F\u8CC7\u6599\u6703 \u5B8C\u5168\u88AB\u53D6\u4EE3 ,\u6B64\u52D5\u4F5C \u7121\u6CD5\u5FA9\u539F \u3002
-
-\u78BA\u5B9A\u9084\u539F\u55CE?`,
+      messageList: {
+        styled: true,
+        before: "\u5C07\u7528\u9019\u4EFD Google Drive \u96F2\u7AEF\u5099\u4EFD\n\u8986\u84CB\u76EE\u524D\u7684\u8CC7\u6599\uFF1A",
+        items: [
+          { text: fileName, card: true },
+          "\u26A0 \u76EE\u524D\u7684\u672C\u6A5F\u8CC7\u6599\u6703 \u5B8C\u5168\u88AB\u53D6\u4EE3\n\u6B64\u52D5\u4F5C \u7121\u6CD5\u5FA9\u539F"
+        ],
+        after: "\u78BA\u5B9A\u9084\u539F\u55CE\uFF1F"
+      },
+      highlightWords: ["\u5B8C\u5168\u88AB\u53D6\u4EE3", "\u7121\u6CD5\u5FA9\u539F"],
       confirmText: "\u9084\u539F",
       danger: true,
       onConfirm: async () => {
@@ -9059,7 +9104,7 @@ function SettingsPage({
           const text = await GDrive.downloadBackup(token, fileId);
           applyImportFromText(text);
         } catch (e) {
-          toast("\u9084\u539F\u5931\u6557:" + (e && e.message || "\u672A\u77E5\u932F\u8AA4"));
+          toastRich({ title: "\u9084\u539F\u5931\u6557", amount: "\u2713", amountColor: "var(--pink)", icon: "warn", lines: [cloudErrText(e && e.message)] }, 2200);
           setDriveSyncing(false);
         }
       }
@@ -9108,7 +9153,7 @@ function SettingsPage({
       const token = await GDrive.ensureToken();
       const files = await GDrive.listBackups(token);
       if (files.length === 0) {
-        toast("\u96F2\u7AEF\u5C1A\u7121\u5099\u4EFD\u6A94");
+        toastRich({ title: "\u96F2\u7AEF\u5C1A\u7121\u5099\u4EFD\u6A94", amount: "\u2713", amountColor: "var(--text-faint)", icon: "info", lines: ["\u5148\u7528\u300C\u7ACB\u5373\u5099\u4EFD\u5230\u96F2\u7AEF\u300D\u4E0A\u50B3\u4E00\u4EFD"] }, 2e3);
         setDriveSyncing(false);
         return;
       }
@@ -9140,6 +9185,19 @@ function SettingsPage({
     if (_remindShownRef.current) return;
     if (!driveLinked) return;
     if (driveAuto) return;
+    try {
+      let inst = localStorage.getItem("ledger_install_at");
+      if (!inst) {
+        inst = String(Date.now());
+        localStorage.setItem("ledger_install_at", inst);
+      }
+      const daysInst = Math.floor((Date.now() - (parseInt(inst, 10) || Date.now())) / 864e5);
+      if (daysInst < 7) {
+        _remindShownRef.current = true;
+        return;
+      }
+    } catch {
+    }
     _remindShownRef.current = true;
     const now = /* @__PURE__ */ new Date();
     const mode = driveRemindMode || "7";
@@ -9875,8 +9933,8 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
         },
         onClick: (e) => e.stopPropagation()
       },
-      /* @__PURE__ */ React.createElement("div", { style: { padding: "16px 16px 8px", fontSize: 16, fontWeight: 700 } }, "\u9078\u64C7\u96F2\u7AEF\u5099\u4EFD\u9084\u539F"),
-      /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 8px", fontSize: 12, color: "var(--text-dim)" } }, "\u9EDE\u4E00\u4EFD\u5099\u4EFD\u5373\u53EF\u9084\u539F(\u6703\u8986\u84CB\u76EE\u524D\u8CC7\u6599)"),
+      /* @__PURE__ */ React.createElement("div", { style: { padding: "16px 16px 6px", fontSize: 16, fontWeight: 700 } }, "\u9078\u64C7\u96F2\u7AEF\u5099\u4EFD\u9084\u539F"),
+      /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 10px", fontSize: 12, color: "var(--text-dim)", lineHeight: 1.6 } }, "\u9EDE\u6574\u5217\u5373\u53EF\u9084\u539F(\u6703\u8986\u84CB\u76EE\u524D\u8CC7\u6599)\u3002", driveBackupList && driveBackupList.length > 0 && /* @__PURE__ */ React.createElement("span", null, `\u76EE\u524D ${driveBackupList.length} / ${GDRIVE_MAX_BACKUPS} \u4EFD,\u6EFF\u4E86\u6703\u81EA\u52D5\u8986\u84CB\u6700\u820A\u7684,\u4E0D\u4F54\u984D\u5916\u7A7A\u9593\u3002`)),
       /* @__PURE__ */ React.createElement("div", { style: { overflowY: "auto", padding: "4px 16px 16px" } }, driveBackupList.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { padding: "30px 0", textAlign: "center", color: "var(--text-faint)", fontSize: 13 } }, "\u96F2\u7AEF\u5C1A\u7121\u5099\u4EFD\u6A94") : driveBackupList.map((f) => {
         let displayTime = f.name;
         const m = f.name.match(/ledger-backup-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/);
@@ -9887,100 +9945,72 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
         }
         const sizeKB = f.size ? Math.round(parseInt(f.size, 10) / 1024) : null;
         const note = (f.description || "").trim();
+        const iconBtn = (name, color, onClick) => /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            onClick: (e) => {
+              e.stopPropagation();
+              onClick();
+            },
+            style: {
+              flexShrink: 0,
+              width: 34,
+              height: 34,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 8,
+              background: "var(--bg-card-alt)",
+              cursor: "pointer"
+            }
+          },
+          /* @__PURE__ */ React.createElement(TypeIcon, { name, size: 15, color })
+        );
         return /* @__PURE__ */ React.createElement(
           "div",
           {
             key: f.id,
+            onClick: () => {
+              setDriveBackupList(null);
+              driveRestoreFrom(f.id, displayTime);
+            },
             style: {
               display: "flex",
-              flexDirection: "column",
-              padding: 12,
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 10px 8px 12px",
               marginBottom: 8,
               background: "var(--bg-card)",
-              borderRadius: 12,
-              boxSizing: "border-box"
+              borderRadius: 10,
+              minHeight: 60,
+              boxSizing: "border-box",
+              cursor: "pointer"
             }
           },
-          /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { flexShrink: 0, marginTop: 2 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "clipboard", size: 18, color: "var(--accent-text)" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600 } }, displayTime), note ? /* @__PURE__ */ React.createElement("div", { style: {
+          /* @__PURE__ */ React.createElement("div", { style: { flexShrink: 0 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-down", size: 18, color: "var(--mint-text)" })),
+          /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600 } }, displayTime), note ? /* @__PURE__ */ React.createElement("div", { style: {
             fontSize: 12,
             color: "var(--accent-text)",
             marginTop: 2,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap"
-          } }, note) : null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, sizeKB !== null ? `${sizeKB} KB` : ""))),
-          /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              onClick: () => {
-                setDriveBackupList(null);
-                driveRestoreFrom(f.id, displayTime);
-              },
-              style: {
-                marginTop: 10,
-                width: "100%",
-                padding: "11px 0",
-                border: "none",
-                borderRadius: 9,
-                background: "var(--mint)",
-                color: "var(--on-mint)",
-                fontSize: 14,
-                fontWeight: 700,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 6
-              }
-            },
-            /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-down", size: 17, color: "var(--on-mint)" }),
-            "\u9084\u539F\u9019\u4EFD\u5099\u4EFD"
+          } }, note) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, sizeKB !== null ? `${sizeKB} KB` : "\u5099\u4EFD\u6A94")),
+          iconBtn(
+            "pencil",
+            note ? "var(--accent-text)" : "var(--text-dim)",
+            () => setDriveNoteEdit({ fileId: f.id, displayTime, note })
           ),
-          /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8 } }, /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              onClick: () => setDriveNoteEdit({ fileId: f.id, displayTime, note }),
-              style: {
-                flex: 1,
-                padding: "8px 0",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                background: "var(--bg-card-alt)",
-                fontSize: 12,
-                fontWeight: 600,
-                color: note ? "var(--accent-text)" : "var(--text-dim)",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 5
-              }
-            },
-            /* @__PURE__ */ React.createElement(TypeIcon, { name: "pencil", size: 13, color: note ? "var(--accent-text)" : "var(--text-dim)" }),
-            "\u7DE8\u8F2F\u5099\u8A3B"
-          ), /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              onClick: () => driveExportBackup(f.id, displayTime),
-              style: {
-                flex: 1,
-                padding: "8px 0",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                background: "var(--bg-card-alt)",
-                fontSize: 12,
-                fontWeight: 600,
-                color: "var(--text-dim)",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 5
-              }
-            },
-            /* @__PURE__ */ React.createElement(TypeIcon, { name: "download", size: 13, color: "var(--text-dim)" }),
-            "\u532F\u51FA\u6A94\u6848"
-          ))
+          iconBtn(
+            "download",
+            "var(--text-dim)",
+            () => driveExportBackup(f.id, displayTime)
+          ),
+          iconBtn(
+            "trash",
+            "var(--pink-text)",
+            () => driveDeleteBackup(f.id, displayTime)
+          )
         );
       })),
       /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 16px" } }, /* @__PURE__ */ React.createElement(
