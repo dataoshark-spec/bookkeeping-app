@@ -1,7 +1,7 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515AT";
-const BLOCK_ORDER_KEY = "ledger_block_order_v13";
+const APP_VERSION = "1150515AV";
+const BLOCK_ORDER_KEY = "ledger_block_order_v14";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
 const NOTE_PREF_KEY = "ledger_note_pref_v1";
@@ -1185,6 +1185,12 @@ function TypeIcon({ name, size = 22, color = "#fff" }) {
     // 雲端同步(雲 + 循環箭頭)
     case "cloud-sync":
       return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M6.5 19 A4.2 4.2 0 0 1 6 10.8 A5.7 5.7 0 0 1 17 9.6 A3.8 3.8 0 0 1 17.5 19 Z" }), /* @__PURE__ */ React.createElement("g", { strokeWidth: "1.2" }, /* @__PURE__ */ React.createElement("path", { d: "M14 12.1 A2.6 2.6 0 1 0 14.4 15.4" })), /* @__PURE__ */ React.createElement("path", { d: "M13 10.3 L14.5 12 L12.5 12.6 Z", strokeWidth: "1.2", fill: "currentColor" }));
+    // 還原(逆時針循環箭頭)
+    case "restore":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M5.5 12 A6.5 6.5 0 1 1 7.5 16.7" }), /* @__PURE__ */ React.createElement("path", { d: "M3.2 8.4 L5.5 12 L9 9.6", fill: color, stroke: "none" }));
+    // 勾選
+    case "check":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M5 12.5 L10 17.5 L19 6.5" }));
     // 警告（三角驚嘆）
     case "warning":
       return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M12 3 L22 20 L2 20 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M12 10 L12 15 M12 17.5 L12 18" }));
@@ -1416,7 +1422,7 @@ function App() {
       home: ["summary", "dateStrip", "actions", "periods", "recent"],
       txn: ["summary", "period", "list"],
       stats: ["summary", "period", "chart", "compare", "top5", "transfer"],
-      settings: ["dataStat", "appearance", "backup-local", "backup-ext", "account", "cleanup", "danger"],
+      settings: ["dataStat", "appearance", "account", "backup-local", "backup-ext", "cleanup", "danger"],
       addTxn: ["amount", "typeToggle", "date", "category", "subCategory", "note", "account"]
     };
     const merge = (savedPage, defPage) => {
@@ -8787,6 +8793,8 @@ function SettingsPage({
     "ledger_note_pref_v1",
     "ledger_block_order_v12",
     "ledger_block_order_v13",
+    // 舊版 block 排序(相容)
+    "ledger_block_order_v14",
     // 新版 block 排序
     "ledger_account_order",
     "ledger_period_order",
@@ -8856,11 +8864,15 @@ function SettingsPage({
       return false;
     }
   });
-  const [driveRemindDays, setDriveRemindDays] = useState(() => {
+  const [driveRemindMode, setDriveRemindMode] = useState(() => {
     try {
-      return parseInt(localStorage.getItem(GDRIVE_REMIND_DAYS_KEY) || "7", 10);
+      const raw = localStorage.getItem(GDRIVE_REMIND_DAYS_KEY);
+      if (!raw) return "7";
+      if (raw === "month-start" || raw === "month-end") return raw;
+      const n = parseInt(raw, 10);
+      return Number.isFinite(n) ? String(n) : "7";
     } catch {
-      return 7;
+      return "7";
     }
   });
   const [driveLastSync, setDriveLastSync] = useState(() => {
@@ -8942,10 +8954,10 @@ function SettingsPage({
     }
     toast(next ? "\u5DF2\u958B\u555F\u81EA\u52D5\u5099\u4EFD" : "\u5DF2\u95DC\u9589\u81EA\u52D5\u5099\u4EFD");
   };
-  const setDriveRemind = (days) => {
-    setDriveRemindDays(days);
+  const setDriveRemind = (mode) => {
+    setDriveRemindMode(String(mode));
     try {
-      localStorage.setItem(GDRIVE_REMIND_DAYS_KEY, String(days));
+      localStorage.setItem(GDRIVE_REMIND_DAYS_KEY, String(mode));
     } catch {
     }
   };
@@ -8966,9 +8978,10 @@ function SettingsPage({
   const driveRestoreFrom = async (fileId, fileName) => {
     setConfirmDialog({
       title: "\u5F9E\u96F2\u7AEF\u9084\u539F",
-      message: `\u5C07\u7528\u96F2\u7AEF\u5099\u4EFD \u300C${fileName}\u300D \u8986\u84CB\u76EE\u524D\u7684\u8CC7\u6599\u3002
+      message: `\u5C07\u7528\u9019\u4EFD Google Drive \u96F2\u7AEF\u5099\u4EFD\u8986\u84CB\u76EE\u524D\u7684\u8CC7\u6599:
+\u300C${fileName}\u300D
 
-\u76EE\u524D\u7684\u672C\u6A5F\u8CC7\u6599\u6703 \u5B8C\u5168\u88AB\u53D6\u4EE3 ,\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F\u3002
+\u26A0 \u76EE\u524D\u7684\u672C\u6A5F\u8CC7\u6599\u6703 \u5B8C\u5168\u88AB\u53D6\u4EE3 ,\u6B64\u52D5\u4F5C \u7121\u6CD5\u5FA9\u539F \u3002
 
 \u78BA\u5B9A\u9084\u539F\u55CE?`,
       confirmText: "\u9084\u539F",
@@ -9062,17 +9075,43 @@ function SettingsPage({
     if (!driveLinked) return;
     if (driveAuto) return;
     _remindShownRef.current = true;
-    const days = driveRemindDays || 7;
-    const elapsed = Date.now() - (driveLastSync || 0);
-    const threshold = days * 24 * 60 * 60 * 1e3;
-    if (driveLastSync > 0 && elapsed < threshold) return;
+    const now = /* @__PURE__ */ new Date();
+    const mode = driveRemindMode || "7";
+    let shouldRemind = false;
+    let reasonTxt = "";
+    if (mode === "month-start" || mode === "month-end") {
+      const last = driveLastSync > 0 ? new Date(driveLastSync) : null;
+      const backedUpThisMonth = !!last && last.getFullYear() === now.getFullYear() && last.getMonth() === now.getMonth();
+      const dom = now.getDate();
+      const lastDom = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      if (mode === "month-start") {
+        if (dom <= 5 && !backedUpThisMonth) {
+          shouldRemind = true;
+          reasonTxt = "\u9019\u500B\u6708\u9084\u6C92\u5099\u4EFD\u5230 Google Drive";
+        }
+      } else {
+        if (dom > lastDom - 5 && !backedUpThisMonth) {
+          shouldRemind = true;
+          reasonTxt = "\u9019\u500B\u6708\u9084\u6C92\u5099\u4EFD\u5230 Google Drive";
+        }
+      }
+    } else {
+      const days = parseInt(mode, 10) || 7;
+      const elapsed = Date.now() - (driveLastSync || 0);
+      const threshold = days * 24 * 60 * 60 * 1e3;
+      if (!(driveLastSync > 0 && elapsed < threshold)) {
+        shouldRemind = true;
+        reasonTxt = `\u5DF2\u7D93\u8D85\u904E ${days} \u5929 \u6C92\u6709\u5099\u4EFD\u5230 Google Drive`;
+      }
+    }
+    if (!shouldRemind) return;
     const timer = setTimeout(() => {
       const lastTxt = driveLastSync > 0 ? `\u4E0A\u6B21\u5099\u4EFD:${new Date(driveLastSync).toLocaleDateString()}` : "\u5C1A\u672A\u5099\u4EFD\u904E";
       setConfirmDialog({
         title: "\u96F2\u7AEF\u5099\u4EFD\u63D0\u9192",
         message: `${lastTxt}
 
-\u5DF2\u7D93\u8D85\u904E ${days} \u5929 \u6C92\u6709\u5099\u4EFD\u5230 Google Drive,\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
+${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
         confirmText: "\u7ACB\u5373\u5099\u4EFD",
         onConfirm: () => {
           driveSyncNow(false);
@@ -9080,7 +9119,7 @@ function SettingsPage({
       });
     }, 1500);
     return () => clearTimeout(timer);
-  }, [driveLinked, driveAuto, driveLastSync, driveRemindDays]);
+  }, [driveLinked, driveAuto, driveLastSync, driveRemindMode]);
   const doExport = () => {
     const data = buildExportPayload();
     try {
@@ -9235,8 +9274,8 @@ function SettingsPage({
     setShowReminderSetup(false);
     toast(`\u5DF2\u8A2D\u5B9A\u6BCF ${days} \u5929\u63D0\u9192\u5099\u4EFD`);
   };
-  return /* @__PURE__ */ React.createElement("div", { style: styles.page }, /* @__PURE__ */ React.createElement("div", { style: styles.pageHeader }, /* @__PURE__ */ React.createElement("h1", { style: styles.pageTitle }, "\u8A2D\u5B9A"), /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode })), /* @__PURE__ */ React.createElement(EditModeBanner, { editMode, setEditMode }), /* @__PURE__ */ React.createElement("div", { style: styles.pageScroll }, needsBackup && state.transactions.length > 0 && /* @__PURE__ */ React.createElement("div", { style: styles.backupReminder, onClick: doExport }, /* @__PURE__ */ React.createElement("div", { style: { width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "warning", size: 22, color: "#f5a04a" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: "#f5a04a", marginBottom: 2 } }, daysSinceBackup === null ? "\u5EFA\u8B70\u9032\u884C\u9996\u6B21\u5099\u4EFD" : `\u5DF2 ${daysSinceBackup} \u5929\u672A\u5099\u4EFD`), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)" } }, "\u9EDE\u6B64\u7ACB\u5373\u532F\u51FA JSON \u5099\u4EFD")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), (blockOrder || ["backup-local", "backup-ext", "drive", "reminder", "account", "dataStat", "cleanup", "danger"]).map((blockKey, idx) => {
-    const order = blockOrder || ["backup-local", "backup-ext", "drive", "reminder", "account", "dataStat", "cleanup", "danger"];
+  return /* @__PURE__ */ React.createElement("div", { style: styles.page }, /* @__PURE__ */ React.createElement("div", { style: styles.pageHeader }, /* @__PURE__ */ React.createElement("h1", { style: styles.pageTitle }, "\u8A2D\u5B9A"), /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode })), /* @__PURE__ */ React.createElement(EditModeBanner, { editMode, setEditMode }), /* @__PURE__ */ React.createElement("div", { style: styles.pageScroll }, needsBackup && state.transactions.length > 0 && /* @__PURE__ */ React.createElement("div", { style: styles.backupReminder, onClick: doExport }, /* @__PURE__ */ React.createElement("div", { style: { width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "warning", size: 22, color: "#f5a04a" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: "#f5a04a", marginBottom: 2 } }, daysSinceBackup === null ? "\u5EFA\u8B70\u9032\u884C\u9996\u6B21\u5099\u4EFD" : `\u5DF2 ${daysSinceBackup} \u5929\u672A\u5099\u4EFD`), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)" } }, "\u9EDE\u6B64\u7ACB\u5373\u532F\u51FA JSON \u5099\u4EFD")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), (blockOrder || ["dataStat", "appearance", "account", "backup-local", "backup-ext", "cleanup", "danger"]).map((blockKey, idx) => {
+    const order = blockOrder || ["dataStat", "appearance", "account", "backup-local", "backup-ext", "cleanup", "danger"];
     const blockProps = {
       onReorder: setPageOrder,
       blockKey,
@@ -9294,6 +9333,7 @@ function SettingsPage({
     }
     if (blockKey === "account") {
       const lastSyncTxt = driveLastSync > 0 ? new Date(driveLastSync).toLocaleString("zh-TW", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "\u5C1A\u672A\u5099\u4EFD";
+      const remindLabel = driveRemindMode === "month-start" ? "\u6BCF\u6708\u521D" : driveRemindMode === "month-end" ? "\u6BCF\u6708\u5E95" : `\u6BCF ${driveRemindMode} \u5929`;
       return /* @__PURE__ */ React.createElement(Block, { key: "account", ...blockProps, title: "\u5E33\u865F\u9023\u7D50" }, !driveLinked ? /* @__PURE__ */ React.createElement(
         "div",
         {
@@ -9308,16 +9348,24 @@ function SettingsPage({
         background: "var(--bg-card)",
         borderRadius: 10,
         marginBottom: 8
-      } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-check", size: 20, color: "#4285F4" }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600 } }, "Google Drive \u5DF2\u9023\u7D50"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, driveEmail || "(\u5E33\u865F)"))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 8 } }, "\u4E0A\u6B21\u5099\u4EFD:", lastSyncTxt)), /* @__PURE__ */ React.createElement(
+      } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-check", size: 20, color: "#4285F4" }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, flexShrink: 0 } }, "Google Drive \u5DF2\u9023\u7D50"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginLeft: "auto", flexShrink: 0, whiteSpace: "nowrap" } }, "\u4E0A\u6B21\u5099\u4EFD ", lastSyncTxt)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, driveEmail || "(\u5E33\u865F)")))), /* @__PURE__ */ React.createElement("div", { style: {
+        padding: "9px 12px",
+        background: "var(--bg-card-alt)",
+        borderRadius: 8,
+        marginBottom: 8,
+        fontSize: 11,
+        color: "var(--text-dim)",
+        lineHeight: 1.6
+      } }, "\u5099\u4EFD\u5B58\u5728 Google Drive \u5C08\u5C6C\u7A7A\u9593\u3002\u5728 Drive App \u770B\u4E0D\u5230\u662F\u6B63\u5E38\u7684,\u8981\u67E5\u770B / \u9084\u539F\u8ACB\u7528\u4E0B\u65B9\u300C\u9078\u64C7\u96F2\u7AEF\u5099\u4EFD\u9084\u539F\u300D\u3002"), /* @__PURE__ */ React.createElement(
         "div",
         {
           style: { ...styles.settingsItem, opacity: driveSyncing ? 0.5 : 1 },
           onClick: () => !editMode && !driveSyncing && driveSyncNow(false)
         },
         /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-up", size: 20, color: "var(--mint-text)" })),
-        /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, driveSyncing ? "\u540C\u6B65\u4E2D\u2026" : "\u7ACB\u5373\u5099\u4EFD\u5230\u96F2\u7AEF"),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, driveSyncing ? "\u540C\u6B65\u4E2D\u2026" : "\u7ACB\u5373\u5099\u4EFD\u5230\u96F2\u7AEF"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, "\u624B\u52D5\u4E0A\u50B3\u4E00\u4EFD\u5099\u4EFD\u5230 Google Drive")),
         /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
-      ), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && toggleDriveAuto() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-sync", size: 20, color: "#e0a82e" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u81EA\u52D5\u5099\u4EFD"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, driveAuto ? "\u8CC7\u6599\u8B8A\u52D5\u6642\u81EA\u52D5\u4E0A\u50B3" : "\u95DC\u9589(\u6539\u7528\u4E0B\u65B9\u63D0\u9192)")), /* @__PURE__ */ React.createElement("div", { style: {
+      ), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && toggleDriveAuto() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-sync", size: 20, color: "#e0a82e" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u81EA\u52D5\u5099\u4EFD"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, driveAuto ? "\u8CC7\u6599\u4E00\u8B8A\u52D5\u5C31\u81EA\u52D5\u4E0A\u50B3\u5230 Google Drive" : "\u95DC\u9589(\u5982\u672A\u958B\u555F,\u81EA\u52D5\u6539\u7528\u4E0B\u65B9\u63D0\u9192\u529F\u80FD)")), /* @__PURE__ */ React.createElement("div", { style: {
         width: 44,
         height: 26,
         borderRadius: 13,
@@ -9336,7 +9384,16 @@ function SettingsPage({
         left: driveAuto ? 21 : 3,
         transition: "left 0.15s",
         boxShadow: "0 1px 3px rgba(0,0,0,0.3)"
-      } }))), !driveAuto && /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && setShowDriveRemindSetup(true) }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "clock", size: 20, color: "var(--text-dim)" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u63D0\u9192\u983B\u7387"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, "\u8D85\u904E\u5929\u6578\u672A\u5099\u4EFD\u6642\u63D0\u9192")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--mint-text)", fontWeight: 600, marginRight: 4 } }, "\u6BCF ", driveRemindDays, " \u5929"), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), /* @__PURE__ */ React.createElement(
+      } }))), !driveAuto && /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && setShowDriveRemindSetup(true) }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "clock", size: 20, color: "var(--text-dim)" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u63D0\u9192\u983B\u7387"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, "\u8D85\u904E\u5929\u6578\u672A\u5099\u4EFD\u6642\u63D0\u9192")), /* @__PURE__ */ React.createElement("div", { style: {
+        fontSize: 12,
+        fontWeight: 600,
+        color: "var(--text-dim)",
+        background: "var(--bg-card-alt)",
+        borderRadius: 999,
+        padding: "3px 10px",
+        marginRight: 4,
+        flexShrink: 0
+      } }, remindLabel), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), /* @__PURE__ */ React.createElement(
         "div",
         {
           style: { ...styles.settingsItem, opacity: driveSyncing ? 0.5 : 1 },
@@ -9354,7 +9411,7 @@ function SettingsPage({
         /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "clipboard", size: 20, color: "var(--accent-text)" })),
         /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u9078\u64C7\u96F2\u7AEF\u5099\u4EFD\u9084\u539F"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, "\u5F9E\u6B77\u53F2\u5099\u4EFD\u6E05\u55AE\u6311\u4E00\u4EFD\u9084\u539F")),
         /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
-      ), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && driveSignOut() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "link", size: 20, color: "var(--text-faint)" })), /* @__PURE__ */ React.createElement("div", { style: { ...styles.settingsLabel, color: "var(--text-dim)" } }, "\u89E3\u9664 Google Drive \u9023\u7D50"), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A"))));
+      ), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && driveSignOut() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "link", size: 20, color: "var(--text-faint)" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.settingsLabel, color: "var(--text-dim)" } }, "\u89E3\u9664 Google Drive \u9023\u7D50"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, "\u4E2D\u65B7\u96F2\u7AEF\u540C\u6B65,\u96F2\u7AEF\u5099\u4EFD\u4E0D\u6703\u88AB\u522A\u9664")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A"))));
     }
     if (blockKey === "dataStat") {
       const catCount = (state.categories.expense?.length || 0) + (state.categories.income?.length || 0);
@@ -9753,81 +9810,94 @@ function SettingsPage({
             key: f.id,
             style: {
               display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "8px 8px 8px 12px",
-              marginBottom: 6,
+              flexDirection: "column",
+              padding: 12,
+              marginBottom: 8,
               background: "var(--bg-card)",
-              borderRadius: 10,
-              minHeight: 56,
+              borderRadius: 12,
               boxSizing: "border-box"
             }
           },
-          /* @__PURE__ */ React.createElement(TypeIcon, { name: "clipboard", size: 18, color: "var(--accent-text)" }),
+          /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { flexShrink: 0, marginTop: 2 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "clipboard", size: 18, color: "var(--accent-text)" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600 } }, displayTime), note ? /* @__PURE__ */ React.createElement("div", { style: {
+            fontSize: 12,
+            color: "var(--accent-text)",
+            marginTop: 2,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap"
+          } }, note) : null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, sizeKB !== null ? `${sizeKB} KB` : ""))),
           /* @__PURE__ */ React.createElement(
-            "div",
+            "button",
             {
-              style: { flex: 1, minWidth: 0, cursor: "pointer" },
               onClick: () => {
                 setDriveBackupList(null);
                 driveRestoreFrom(f.id, displayTime);
+              },
+              style: {
+                marginTop: 10,
+                width: "100%",
+                padding: "11px 0",
+                border: "none",
+                borderRadius: 9,
+                background: "var(--mint)",
+                color: "var(--on-mint)",
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6
               }
             },
-            /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600 } }, displayTime),
-            note ? /* @__PURE__ */ React.createElement("div", { style: {
-              fontSize: 12,
-              color: "var(--accent-text)",
-              marginTop: 2,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap"
-            } }, note) : null,
-            /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, sizeKB !== null ? `${sizeKB} KB \xB7 ` : "", "\u9EDE\u6B64\u9084\u539F")
+            /* @__PURE__ */ React.createElement(TypeIcon, { name: "restore", size: 16, color: "var(--on-mint)" }),
+            "\u9084\u539F\u9019\u4EFD\u5099\u4EFD"
           ),
-          /* @__PURE__ */ React.createElement(
-            "div",
+          /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8 } }, /* @__PURE__ */ React.createElement(
+            "button",
             {
               onClick: () => setDriveNoteEdit({ fileId: f.id, displayTime, note }),
               style: {
-                flexShrink: 0,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 2,
-                padding: "6px 8px",
+                flex: 1,
+                padding: "8px 0",
+                border: "1px solid var(--border)",
                 borderRadius: 8,
                 background: "var(--bg-card-alt)",
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: 600,
                 color: note ? "var(--accent-text)" : "var(--text-dim)",
-                cursor: "pointer"
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 5
               }
             },
-            /* @__PURE__ */ React.createElement(TypeIcon, { name: "pencil", size: 14, color: note ? "var(--accent-text)" : "var(--text-dim)" }),
-            "\u5099\u8A3B"
-          ),
-          /* @__PURE__ */ React.createElement(
-            "div",
+            /* @__PURE__ */ React.createElement(TypeIcon, { name: "pencil", size: 13, color: note ? "var(--accent-text)" : "var(--text-dim)" }),
+            "\u7DE8\u8F2F\u5099\u8A3B"
+          ), /* @__PURE__ */ React.createElement(
+            "button",
             {
               onClick: () => driveExportBackup(f.id, displayTime),
               style: {
-                flexShrink: 0,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 2,
-                padding: "6px 8px",
+                flex: 1,
+                padding: "8px 0",
+                border: "1px solid var(--border)",
                 borderRadius: 8,
                 background: "var(--bg-card-alt)",
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: 600,
                 color: "var(--text-dim)",
-                cursor: "pointer"
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 5
               }
             },
-            /* @__PURE__ */ React.createElement(TypeIcon, { name: "download", size: 14, color: "var(--text-dim)" }),
-            "\u532F\u51FA"
-          )
+            /* @__PURE__ */ React.createElement(TypeIcon, { name: "download", size: 13, color: "var(--text-dim)" }),
+            "\u532F\u51FA\u6A94\u6848"
+          ))
         );
       })),
       /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 16px" } }, /* @__PURE__ */ React.createElement(
@@ -9843,7 +9913,19 @@ function SettingsPage({
     "div",
     {
       "data-picker-backdrop": "true",
-      style: styles.centerDialogBackdrop,
+      style: {
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: "rgba(0,0,0,0.55)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+        zIndex: 1100
+      },
       onClick: () => setDriveNoteEdit(null)
     },
     /* @__PURE__ */ React.createElement(
@@ -10088,23 +10170,48 @@ function SettingsPage({
     },
     /* @__PURE__ */ React.createElement("div", { style: styles.pickerItemLabel }, "\u6BCF ", d, " \u5929\u63D0\u9192"),
     backupReminderDays === d && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--mint-text)", fontSize: 14 } }, "\u2713")
-  ))))), showDriveRemindSetup && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowDriveRemindSetup(false) }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, "\u96F2\u7AEF\u5099\u4EFD\u63D0\u9192\u983B\u7387"), /* @__PURE__ */ React.createElement("div", { style: styles.pickerList }, [1, 3, 7, 14, 30].map((d) => /* @__PURE__ */ React.createElement(
-    "div",
-    {
-      className: "picker-item",
-      key: d,
-      style: {
-        ...styles.pickerItem,
-        ...driveRemindDays === d ? { background: "rgba(126, 224, 192, 0.08)" } : {}
+  ))))), showDriveRemindSetup && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowDriveRemindSetup(false) }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: { padding: "16px 18px 6px", textAlign: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 700 } }, "\u96F2\u7AEF\u5099\u4EFD\u63D0\u9192\u983B\u7387"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 4, lineHeight: 1.5 } }, "\u81EA\u52D5\u5099\u4EFD\u95DC\u9589\u6642,\u8D85\u904E\u8A2D\u5B9A\u6642\u9593\u6703\u63D0\u9192\u4F60\u624B\u52D5\u5099\u4EFD")), /* @__PURE__ */ React.createElement("div", { style: { padding: "6px 12px 12px" } }, [
+    { val: "1", label: "\u6BCF 1 \u5929 \u63D0\u9192" },
+    { val: "3", label: "\u6BCF 3 \u5929 \u63D0\u9192" },
+    { val: "7", label: "\u6BCF 7 \u5929 \u63D0\u9192" },
+    { val: "14", label: "\u6BCF 14 \u5929 \u63D0\u9192" },
+    { val: "30", label: "\u6BCF 30 \u5929 \u63D0\u9192" },
+    { val: "month-start", label: "\u6BCF\u6708\u521D \u63D0\u9192" },
+    { val: "month-end", label: "\u6BCF\u6708\u5E95 \u63D0\u9192" }
+  ].map((opt) => {
+    const active = driveRemindMode === opt.val;
+    return /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        className: "picker-item",
+        key: opt.val,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "11px 12px",
+          borderRadius: 10,
+          marginBottom: 6,
+          cursor: "pointer",
+          boxSizing: "border-box",
+          background: active ? "rgba(47,170,131,0.12)" : "var(--bg-card-alt)",
+          border: active ? "1.5px solid var(--mint)" : "1.5px solid transparent"
+        },
+        onClick: () => {
+          setDriveRemind(opt.val);
+          setShowDriveRemindSetup(false);
+        }
       },
-      onClick: () => {
-        setDriveRemind(d);
-        setShowDriveRemindSetup(false);
-      }
-    },
-    /* @__PURE__ */ React.createElement("div", { style: styles.pickerItemLabel }, "\u6BCF ", d, " \u5929\u63D0\u9192"),
-    driveRemindDays === d && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--mint-text)", fontSize: 14 } }, "\u2713")
-  ))))), showSnapshotNameDialog && (() => {
+      /* @__PURE__ */ React.createElement(TypeIcon, { name: "calendar", size: 17, color: active ? "var(--mint-text)" : "var(--text-dim)" }),
+      /* @__PURE__ */ React.createElement("div", { style: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: active ? 700 : 500,
+        color: active ? "var(--mint-text)" : "var(--text)"
+      } }, opt.label),
+      active && /* @__PURE__ */ React.createElement(TypeIcon, { name: "check", size: 16, color: "var(--mint-text)" })
+    );
+  })))), showSnapshotNameDialog && (() => {
     const scopeOpts = [
       { key: "transactions", label: "\u4EA4\u6613\u7D00\u9304", count: state.transactions.length },
       { key: "accounts", label: "\u5E33\u6236", count: state.accounts.length },
