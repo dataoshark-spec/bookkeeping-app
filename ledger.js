@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515AV";
+const APP_VERSION = "1150515AW";
 const BLOCK_ORDER_KEY = "ledger_block_order_v14";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -36,6 +36,20 @@ const GDRIVE_REMIND_DAYS_KEY = "ledger_gdrive_remind_days_v1";
 const GDRIVE_MAX_BACKUPS = 20;
 const GDrive = {
   _tokenClient: null,
+  // 帶逾時的 fetch:慢速網路 / 斷線時不會永久卡住(預設 45 秒)
+  async _fetch(url, options, timeoutMs) {
+    const ms = timeoutMs || 45e3;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    try {
+      return await fetch(url, { ...options || {}, signal: ctrl.signal });
+    } catch (e) {
+      if (e && e.name === "AbortError") throw new Error("\u9023\u7DDA\u903E\u6642,\u8ACB\u6AA2\u67E5\u7DB2\u8DEF\u5F8C\u91CD\u8A66");
+      throw new Error("\u9023\u7DDA\u5931\u6557,\u8ACB\u6AA2\u67E5\u7DB2\u8DEF\u5F8C\u91CD\u8A66");
+    } finally {
+      clearTimeout(timer);
+    }
+  },
   // 取得目前有效的 access token(null = 未登入或過期)
   getToken() {
     try {
@@ -160,12 +174,15 @@ const GDrive = {
   async ensureToken() {
     let token = this.getToken();
     if (token) return token;
-    return await this.refreshToken();
+    return await Promise.race([
+      this.refreshToken(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error("\u9023\u7DDA\u903E\u6642,\u8ACB\u91CD\u8A66")), 7e4))
+    ]);
   },
   // 取得使用者 email(透過 userinfo)
   async fetchEmail(token) {
     try {
-      const r = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+      const r = await this._fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
         headers: { Authorization: "Bearer " + token }
       });
       if (!r.ok) return "";
@@ -181,14 +198,14 @@ const GDrive = {
   async listBackups(token) {
     const q = encodeURIComponent("name contains 'ledger-backup-' and trashed = false");
     const url = "https://www.googleapis.com/drive/v3/files?q=" + q + "&spaces=appDataFolder&orderBy=createdTime desc&fields=files(id,name,createdTime,size,description)&pageSize=50";
-    const r = await fetch(url, { headers: { Authorization: "Bearer " + token } });
+    const r = await this._fetch(url, { headers: { Authorization: "Bearer " + token } });
     if (!r.ok) throw new Error("\u8B80\u53D6\u96F2\u7AEF\u6A94\u6848\u6E05\u55AE\u5931\u6557 (" + r.status + ")");
     const d = await r.json();
     return d.files || [];
   },
   // 更新某份備份的備註(寫進 Drive 檔案的 description 欄位,不動檔案內容)
   async updateBackupNote(token, fileId, note) {
-    const r = await fetch(
+    const r = await this._fetch(
       "https://www.googleapis.com/drive/v3/files/" + fileId + "?fields=id",
       {
         method: "PATCH",
@@ -210,7 +227,7 @@ const GDrive = {
     const boundary = "ledgerbnd" + Date.now();
     const metadata = { name, mimeType: "application/json", parents: ["appDataFolder"] };
     const body = "--" + boundary + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" + JSON.stringify(metadata) + "\r\n--" + boundary + "\r\nContent-Type: application/json\r\n\r\n" + payloadStr + "\r\n--" + boundary + "--";
-    const r = await fetch(
+    const r = await this._fetch(
       "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,createdTime",
       {
         method: "POST",
@@ -219,14 +236,15 @@ const GDrive = {
           "Content-Type": "multipart/related; boundary=" + boundary
         },
         body
-      }
+      },
+      9e4
     );
     if (!r.ok) throw new Error("\u4E0A\u50B3\u5931\u6557 (" + r.status + ")");
     return await r.json();
   },
   // 下載指定檔案內容
   async downloadBackup(token, fileId) {
-    const r = await fetch(
+    const r = await this._fetch(
       "https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media",
       { headers: { Authorization: "Bearer " + token } }
     );
@@ -235,7 +253,7 @@ const GDrive = {
   },
   // 刪除檔案
   async deleteBackup(token, fileId) {
-    const r = await fetch("https://www.googleapis.com/drive/v3/files/" + fileId, {
+    const r = await this._fetch("https://www.googleapis.com/drive/v3/files/" + fileId, {
       method: "DELETE",
       headers: { Authorization: "Bearer " + token }
     });
