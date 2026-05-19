@@ -1,6 +1,6 @@
 // Service Worker — 記帳 LEDGER 個人版
 
-const CACHE_VERSION = 'ledger-v648';
+const CACHE_VERSION = 'ledger-v650';
 const CACHE_NAME = `${CACHE_VERSION}-cache`;
 
 const PRECACHE_URLS = [
@@ -36,6 +36,12 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   if (!req.url.startsWith('http')) return;
   if (req.url.includes('fonts.googleapis.com') || req.url.includes('fonts.gstatic.com')) {
+    return;
+  }
+  // Google 帳號 / Drive API 一律走網路,不快取、不攔截
+  if (req.url.includes('accounts.google.com')
+      || req.url.includes('googleapis.com')
+      || req.url.includes('google.com/gsi')) {
     return;
   }
   event.respondWith(

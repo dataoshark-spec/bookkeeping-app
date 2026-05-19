@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515AK";
+const APP_VERSION = "1150515AM";
 const BLOCK_ORDER_KEY = "ledger_block_order_v13";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -26,6 +26,209 @@ const NUM_FONT_STACKS = {
   "mono": "ui-monospace, SF Mono, Menlo, Monaco, Consolas, Cascadia Code, Roboto Mono, Droid Sans Mono, monospace"
 };
 const LEND_BUCKET_ACCOUNT_NAME = "\u4EE3\u588A\u66AB\u5B58";
+const GDRIVE_CLIENT_ID = "487079350281-7p3b3230jbkmhtrh9ikh8daqsrg759d2.apps.googleusercontent.com";
+const GDRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+const GDRIVE_TOKEN_KEY = "ledger_gdrive_token_v1";
+const GDRIVE_EMAIL_KEY = "ledger_gdrive_email_v1";
+const GDRIVE_AUTO_KEY = "ledger_gdrive_auto_v1";
+const GDRIVE_LASTSYNC_KEY = "ledger_gdrive_lastsync_v1";
+const GDRIVE_REMIND_DAYS_KEY = "ledger_gdrive_remind_days_v1";
+const GDRIVE_MAX_BACKUPS = 10;
+const GDrive = {
+  _tokenClient: null,
+  // 取得目前有效的 access token(null = 未登入或過期)
+  getToken() {
+    try {
+      const raw = localStorage.getItem(GDRIVE_TOKEN_KEY);
+      if (!raw) return null;
+      const t = JSON.parse(raw);
+      if (!t.access_token || !t.expires_at) return null;
+      if (Date.now() >= t.expires_at - 6e4) return null;
+      return t.access_token;
+    } catch {
+      return null;
+    }
+  },
+  isLinked() {
+    try {
+      return !!localStorage.getItem(GDRIVE_EMAIL_KEY);
+    } catch {
+      return false;
+    }
+  },
+  getEmail() {
+    try {
+      return localStorage.getItem(GDRIVE_EMAIL_KEY) || "";
+    } catch {
+      return "";
+    }
+  },
+  // 觸發 Google 登入授權;resolve(access_token) 或 reject(error)
+  signIn() {
+    return new Promise((resolve, reject) => {
+      if (typeof google === "undefined" || !google.accounts || !google.accounts.oauth2) {
+        reject(new Error("Google \u767B\u5165\u670D\u52D9\u5C1A\u672A\u8F09\u5165,\u8ACB\u6AA2\u67E5\u7DB2\u8DEF\u5F8C\u91CD\u8A66"));
+        return;
+      }
+      try {
+        const client = google.accounts.oauth2.initTokenClient({
+          client_id: GDRIVE_CLIENT_ID,
+          scope: GDRIVE_SCOPE,
+          callback: (resp) => {
+            if (resp.error) {
+              reject(new Error(resp.error));
+              return;
+            }
+            const expiresAt = Date.now() + (resp.expires_in || 3600) * 1e3;
+            try {
+              localStorage.setItem(GDRIVE_TOKEN_KEY, JSON.stringify({
+                access_token: resp.access_token,
+                expires_at: expiresAt
+              }));
+            } catch {
+            }
+            resolve(resp.access_token);
+          }
+        });
+        client.requestAccessToken({ prompt: "consent" });
+      } catch (e) {
+        reject(e);
+      }
+    });
+  },
+  // 靜默重新取得 token(已登入過、token 過期時用)
+  refreshToken() {
+    return new Promise((resolve, reject) => {
+      if (typeof google === "undefined" || !google.accounts || !google.accounts.oauth2) {
+        reject(new Error("Google \u670D\u52D9\u672A\u8F09\u5165"));
+        return;
+      }
+      try {
+        const client = google.accounts.oauth2.initTokenClient({
+          client_id: GDRIVE_CLIENT_ID,
+          scope: GDRIVE_SCOPE,
+          callback: (resp) => {
+            if (resp.error) {
+              reject(new Error(resp.error));
+              return;
+            }
+            const expiresAt = Date.now() + (resp.expires_in || 3600) * 1e3;
+            try {
+              localStorage.setItem(GDRIVE_TOKEN_KEY, JSON.stringify({
+                access_token: resp.access_token,
+                expires_at: expiresAt
+              }));
+            } catch {
+            }
+            resolve(resp.access_token);
+          }
+        });
+        client.requestAccessToken({ prompt: "" });
+      } catch (e) {
+        reject(e);
+      }
+    });
+  },
+  // 確保有有效 token(過期就靜默刷新,失敗則需重新登入)
+  async ensureToken() {
+    let token = this.getToken();
+    if (token) return token;
+    return await this.refreshToken();
+  },
+  // 取得使用者 email(透過 userinfo)
+  async fetchEmail(token) {
+    try {
+      const r = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: { Authorization: "Bearer " + token }
+      });
+      if (!r.ok) return "";
+      const d = await r.json();
+      return d.email || "";
+    } catch {
+      return "";
+    }
+  },
+  // 列出 app 在 Drive 建立的備份檔(依時間新到舊)
+  async listBackups(token) {
+    const q = encodeURIComponent("name contains 'ledger-backup-' and trashed = false");
+    const url = "https://www.googleapis.com/drive/v3/files?q=" + q + "&orderBy=createdTime desc&fields=files(id,name,createdTime,size)&pageSize=50";
+    const r = await fetch(url, { headers: { Authorization: "Bearer " + token } });
+    if (!r.ok) throw new Error("\u8B80\u53D6\u96F2\u7AEF\u6A94\u6848\u6E05\u55AE\u5931\u6557 (" + r.status + ")");
+    const d = await r.json();
+    return d.files || [];
+  },
+  // 上傳一份新備份(multipart);payloadStr 是 JSON 字串
+  async uploadBackup(token, payloadStr) {
+    const now = /* @__PURE__ */ new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const name = "ledger-backup-" + now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()) + "-" + pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds()) + ".json";
+    const boundary = "ledgerbnd" + Date.now();
+    const metadata = { name, mimeType: "application/json" };
+    const body = "--" + boundary + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" + JSON.stringify(metadata) + "\r\n--" + boundary + "\r\nContent-Type: application/json\r\n\r\n" + payloadStr + "\r\n--" + boundary + "--";
+    const r = await fetch(
+      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,createdTime",
+      {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + token,
+          "Content-Type": "multipart/related; boundary=" + boundary
+        },
+        body
+      }
+    );
+    if (!r.ok) throw new Error("\u4E0A\u50B3\u5931\u6557 (" + r.status + ")");
+    return await r.json();
+  },
+  // 下載指定檔案內容
+  async downloadBackup(token, fileId) {
+    const r = await fetch(
+      "https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media",
+      { headers: { Authorization: "Bearer " + token } }
+    );
+    if (!r.ok) throw new Error("\u4E0B\u8F09\u5931\u6557 (" + r.status + ")");
+    return await r.text();
+  },
+  // 刪除檔案
+  async deleteBackup(token, fileId) {
+    const r = await fetch("https://www.googleapis.com/drive/v3/files/" + fileId, {
+      method: "DELETE",
+      headers: { Authorization: "Bearer " + token }
+    });
+    return r.ok || r.status === 404;
+  },
+  // 清掉超過上限的舊備份(保留最新 GDRIVE_MAX_BACKUPS 份)
+  async pruneOldBackups(token) {
+    try {
+      const files = await this.listBackups(token);
+      if (files.length <= GDRIVE_MAX_BACKUPS) return;
+      const toDelete = files.slice(GDRIVE_MAX_BACKUPS);
+      for (const f of toDelete) {
+        await this.deleteBackup(token, f.id);
+      }
+    } catch {
+    }
+  },
+  // 登出:清掉本機 token / email
+  signOut() {
+    try {
+      const raw = localStorage.getItem(GDRIVE_TOKEN_KEY);
+      if (raw) {
+        const t = JSON.parse(raw);
+        if (t.access_token && typeof google !== "undefined" && google.accounts && google.accounts.oauth2) {
+          google.accounts.oauth2.revoke(t.access_token, () => {
+          });
+        }
+      }
+    } catch {
+    }
+    try {
+      localStorage.removeItem(GDRIVE_TOKEN_KEY);
+      localStorage.removeItem(GDRIVE_EMAIL_KEY);
+      localStorage.removeItem(GDRIVE_LASTSYNC_KEY);
+    } catch {
+    }
+  }
+};
 const getLendBucketAccount = (accounts) => accounts.find((a) => a.name === LEND_BUCKET_ACCOUNT_NAME && a.isSystem === "lend_bucket");
 const DEFAULT_CATEGORIES = {
   expense: [
@@ -8605,6 +8808,201 @@ function SettingsPage({
     exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
     exportVersion: 3
   }, null, 2);
+  const [driveLinked, setDriveLinked] = useState(() => GDrive.isLinked());
+  const [driveEmail, setDriveEmail] = useState(() => GDrive.getEmail());
+  const [driveSyncing, setDriveSyncing] = useState(false);
+  const [driveAuto, setDriveAuto] = useState(() => {
+    try {
+      return localStorage.getItem(GDRIVE_AUTO_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [driveRemindDays, setDriveRemindDays] = useState(() => {
+    try {
+      return parseInt(localStorage.getItem(GDRIVE_REMIND_DAYS_KEY) || "7", 10);
+    } catch {
+      return 7;
+    }
+  });
+  const [driveLastSync, setDriveLastSync] = useState(() => {
+    try {
+      return parseInt(localStorage.getItem(GDRIVE_LASTSYNC_KEY) || "0", 10);
+    } catch {
+      return 0;
+    }
+  });
+  const [driveBackupList, setDriveBackupList] = useState(null);
+  const driveSignIn = async () => {
+    setDriveSyncing(true);
+    try {
+      const token = await GDrive.signIn();
+      const email = await GDrive.fetchEmail(token);
+      try {
+        localStorage.setItem(GDRIVE_EMAIL_KEY, email);
+      } catch {
+      }
+      setDriveLinked(true);
+      setDriveEmail(email);
+      toast("\u5DF2\u9023\u7D50 Google Drive");
+    } catch (e) {
+      toast("\u9023\u7D50\u5931\u6557:" + (e && e.message || "\u672A\u77E5\u932F\u8AA4"));
+    } finally {
+      setDriveSyncing(false);
+    }
+  };
+  const driveSignOut = () => {
+    setConfirmDialog({
+      title: "\u89E3\u9664 Google Drive \u9023\u7D50",
+      message: "\u89E3\u9664\u5F8C\u5C07\u4E0D\u518D\u81EA\u52D5\u5099\u4EFD\u3002\n\u96F2\u7AEF\u4E0A\u5DF2\u5099\u4EFD\u7684\u6A94\u6848 \u4E0D\u6703 \u88AB\u522A\u9664\u3002\n\n\u78BA\u5B9A\u89E3\u9664\u55CE?",
+      confirmText: "\u89E3\u9664\u9023\u7D50",
+      danger: true,
+      onConfirm: () => {
+        GDrive.signOut();
+        setDriveLinked(false);
+        setDriveEmail("");
+        setDriveLastSync(0);
+        toast("\u5DF2\u89E3\u9664 Google Drive \u9023\u7D50");
+      }
+    });
+  };
+  const driveSyncNow = async (silent) => {
+    if (driveSyncing) return;
+    setDriveSyncing(true);
+    try {
+      const token = await GDrive.ensureToken();
+      const payload = buildExportPayload();
+      await GDrive.uploadBackup(token, payload);
+      await GDrive.pruneOldBackups(token);
+      const now = Date.now();
+      try {
+        localStorage.setItem(GDRIVE_LASTSYNC_KEY, String(now));
+      } catch {
+      }
+      setDriveLastSync(now);
+      if (!silent) toast("\u5DF2\u5099\u4EFD\u5230 Google Drive");
+    } catch (e) {
+      const msg = e && e.message || "\u672A\u77E5\u932F\u8AA4";
+      if (msg.includes("401") || msg.includes("token") || msg.includes("\u672A\u8F09\u5165")) {
+        if (!silent) toast("\u9023\u7DDA\u904E\u671F,\u8ACB\u91CD\u65B0\u9023\u7D50 Google Drive");
+      } else {
+        if (!silent) toast("\u5099\u4EFD\u5931\u6557:" + msg);
+      }
+    } finally {
+      setDriveSyncing(false);
+    }
+  };
+  const toggleDriveAuto = () => {
+    const next = !driveAuto;
+    setDriveAuto(next);
+    try {
+      localStorage.setItem(GDRIVE_AUTO_KEY, next ? "1" : "0");
+    } catch {
+    }
+    toast(next ? "\u5DF2\u958B\u555F\u81EA\u52D5\u5099\u4EFD" : "\u5DF2\u95DC\u9589\u81EA\u52D5\u5099\u4EFD");
+  };
+  const setDriveRemind = (days) => {
+    setDriveRemindDays(days);
+    try {
+      localStorage.setItem(GDRIVE_REMIND_DAYS_KEY, String(days));
+    } catch {
+    }
+  };
+  const driveLoadBackupList = async () => {
+    setDriveSyncing(true);
+    try {
+      const token = await GDrive.ensureToken();
+      const files = await GDrive.listBackups(token);
+      setDriveBackupList(files);
+      if (files.length === 0) toast("\u96F2\u7AEF\u5C1A\u7121\u5099\u4EFD\u6A94");
+    } catch (e) {
+      toast("\u8B80\u53D6\u6E05\u55AE\u5931\u6557:" + (e && e.message || "\u672A\u77E5\u932F\u8AA4"));
+      setDriveBackupList(null);
+    } finally {
+      setDriveSyncing(false);
+    }
+  };
+  const driveRestoreFrom = async (fileId, fileName) => {
+    setConfirmDialog({
+      title: "\u5F9E\u96F2\u7AEF\u9084\u539F",
+      message: `\u5C07\u7528\u96F2\u7AEF\u5099\u4EFD \u300C${fileName}\u300D \u8986\u84CB\u76EE\u524D\u7684\u8CC7\u6599\u3002
+
+\u76EE\u524D\u7684\u672C\u6A5F\u8CC7\u6599\u6703 \u5B8C\u5168\u88AB\u53D6\u4EE3 ,\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F\u3002
+
+\u78BA\u5B9A\u9084\u539F\u55CE?`,
+      confirmText: "\u9084\u539F",
+      danger: true,
+      onConfirm: async () => {
+        setDriveSyncing(true);
+        try {
+          const token = await GDrive.ensureToken();
+          const text = await GDrive.downloadBackup(token, fileId);
+          applyImportFromText(text);
+        } catch (e) {
+          toast("\u9084\u539F\u5931\u6557:" + (e && e.message || "\u672A\u77E5\u932F\u8AA4"));
+          setDriveSyncing(false);
+        }
+      }
+    });
+  };
+  const driveRestoreLatest = async () => {
+    setDriveSyncing(true);
+    try {
+      const token = await GDrive.ensureToken();
+      const files = await GDrive.listBackups(token);
+      if (files.length === 0) {
+        toast("\u96F2\u7AEF\u5C1A\u7121\u5099\u4EFD\u6A94");
+        setDriveSyncing(false);
+        return;
+      }
+      setDriveSyncing(false);
+      driveRestoreFrom(files[0].id, files[0].name);
+    } catch (e) {
+      toast("\u8B80\u53D6\u5931\u6557:" + (e && e.message || "\u672A\u77E5\u932F\u8AA4"));
+      setDriveSyncing(false);
+    }
+  };
+  const _autoSyncTimerRef = React.useRef(null);
+  const _autoSyncMountRef = React.useRef(false);
+  useEffect(() => {
+    if (!_autoSyncMountRef.current) {
+      _autoSyncMountRef.current = true;
+      return;
+    }
+    if (!driveAuto || !driveLinked) return;
+    if (_autoSyncTimerRef.current) clearTimeout(_autoSyncTimerRef.current);
+    _autoSyncTimerRef.current = setTimeout(() => {
+      driveSyncNow(true);
+    }, 8e3);
+    return () => {
+      if (_autoSyncTimerRef.current) clearTimeout(_autoSyncTimerRef.current);
+    };
+  }, [state, driveAuto, driveLinked]);
+  const _remindShownRef = React.useRef(false);
+  useEffect(() => {
+    if (_remindShownRef.current) return;
+    if (!driveLinked) return;
+    if (driveAuto) return;
+    _remindShownRef.current = true;
+    const days = driveRemindDays || 7;
+    const elapsed = Date.now() - (driveLastSync || 0);
+    const threshold = days * 24 * 60 * 60 * 1e3;
+    if (driveLastSync > 0 && elapsed < threshold) return;
+    const timer = setTimeout(() => {
+      const lastTxt = driveLastSync > 0 ? `\u4E0A\u6B21\u5099\u4EFD:${new Date(driveLastSync).toLocaleDateString()}` : "\u5C1A\u672A\u5099\u4EFD\u904E";
+      setConfirmDialog({
+        title: "\u96F2\u7AEF\u5099\u4EFD\u63D0\u9192",
+        message: `${lastTxt}
+
+\u5DF2\u7D93\u8D85\u904E ${days} \u5929 \u6C92\u6709\u5099\u4EFD\u5230 Google Drive,\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
+        confirmText: "\u7ACB\u5373\u5099\u4EFD",
+        onConfirm: () => {
+          driveSyncNow(false);
+        }
+      });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [driveLinked, driveAuto, driveLastSync, driveRemindDays]);
   const doExport = () => {
     const data = buildExportPayload();
     try {
@@ -8817,7 +9215,87 @@ function SettingsPage({
       return null;
     }
     if (blockKey === "account") {
-      return /* @__PURE__ */ React.createElement(Block, { key: "account", ...blockProps, title: "\u5E33\u865F\u9023\u7D50" }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && setShowThirdParty(true) }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "link", size: 20, color: "#a8c8f5" })), /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u4E32\u9023\u7B2C\u4E09\u65B9\u9023\u7D50"), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")));
+      const lastSyncTxt = driveLastSync > 0 ? new Date(driveLastSync).toLocaleString("zh-TW", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "\u5C1A\u672A\u5099\u4EFD";
+      return /* @__PURE__ */ React.createElement(Block, { key: "account", ...blockProps, title: "\u5E33\u865F\u9023\u7D50" }, !driveLinked ? /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: styles.settingsItem,
+          onClick: () => !editMode && !driveSyncing && driveSignIn()
+        },
+        /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "link", size: 20, color: "#4285F4" })),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u9023\u7D50 Google Drive"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, "\u5099\u4EFD\u8CC7\u6599\u5230\u96F2\u7AEF,\u63DB\u624B\u6A5F / \u6E05\u9664\u700F\u89BD\u5668\u4E5F\u4E0D\u6015\u907A\u5931")),
+        driveSyncing ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)" } }, "\u9023\u7D50\u4E2D\u2026") : /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
+      ) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: {
+        padding: "12px 14px",
+        background: "var(--bg-card)",
+        borderRadius: 10,
+        marginBottom: 8
+      } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "link", size: 20, color: "#4285F4" }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600 } }, "Google Drive \u5DF2\u9023\u7D50"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, driveEmail || "(\u5E33\u865F)"))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 8 } }, "\u4E0A\u6B21\u5099\u4EFD:", lastSyncTxt)), /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: { ...styles.settingsItem, opacity: driveSyncing ? 0.5 : 1 },
+          onClick: () => !editMode && !driveSyncing && driveSyncNow(false)
+        },
+        /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "upload", size: 20, color: "var(--mint-text)" })),
+        /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, driveSyncing ? "\u540C\u6B65\u4E2D\u2026" : "\u7ACB\u5373\u5099\u4EFD\u5230\u96F2\u7AEF"),
+        /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
+      ), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && toggleDriveAuto() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "spark", size: 20, color: "#c9962d" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u81EA\u52D5\u5099\u4EFD"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, driveAuto ? "\u8CC7\u6599\u8B8A\u52D5\u6642\u81EA\u52D5\u4E0A\u50B3" : "\u95DC\u9589(\u6539\u7528\u4E0B\u65B9\u63D0\u9192)")), /* @__PURE__ */ React.createElement("div", { style: {
+        width: 44,
+        height: 26,
+        borderRadius: 13,
+        flexShrink: 0,
+        background: driveAuto ? "var(--mint)" : "var(--bg-card-alt)",
+        border: driveAuto ? "none" : "1px solid var(--border)",
+        position: "relative",
+        transition: "background 0.15s"
+      } }, /* @__PURE__ */ React.createElement("div", { style: {
+        width: 20,
+        height: 20,
+        borderRadius: "50%",
+        background: "#fff",
+        position: "absolute",
+        top: 2,
+        left: driveAuto ? 21 : 3,
+        transition: "left 0.15s",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.3)"
+      } }))), !driveAuto && /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 14px 4px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 8 } }, "\u63D0\u9192\u983B\u7387"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, [1, 3, 7, 14, 30].map((d) => /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: d,
+          onClick: () => !editMode && setDriveRemind(d),
+          style: {
+            flex: 1,
+            textAlign: "center",
+            padding: "8px 0",
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            background: driveRemindDays === d ? "var(--mint)" : "var(--bg-card-alt)",
+            color: driveRemindDays === d ? "var(--on-mint)" : "var(--text-dim)"
+          }
+        },
+        d,
+        "\u5929"
+      )))), /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: { ...styles.settingsItem, opacity: driveSyncing ? 0.5 : 1 },
+          onClick: () => !editMode && !driveSyncing && driveRestoreLatest()
+        },
+        /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "download", size: 20, color: "#a8c8f5" })),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u4E0B\u8F09\u96F2\u7AEF\u6700\u65B0\u5099\u4EFD"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, "\u7528\u96F2\u7AEF\u6700\u65B0\u4E00\u4EFD\u8986\u84CB\u672C\u6A5F\u8CC7\u6599")),
+        /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
+      ), /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: { ...styles.settingsItem, opacity: driveSyncing ? 0.5 : 1 },
+          onClick: () => !editMode && !driveSyncing && driveLoadBackupList()
+        },
+        /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "clipboard", size: 20, color: "var(--accent-text)" })),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u9078\u64C7\u96F2\u7AEF\u5099\u4EFD\u9084\u539F"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, "\u5F9E\u6B77\u53F2\u5099\u4EFD\u6E05\u55AE\u6311\u4E00\u4EFD\u9084\u539F")),
+        /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
+      ), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && driveSignOut() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "link", size: 20, color: "var(--text-faint)" })), /* @__PURE__ */ React.createElement("div", { style: { ...styles.settingsLabel, color: "var(--text-dim)" } }, "\u89E3\u9664 Google Drive \u9023\u7D50"), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A"))), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && setShowThirdParty(true) }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "link", size: 20, color: "#a8c8f5" })), /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u4E32\u9023\u7B2C\u4E09\u65B9\u9023\u7D50"), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")));
     }
     if (blockKey === "dataStat") {
       const catCount = (state.categories.expense?.length || 0) + (state.categories.income?.length || 0);
@@ -9171,7 +9649,80 @@ function SettingsPage({
       );
     }
     return null;
-  })), showThirdParty && /* @__PURE__ */ React.createElement(ThirdPartySheet, { onClose: () => setShowThirdParty(false), toast }), showCleanupSheet && /* @__PURE__ */ React.createElement(
+  })), showThirdParty && /* @__PURE__ */ React.createElement(ThirdPartySheet, { onClose: () => setShowThirdParty(false), toast }), driveBackupList !== null && /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: {
+        position: "fixed",
+        inset: 0,
+        zIndex: 1e3,
+        background: "var(--toast-backdrop)",
+        display: "flex",
+        alignItems: "flex-end"
+      },
+      onClick: () => setDriveBackupList(null)
+    },
+    /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          width: "100%",
+          background: "var(--bg)",
+          borderRadius: "18px 18px 0 0",
+          maxHeight: "75vh",
+          display: "flex",
+          flexDirection: "column",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)"
+        },
+        onClick: (e) => e.stopPropagation()
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { padding: "16px 16px 8px", fontSize: 16, fontWeight: 700 } }, "\u9078\u64C7\u96F2\u7AEF\u5099\u4EFD\u9084\u539F"),
+      /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 8px", fontSize: 12, color: "var(--text-dim)" } }, "\u9EDE\u4E00\u4EFD\u5099\u4EFD\u5373\u53EF\u9084\u539F(\u6703\u8986\u84CB\u76EE\u524D\u8CC7\u6599)"),
+      /* @__PURE__ */ React.createElement("div", { style: { overflowY: "auto", padding: "4px 16px 16px" } }, driveBackupList.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { padding: "30px 0", textAlign: "center", color: "var(--text-faint)", fontSize: 13 } }, "\u96F2\u7AEF\u5C1A\u7121\u5099\u4EFD\u6A94") : driveBackupList.map((f) => {
+        let displayTime = f.name;
+        const m = f.name.match(/ledger-backup-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/);
+        if (m) {
+          displayTime = `${m[1]}/${m[2]}/${m[3]} ${m[4]}:${m[5]}`;
+        } else if (f.createdTime) {
+          displayTime = new Date(f.createdTime).toLocaleString("zh-TW");
+        }
+        const sizeKB = f.size ? Math.round(parseInt(f.size, 10) / 1024) : null;
+        return /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            key: f.id,
+            onClick: () => {
+              setDriveBackupList(null);
+              driveRestoreFrom(f.id, displayTime);
+            },
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "12px 12px",
+              marginBottom: 6,
+              background: "var(--bg-card)",
+              borderRadius: 10,
+              cursor: "pointer",
+              minHeight: 56,
+              boxSizing: "border-box"
+            }
+          },
+          /* @__PURE__ */ React.createElement(TypeIcon, { name: "clipboard", size: 18, color: "var(--accent-text)" }),
+          /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600 } }, displayTime), sizeKB !== null && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, sizeKB, " KB")),
+          /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
+        );
+      })),
+      /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 16px" } }, /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          style: { ...styles.deleteBtn, width: "100%", marginTop: 0 },
+          onClick: () => setDriveBackupList(null)
+        },
+        "\u95DC\u9589"
+      ))
+    )
+  ), showCleanupSheet && /* @__PURE__ */ React.createElement(
     CleanupHistorySheet,
     {
       state,
