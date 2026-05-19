@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515BC";
+const APP_VERSION = "1150515BD";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -1285,6 +1285,55 @@ function App() {
     }
     noteColorBroadcast(noteColor);
   }, [noteColor]);
+  const _autoBkTimerRef = React.useRef(null);
+  const _autoBkMountRef = React.useRef(false);
+  const _autoBkRunningRef = React.useRef(false);
+  useEffect(() => {
+    if (!_autoBkMountRef.current) {
+      _autoBkMountRef.current = true;
+      return;
+    }
+    let autoOn = false;
+    try {
+      autoOn = localStorage.getItem(GDRIVE_AUTO_KEY) === "1";
+    } catch {
+    }
+    if (!autoOn || !GDrive.isLinked()) return;
+    if (_autoBkTimerRef.current) return;
+    _autoBkTimerRef.current = setTimeout(async () => {
+      _autoBkTimerRef.current = null;
+      if (_autoBkRunningRef.current) return;
+      let stillOn = false;
+      try {
+        stillOn = localStorage.getItem(GDRIVE_AUTO_KEY) === "1";
+      } catch {
+      }
+      if (!stillOn || !GDrive.isLinked()) return;
+      _autoBkRunningRef.current = true;
+      try {
+        const token = await GDrive.ensureToken();
+        const payload = JSON.stringify({
+          transactions: state.transactions,
+          accounts: state.accounts,
+          categories: state.categories,
+          accountTypes: state.accountTypes,
+          holdings: state.holdings,
+          trades: state.trades,
+          exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          exportVersion: 3
+        }, null, 2);
+        await GDrive.uploadBackup(token, payload);
+        await GDrive.pruneOldBackups(token);
+        try {
+          localStorage.setItem(GDRIVE_LASTSYNC_KEY, String(Date.now()));
+        } catch {
+        }
+      } catch (e) {
+      } finally {
+        _autoBkRunningRef.current = false;
+      }
+    }, 8e3);
+  }, [state]);
   useEffect(() => {
     let migrated = false;
     setState((s) => {
@@ -8558,7 +8607,7 @@ function SettingsPage({
   const reminderSetupSwipe = useSwipeToClose(() => setShowReminderSetup(false));
   const snapshotNameSwipe = useSwipeToClose(() => setShowSnapshotNameDialog(false));
   const snapshotsSwipe = useSwipeToClose(() => setShowSnapshots(false));
-  const driveBackupListSwipe = useSwipeToCloseAny(() => setDriveBackupList(null));
+  const driveBackupListSwipe = useSwipeToClose(() => setDriveBackupList(null));
   const persistSnapshots = (list) => {
     setSnapshots(list);
     try {
@@ -9168,20 +9217,6 @@ function SettingsPage({
       setDriveSyncing(false);
     }
   };
-  const _autoSyncTimerRef = React.useRef(null);
-  const _autoSyncMountRef = React.useRef(false);
-  useEffect(() => {
-    if (!_autoSyncMountRef.current) {
-      _autoSyncMountRef.current = true;
-      return;
-    }
-    if (!driveAuto || !driveLinked) return;
-    if (_autoSyncTimerRef.current) return;
-    _autoSyncTimerRef.current = setTimeout(() => {
-      _autoSyncTimerRef.current = null;
-      driveSyncNow(true);
-    }, 8e3);
-  }, [state, driveAuto, driveLinked]);
   const _remindShownRef = React.useRef(false);
   useEffect(() => {
     if (_remindShownRef.current) return;
@@ -9931,9 +9966,7 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
           maxHeight: "75vh",
           display: "flex",
           flexDirection: "column",
-          paddingBottom: "env(safe-area-inset-bottom, 0px)",
-          transform: `translateY(${driveBackupListSwipe.dragY}px)`,
-          transition: driveBackupListSwipe.dragY ? "none" : "transform 0.2s"
+          paddingBottom: "env(safe-area-inset-bottom, 0px)"
         },
         onClick: (e) => e.stopPropagation(),
         onTouchStart: driveBackupListSwipe.onTouchStart,
@@ -9941,8 +9974,27 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
         onTouchEnd: driveBackupListSwipe.onTouchEnd,
         onTouchCancel: driveBackupListSwipe.onTouchCancel
       },
-      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "center", padding: "8px 0 2px" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: "var(--border)" } })),
-      /* @__PURE__ */ React.createElement("div", { style: { padding: "8px 16px 6px", fontSize: 16, fontWeight: 700 } }, "\u9078\u64C7\u96F2\u7AEF\u5099\u4EFD\u9084\u539F"),
+      /* @__PURE__ */ React.createElement("div", { style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "14px 12px 6px 16px"
+      } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, fontWeight: 700 } }, "\u9078\u64C7\u96F2\u7AEF\u5099\u4EFD\u9084\u539F"), /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          onClick: () => setDriveBackupList(null),
+          style: {
+            padding: "7px 16px",
+            borderRadius: 8,
+            background: "var(--bg-card-alt)",
+            cursor: "pointer",
+            fontSize: 13,
+            color: "var(--text-dim)",
+            fontWeight: 600
+          }
+        },
+        "\u8FD4\u56DE"
+      )),
       /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 10px", fontSize: 12, color: "var(--text-dim)", lineHeight: 1.6 } }, "\u9EDE\u6574\u5217\u5373\u53EF\u9084\u539F(\u6703\u8986\u84CB\u76EE\u524D\u8CC7\u6599)\u3002", driveBackupList && driveBackupList.length > 0 && /* @__PURE__ */ React.createElement("span", null, `\u76EE\u524D ${driveBackupList.length} / ${GDRIVE_MAX_BACKUPS} \u4EFD,\u6EFF\u4E86\u6703\u81EA\u52D5\u8986\u84CB\u6700\u820A\u7684,\u4E0D\u4F54\u984D\u5916\u7A7A\u9593\u3002`)),
       /* @__PURE__ */ React.createElement("div", { style: { overflowY: "auto", padding: "4px 16px 16px" } }, driveBackupList.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { padding: "30px 0", textAlign: "center", color: "var(--text-faint)", fontSize: 13 } }, "\u96F2\u7AEF\u5C1A\u7121\u5099\u4EFD\u6A94") : driveBackupList.map((f) => {
         let displayTime = f.name;
