@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515BD";
+const APP_VERSION = "1150515BE";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -34,6 +34,15 @@ const GDRIVE_AUTO_KEY = "ledger_gdrive_auto_v1";
 const GDRIVE_LASTSYNC_KEY = "ledger_gdrive_lastsync_v1";
 const GDRIVE_REMIND_DAYS_KEY = "ledger_gdrive_remind_days_v1";
 const GDRIVE_MAX_BACKUPS = 20;
+const driveLastSyncListeners = /* @__PURE__ */ new Set();
+const broadcastDriveLastSync = (ts) => {
+  driveLastSyncListeners.forEach((cb) => {
+    try {
+      cb(ts);
+    } catch {
+    }
+  });
+};
 const GDrive = {
   _tokenClient: null,
   // 帶逾時的 fetch:慢速網路 / 斷線時不會永久卡住(預設 45 秒)
@@ -1324,10 +1333,12 @@ function App() {
         }, null, 2);
         await GDrive.uploadBackup(token, payload);
         await GDrive.pruneOldBackups(token);
+        const ts = Date.now();
         try {
-          localStorage.setItem(GDRIVE_LASTSYNC_KEY, String(Date.now()));
+          localStorage.setItem(GDRIVE_LASTSYNC_KEY, String(ts));
         } catch {
         }
+        broadcastDriveLastSync(ts);
       } catch (e) {
       } finally {
         _autoBkRunningRef.current = false;
@@ -8996,6 +9007,12 @@ function SettingsPage({
       return 0;
     }
   });
+  useEffect(() => {
+    driveLastSyncListeners.add(setDriveLastSync);
+    return () => {
+      driveLastSyncListeners.delete(setDriveLastSync);
+    };
+  }, []);
   const [driveBackupList, setDriveBackupList] = useState(null);
   const [driveNoteEdit, setDriveNoteEdit] = useState(null);
   const driveSignIn = async () => {
@@ -9288,13 +9305,15 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `\u8A18\u5E33\u5099\u4EFD_${todayStr()}.json`;
+      const now = /* @__PURE__ */ new Date();
+      const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
+      a.download = `\u8A18\u5E33\u5099\u4EFD_${stamp}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       updateLastBackup();
-      toast("\u5DF2\u532F\u51FA JSON\uFF0C\u8ACB\u81F3\u300C\u4E0B\u8F09\u300D\u8CC7\u6599\u593E\u67E5\u770B");
+      toast("\u5DF2\u9001\u51FA\u4E0B\u8F09,\u8ACB\u81F3\u300C\u4E0B\u8F09\u300D\u8CC7\u6599\u593E\u78BA\u8A8D");
     } catch {
       toast("\u532F\u51FA\u5931\u6557");
     }
