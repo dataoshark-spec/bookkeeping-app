@@ -1,7 +1,7 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515AW";
-const BLOCK_ORDER_KEY = "ledger_block_order_v14";
+const APP_VERSION = "1150515AZ";
+const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
 const NOTE_PREF_KEY = "ledger_note_pref_v1";
@@ -1440,7 +1440,7 @@ function App() {
       home: ["summary", "dateStrip", "actions", "periods", "recent"],
       txn: ["summary", "period", "list"],
       stats: ["summary", "period", "chart", "compare", "top5", "transfer"],
-      settings: ["dataStat", "appearance", "account", "backup-local", "backup-ext", "cleanup", "danger"],
+      settings: ["dataStat", "appearance", "backup-local", "account", "backup-ext", "cleanup", "danger"],
       addTxn: ["amount", "typeToggle", "date", "category", "subCategory", "note", "account"]
     };
     const merge = (savedPage, defPage) => {
@@ -3767,18 +3767,47 @@ function ConfirmDialogRenderer({ dialog, onClose }) {
     letterSpacing: 1,
     lineHeight: 1.1,
     fontVariantNumeric: "tabular-nums"
-  } }, dialog.bigNumber.value), dialog.bigNumber.label && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", letterSpacing: 0.5 } }, dialog.bigNumber.label)), dialog.messageList && /* @__PURE__ */ React.createElement("div", { style: {
-    padding: "4px 20px 14px",
-    fontSize: 14,
-    color: "var(--text-dim)",
-    lineHeight: 1.6,
-    whiteSpace: "pre-wrap"
-  } }, dialog.messageList.before && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, dialog.messageList.before), Array.isArray(dialog.messageList.items) && dialog.messageList.items.length > 0 && /* @__PURE__ */ React.createElement("div", { style: {
-    margin: "0 0 10px",
-    display: "flex",
-    flexDirection: "column",
-    gap: 6
-  } }, dialog.messageList.items.map((it, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { color: "var(--text)", fontWeight: 500 } }, it))), dialog.messageList.after && /* @__PURE__ */ React.createElement("div", null, dialog.messageList.after)), dialog.message && !dialog.messageList && (() => {
+  } }, dialog.bigNumber.value), dialog.bigNumber.label && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", letterSpacing: 0.5 } }, dialog.bigNumber.label)), dialog.messageList && (() => {
+    const ml = dialog.messageList;
+    const styled = !!ml.styled;
+    const hlWarn = Array.isArray(dialog.highlightWords) ? dialog.highlightWords.filter(Boolean) : [];
+    const hlSafe = Array.isArray(dialog.highlightWordsSafe) ? dialog.highlightWordsSafe.filter(Boolean) : [];
+    const renderHL = (text) => {
+      if (!text || !styled || hlWarn.length === 0 && hlSafe.length === 0) return text;
+      const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const all = [...hlWarn, ...hlSafe].sort((a, b) => b.length - a.length);
+      const re = new RegExp("(" + all.map(esc).join("|") + ")", "g");
+      const warnSet = new Set(hlWarn);
+      const safeSet = new Set(hlSafe);
+      return text.split(re).map((part, i) => {
+        if (!part) return null;
+        if (warnSet.has(part)) {
+          return /* @__PURE__ */ React.createElement("span", { key: i, style: { color: "var(--pink)", fontWeight: 700 } }, part);
+        }
+        if (safeSet.has(part)) {
+          return /* @__PURE__ */ React.createElement("span", { key: i, style: { color: "var(--mint)", fontWeight: 700 } }, part);
+        }
+        return /* @__PURE__ */ React.createElement(React.Fragment, { key: i }, part);
+      });
+    };
+    return /* @__PURE__ */ React.createElement("div", { style: {
+      padding: "4px 20px 14px",
+      fontSize: 14,
+      color: "var(--text-dim)",
+      lineHeight: 1.6,
+      whiteSpace: "pre-wrap"
+    } }, ml.before && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, renderHL(ml.before)), Array.isArray(ml.items) && ml.items.length > 0 && (styled ? /* @__PURE__ */ React.createElement("div", { style: { margin: "0 0 10px" } }, ml.items.map((it, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: {
+      display: "flex",
+      gap: 8,
+      padding: "9px 2px",
+      borderTop: "1px solid var(--border)"
+    } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", flexShrink: 0, lineHeight: 1.5 } }, "\u30FB"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, color: "var(--text)", fontWeight: 500, lineHeight: 1.5 } }, renderHL(it))))) : /* @__PURE__ */ React.createElement("div", { style: {
+      margin: "0 0 10px",
+      display: "flex",
+      flexDirection: "column",
+      gap: 6
+    } }, ml.items.map((it, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { color: "var(--text)", fontWeight: 500 } }, it)))), ml.after && /* @__PURE__ */ React.createElement("div", null, renderHL(ml.after)));
+  })(), dialog.message && !dialog.messageList && (() => {
     const rawText = dialog.message;
     const lines = rawText.split("\n").map((l) => l.trim()).filter(Boolean);
     const warningPatterns = [
@@ -8813,6 +8842,8 @@ function SettingsPage({
     "ledger_block_order_v13",
     // 舊版 block 排序(相容)
     "ledger_block_order_v14",
+    // 舊版 block 排序(相容)
+    "ledger_block_order_v15",
     // 新版 block 排序
     "ledger_account_order",
     "ledger_period_order",
@@ -8925,7 +8956,17 @@ function SettingsPage({
   const driveSignOut = () => {
     setConfirmDialog({
       title: "\u89E3\u9664 Google Drive \u9023\u7D50",
-      message: "\u89E3\u9664\u5F8C\u5C07\u4E0D\u518D\u81EA\u52D5\u5099\u4EFD\u3002\n\u96F2\u7AEF\u4E0A\u5DF2\u5099\u4EFD\u7684\u6A94\u6848 \u4E0D\u6703 \u88AB\u522A\u9664\u3002\n\n\u78BA\u5B9A\u89E3\u9664\u55CE?",
+      messageList: {
+        styled: true,
+        before: "\u89E3\u9664\u5F8C\u6703\u767C\u751F\u9019\u4E9B\u4E8B:",
+        items: [
+          "\u5C07\u4E0D\u518D\u81EA\u52D5\u5099\u4EFD\u5230\u96F2\u7AEF",
+          "\u96F2\u7AEF\u4E0A\u5DF2\u5099\u4EFD\u7684\u6A94\u6848\u4E0D\u6703\u88AB\u522A\u9664,\u4E4B\u5F8C\u91CD\u65B0\u9023\u7D50\u5373\u53EF\u9084\u539F"
+        ],
+        after: "\u78BA\u5B9A\u8981\u89E3\u9664\u9023\u7D50\u55CE?"
+      },
+      highlightWords: ["\u4E0D\u518D\u81EA\u52D5\u5099\u4EFD"],
+      highlightWordsSafe: ["\u4E0D\u6703\u88AB\u522A\u9664"],
       confirmText: "\u89E3\u9664\u9023\u7D50",
       danger: true,
       onConfirm: () => {
@@ -8940,6 +8981,7 @@ function SettingsPage({
   const driveSyncNow = async (silent) => {
     if (driveSyncing) return;
     setDriveSyncing(true);
+    if (!silent) toast("\u958B\u59CB\u5099\u4EFD\u22EF");
     try {
       const token = await GDrive.ensureToken();
       const payload = buildExportPayload();
@@ -9280,9 +9322,10 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
     setShowDriveSetup(false);
     toast(url ? "\u5DF2\u5132\u5B58\u8CC7\u6599\u593E\u9023\u7D50" : "\u5DF2\u6E05\u9664\u8CC7\u6599\u593E\u9023\u7D50");
   };
-  const daysSinceBackup = lastBackupAt ? Math.floor((Date.now() - lastBackupAt) / 864e5) : null;
+  const lastAnyBackupAt = Math.max(lastBackupAt || 0, driveLastSync || 0);
+  const daysSinceBackup = lastAnyBackupAt > 0 ? Math.floor((Date.now() - lastAnyBackupAt) / 864e5) : null;
   const needsBackup = daysSinceBackup === null || daysSinceBackup >= backupReminderDays;
-  const lastBackupText = lastBackupAt ? new Date(lastBackupAt).toLocaleDateString("zh-TW", { year: "numeric", month: "2-digit", day: "2-digit" }) : "\u5F9E\u672A\u5099\u4EFD";
+  const lastBackupText = lastAnyBackupAt > 0 ? new Date(lastAnyBackupAt).toLocaleDateString("zh-TW", { year: "numeric", month: "2-digit", day: "2-digit" }) : "\u5F9E\u672A\u5099\u4EFD";
   const updateReminderDays = (days) => {
     setBackupReminderDays(days);
     try {
@@ -9292,8 +9335,8 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
     setShowReminderSetup(false);
     toast(`\u5DF2\u8A2D\u5B9A\u6BCF ${days} \u5929\u63D0\u9192\u5099\u4EFD`);
   };
-  return /* @__PURE__ */ React.createElement("div", { style: styles.page }, /* @__PURE__ */ React.createElement("div", { style: styles.pageHeader }, /* @__PURE__ */ React.createElement("h1", { style: styles.pageTitle }, "\u8A2D\u5B9A"), /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode })), /* @__PURE__ */ React.createElement(EditModeBanner, { editMode, setEditMode }), /* @__PURE__ */ React.createElement("div", { style: styles.pageScroll }, needsBackup && state.transactions.length > 0 && /* @__PURE__ */ React.createElement("div", { style: styles.backupReminder, onClick: doExport }, /* @__PURE__ */ React.createElement("div", { style: { width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "warning", size: 22, color: "#f5a04a" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: "#f5a04a", marginBottom: 2 } }, daysSinceBackup === null ? "\u5EFA\u8B70\u9032\u884C\u9996\u6B21\u5099\u4EFD" : `\u5DF2 ${daysSinceBackup} \u5929\u672A\u5099\u4EFD`), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)" } }, "\u9EDE\u6B64\u7ACB\u5373\u532F\u51FA JSON \u5099\u4EFD")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), (blockOrder || ["dataStat", "appearance", "account", "backup-local", "backup-ext", "cleanup", "danger"]).map((blockKey, idx) => {
-    const order = blockOrder || ["dataStat", "appearance", "account", "backup-local", "backup-ext", "cleanup", "danger"];
+  return /* @__PURE__ */ React.createElement("div", { style: styles.page }, /* @__PURE__ */ React.createElement("div", { style: styles.pageHeader }, /* @__PURE__ */ React.createElement("h1", { style: styles.pageTitle }, "\u8A2D\u5B9A"), /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode })), /* @__PURE__ */ React.createElement(EditModeBanner, { editMode, setEditMode }), /* @__PURE__ */ React.createElement("div", { style: styles.pageScroll }, needsBackup && state.transactions.length > 0 && /* @__PURE__ */ React.createElement("div", { style: styles.backupReminder, onClick: doExport }, /* @__PURE__ */ React.createElement("div", { style: { width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "warning", size: 22, color: "#f5a04a" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: "#f5a04a", marginBottom: 2 } }, daysSinceBackup === null ? "\u5EFA\u8B70\u9032\u884C\u9996\u6B21\u5099\u4EFD" : `\u5DF2 ${daysSinceBackup} \u5929\u672A\u5099\u4EFD`), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)" } }, "\u9EDE\u6B64\u7ACB\u5373\u532F\u51FA JSON \u5099\u4EFD")), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), (blockOrder || ["dataStat", "appearance", "backup-local", "account", "backup-ext", "cleanup", "danger"]).map((blockKey, idx) => {
+    const order = blockOrder || ["dataStat", "appearance", "backup-local", "account", "backup-ext", "cleanup", "danger"];
     const blockProps = {
       onReorder: setPageOrder,
       blockKey,
@@ -9377,11 +9420,14 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
       } }, "\u5099\u4EFD\u5B58\u5728 Google Drive \u5C08\u5C6C\u7A7A\u9593\u3002\u5728 Drive App \u770B\u4E0D\u5230\u662F\u6B63\u5E38\u7684,\u8981\u67E5\u770B / \u9084\u539F\u8ACB\u7528\u4E0B\u65B9\u300C\u9078\u64C7\u96F2\u7AEF\u5099\u4EFD\u9084\u539F\u300D\u3002"), /* @__PURE__ */ React.createElement(
         "div",
         {
-          style: { ...styles.settingsItem, opacity: driveSyncing ? 0.5 : 1 },
+          style: { ...styles.settingsItem, opacity: editMode || driveSyncing ? 0.6 : 1 },
           onClick: () => !editMode && !driveSyncing && driveSyncNow(false)
         },
-        /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-up", size: 20, color: "var(--mint-text)" })),
-        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, driveSyncing ? "\u540C\u6B65\u4E2D\u2026" : "\u7ACB\u5373\u5099\u4EFD\u5230\u96F2\u7AEF"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, "\u624B\u52D5\u4E0A\u50B3\u4E00\u4EFD\u5099\u4EFD\u5230 Google Drive")),
+        /* @__PURE__ */ React.createElement("div", { style: {
+          ...styles.settingsIcon,
+          animation: driveSyncing ? "ledgerSpin 1s linear infinite" : void 0
+        } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-up", size: 20, color: "var(--mint-text)" })),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, driveSyncing ? /* @__PURE__ */ React.createElement("span", null, "\u5099\u4EFD\u4E2D", /* @__PURE__ */ React.createElement("span", { style: { animation: "ledgerDots 1.2s ease-in-out infinite" } }, "\u22EF")) : "\u7ACB\u5373\u5099\u4EFD\u5230\u96F2\u7AEF"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, driveSyncing ? "\u6B63\u5728\u4E0A\u50B3\u5230 Google Drive,\u8ACB\u7A0D\u5019" : "\u624B\u52D5\u4E0A\u50B3\u4E00\u4EFD\u5099\u4EFD\u5230 Google Drive")),
         /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
       ), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && toggleDriveAuto() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-sync", size: 20, color: "#e0a82e" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u81EA\u52D5\u5099\u4EFD"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, driveAuto ? "\u8CC7\u6599\u4E00\u8B8A\u52D5\u5C31\u81EA\u52D5\u4E0A\u50B3\u5230 Google Drive" : "\u95DC\u9589(\u5982\u672A\u958B\u555F,\u81EA\u52D5\u6539\u7528\u4E0B\u65B9\u63D0\u9192\u529F\u80FD)")), /* @__PURE__ */ React.createElement("div", { style: {
         width: 44,
@@ -17536,6 +17582,15 @@ function Style({ theme = "dark", numFont = DEFAULT_NUM_FONT }) {
         0%, 100% { transform: translate(0, 0) rotate(0deg); }
         25% { transform: translate(-1px, 0) rotate(-0.3deg); }
         75% { transform: translate(1px, 0) rotate(0.3deg); }
+      }
+      @keyframes ledgerSpin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      @keyframes ledgerDots {
+        0%, 20% { opacity: 0.2; }
+        50% { opacity: 1; }
+        80%, 100% { opacity: 0.2; }
       }
       @keyframes toastSlideIn {
         from { opacity: 0; transform: translate(-50%, -50%) scale(0.92); }
