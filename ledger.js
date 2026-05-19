@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515AP";
+const APP_VERSION = "1150515AS";
 const BLOCK_ORDER_KEY = "ledger_block_order_v13";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -33,7 +33,7 @@ const GDRIVE_EMAIL_KEY = "ledger_gdrive_email_v1";
 const GDRIVE_AUTO_KEY = "ledger_gdrive_auto_v1";
 const GDRIVE_LASTSYNC_KEY = "ledger_gdrive_lastsync_v1";
 const GDRIVE_REMIND_DAYS_KEY = "ledger_gdrive_remind_days_v1";
-const GDRIVE_MAX_BACKUPS = 10;
+const GDRIVE_MAX_BACKUPS = 20;
 const GDrive = {
   _tokenClient: null,
   // 取得目前有效的 access token(null = 未登入或過期)
@@ -153,11 +153,27 @@ const GDrive = {
   // 使用者無法在 Drive 介面看到、改名或刪除,app 永遠存取得到
   async listBackups(token) {
     const q = encodeURIComponent("name contains 'ledger-backup-' and trashed = false");
-    const url = "https://www.googleapis.com/drive/v3/files?q=" + q + "&spaces=appDataFolder&orderBy=createdTime desc&fields=files(id,name,createdTime,size)&pageSize=50";
+    const url = "https://www.googleapis.com/drive/v3/files?q=" + q + "&spaces=appDataFolder&orderBy=createdTime desc&fields=files(id,name,createdTime,size,description)&pageSize=50";
     const r = await fetch(url, { headers: { Authorization: "Bearer " + token } });
     if (!r.ok) throw new Error("\u8B80\u53D6\u96F2\u7AEF\u6A94\u6848\u6E05\u55AE\u5931\u6557 (" + r.status + ")");
     const d = await r.json();
     return d.files || [];
+  },
+  // 更新某份備份的備註(寫進 Drive 檔案的 description 欄位,不動檔案內容)
+  async updateBackupNote(token, fileId, note) {
+    const r = await fetch(
+      "https://www.googleapis.com/drive/v3/files/" + fileId + "?fields=id",
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: "Bearer " + token,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ description: note || "" })
+      }
+    );
+    if (!r.ok) throw new Error("\u66F4\u65B0\u5099\u8A3B\u5931\u6557 (" + r.status + ")");
+    return true;
   },
   // 上傳一份新備份到 appDataFolder(multipart);payloadStr 是 JSON 字串
   async uploadBackup(token, payloadStr) {
@@ -721,8 +737,10 @@ const storageGet = () => {
 const storageSet = (v) => {
   try {
     localStorage.setItem(STORAGE_KEY, v);
+    return true;
   } catch {
     memStore.data = v;
+    return false;
   }
 };
 const storageClear = () => {
@@ -1460,6 +1478,7 @@ function App() {
     };
   }, []);
   const _hasMountedRef = React.useRef(false);
+  const _storageWarnedRef = React.useRef(false);
   useEffect(() => {
     if (!_hasMountedRef.current) {
       _hasMountedRef.current = true;
@@ -1480,7 +1499,19 @@ function App() {
       }
     } catch {
     }
-    storageSet(JSON.stringify(state));
+    const ok = storageSet(JSON.stringify(state));
+    if (!ok && !_storageWarnedRef.current) {
+      _storageWarnedRef.current = true;
+      setConfirmDialog({
+        title: "\u5132\u5B58\u7A7A\u9593\u5DF2\u6EFF",
+        message: "\u76EE\u524D\u8CC7\u6599 \u7121\u6CD5\u5B58\u5165\u672C\u6A5F ,\u53EF\u80FD\u662F\u700F\u89BD\u5668\u5132\u5B58\u7A7A\u9593\u5DF2\u6EFF\u3002\n\n\u4F60\u7684\u8CC7\u6599 \u66AB\u6642\u4FDD\u7559\u5728\u8A18\u61B6\u9AD4\u4E2D ,\u4F46 \u95DC\u9589 App \u5F8C\u6703\u6D88\u5931 \u3002\n\n\u8ACB\u7ACB\u5373\u7528\u300C\u96F2\u7AEF\u5099\u4EFD\u300D\u6216\u300C\u532F\u51FA\u5099\u4EFD\u6A94\u300D\u4FDD\u5B58\u8CC7\u6599,\u4E26\u6E05\u7406\u820A\u5FEB\u7167\u91CB\u653E\u7A7A\u9593\u3002",
+        confirmText: "\u6211\u77E5\u9053\u4E86",
+        singleAction: true,
+        danger: true,
+        onConfirm: () => {
+        }
+      });
+    }
   }, [state]);
   const toast = (msg, ms = 2400) => {
     setToastMsg(msg);
@@ -6067,43 +6098,6 @@ function SellHoldingSheet({ state, holding, onClose, onConfirm, toast, toastRich
     )))
   );
 }
-function ClosedHoldingsSection({ holdings, trades }) {
-  const [expanded, setExpanded] = useState(false);
-  return /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10 } }, /* @__PURE__ */ React.createElement(
-    "div",
-    {
-      onClick: () => setExpanded(!expanded),
-      style: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "10px 12px",
-        background: "var(--bg-card)",
-        border: "1px solid var(--border)",
-        borderRadius: 10,
-        cursor: "pointer",
-        fontSize: 12,
-        color: "var(--text-dim)"
-      }
-    },
-    /* @__PURE__ */ React.createElement("span", null, "\u5DF2\u6E05\u5009 (", holdings.length, ")"),
-    /* @__PURE__ */ React.createElement("span", null, expanded ? "\u25BE" : "\u25B8")
-  ), expanded && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginTop: 6 } }, holdings.map((h) => {
-    const sells = trades.filter((t) => t.holdingId === h.id && t.type === "sell");
-    const totalPnl = sells.reduce((s, t) => s + (t.realizedPnl || 0), 0);
-    return /* @__PURE__ */ React.createElement("div", { key: h.id, style: {
-      padding: "10px 12px",
-      background: "var(--bg-card-2, rgba(127,127,127,0.04))",
-      border: "1px solid var(--border)",
-      borderRadius: 10,
-      opacity: 0.8
-    } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, fontWeight: 600 } }, h.symbol), /* @__PURE__ */ React.createElement("span", { style: {
-      fontSize: 12,
-      fontWeight: 600,
-      color: totalPnl >= 0 ? "var(--mint-text)" : "var(--pink-text)"
-    } }, "\u7D2F\u8A08 ", totalPnl >= 0 ? "+" : "", fmt(totalPnl))), h.name && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2 } }, h.name));
-  })));
-}
 function SettleDetailSheet({ state, settleGroup, onClose, onDeleteGroup }) {
   const swipe = useSwipeBack(onClose);
   const tradeId = settleGroup[0]?.tradeId;
@@ -8425,17 +8419,17 @@ function SettingsPage({
   moveBlock,
   setPageOrder
 }) {
-  const [showThirdParty, setShowThirdParty] = useState(false);
   const [showDriveSetup, setShowDriveSetup] = useState(false);
   const [showCleanupSheet, setShowCleanupSheet] = useState(false);
   const [showFilterDeleteSheet, setShowFilterDeleteSheet] = useState(false);
   const [showReminderSetup, setShowReminderSetup] = useState(false);
+  const [showDriveRemindSetup, setShowDriveRemindSetup] = useState(false);
   const [dangerLocked, setDangerLocked] = useState(true);
   const [showFontPreview, setShowFontPreview] = useState(false);
   const [showFontPicker, setShowFontPicker] = useState(false);
   const [driveInput, setDriveInput] = useState(driveFolderUrl);
   const [expandedStat, setExpandedStat] = useState(null);
-  const anySubSheetOpen = showThirdParty || showCleanupSheet || showFilterDeleteSheet;
+  const anySubSheetOpen = showCleanupSheet || showFilterDeleteSheet;
   useEffect(() => {
     if (onSubSheetChange) onSubSheetChange(anySubSheetOpen);
   }, [anySubSheetOpen, onSubSheetChange]);
@@ -8850,6 +8844,7 @@ function SettingsPage({
     }
   });
   const [driveBackupList, setDriveBackupList] = useState(null);
+  const [driveNoteEdit, setDriveNoteEdit] = useState(null);
   const driveSignIn = async () => {
     setDriveSyncing(true);
     try {
@@ -8980,6 +8975,21 @@ function SettingsPage({
       toast("\u5DF2\u532F\u51FA\u5230\u300C\u4E0B\u8F09\u300D\u8CC7\u6599\u593E");
     } catch (e) {
       toast("\u532F\u51FA\u5931\u6557:" + (e && e.message || "\u672A\u77E5\u932F\u8AA4"));
+    } finally {
+      setDriveSyncing(false);
+    }
+  };
+  const driveSaveNote = async (fileId, note) => {
+    setDriveSyncing(true);
+    try {
+      const token = await GDrive.ensureToken();
+      await GDrive.updateBackupNote(token, fileId, note);
+      setDriveBackupList(
+        (list) => list ? list.map((f) => f.id === fileId ? { ...f, description: note } : f) : list
+      );
+      toast(note ? "\u5DF2\u5132\u5B58\u5099\u8A3B" : "\u5DF2\u6E05\u9664\u5099\u8A3B");
+    } catch (e) {
+      toast("\u5132\u5B58\u5099\u8A3B\u5931\u6557:" + (e && e.message || "\u672A\u77E5\u932F\u8AA4"));
     } finally {
       setDriveSyncing(false);
     }
@@ -9297,26 +9307,7 @@ function SettingsPage({
         left: driveAuto ? 21 : 3,
         transition: "left 0.15s",
         boxShadow: "0 1px 3px rgba(0,0,0,0.3)"
-      } }))), !driveAuto && /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 14px 4px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 8 } }, "\u63D0\u9192\u983B\u7387"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, [1, 3, 7, 14, 30].map((d) => /* @__PURE__ */ React.createElement(
-        "div",
-        {
-          key: d,
-          onClick: () => !editMode && setDriveRemind(d),
-          style: {
-            flex: 1,
-            textAlign: "center",
-            padding: "8px 0",
-            borderRadius: 8,
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: "pointer",
-            background: driveRemindDays === d ? "var(--mint)" : "var(--bg-card-alt)",
-            color: driveRemindDays === d ? "var(--on-mint)" : "var(--text-dim)"
-          }
-        },
-        d,
-        "\u5929"
-      )))), /* @__PURE__ */ React.createElement(
+      } }))), !driveAuto && /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && setShowDriveRemindSetup(true) }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "clock", size: 20, color: "var(--text-dim)" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u63D0\u9192\u983B\u7387"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, "\u8D85\u904E\u5929\u6578\u672A\u5099\u4EFD\u6642\u63D0\u9192")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--mint-text)", fontWeight: 600, marginRight: 4 } }, "\u6BCF ", driveRemindDays, " \u5929"), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")), /* @__PURE__ */ React.createElement(
         "div",
         {
           style: { ...styles.settingsItem, opacity: driveSyncing ? 0.5 : 1 },
@@ -9688,7 +9679,7 @@ function SettingsPage({
       );
     }
     return null;
-  })), showThirdParty && /* @__PURE__ */ React.createElement(ThirdPartySheet, { onClose: () => setShowThirdParty(false), toast }), driveBackupList !== null && /* @__PURE__ */ React.createElement(
+  })), driveBackupList !== null && /* @__PURE__ */ React.createElement(
     "div",
     {
       style: {
@@ -9726,6 +9717,7 @@ function SettingsPage({
           displayTime = new Date(f.createdTime).toLocaleString("zh-TW");
         }
         const sizeKB = f.size ? Math.round(parseInt(f.size, 10) / 1024) : null;
+        const note = (f.description || "").trim();
         return /* @__PURE__ */ React.createElement(
           "div",
           {
@@ -9753,7 +9745,37 @@ function SettingsPage({
               }
             },
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600 } }, displayTime),
+            note ? /* @__PURE__ */ React.createElement("div", { style: {
+              fontSize: 12,
+              color: "var(--accent-text)",
+              marginTop: 2,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap"
+            } }, note) : null,
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, sizeKB !== null ? `${sizeKB} KB \xB7 ` : "", "\u9EDE\u6B64\u9084\u539F")
+          ),
+          /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              onClick: () => setDriveNoteEdit({ fileId: f.id, displayTime, note }),
+              style: {
+                flexShrink: 0,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 2,
+                padding: "6px 8px",
+                borderRadius: 8,
+                background: "var(--bg-card-alt)",
+                fontSize: 11,
+                fontWeight: 600,
+                color: note ? "var(--accent-text)" : "var(--text-dim)",
+                cursor: "pointer"
+              }
+            },
+            /* @__PURE__ */ React.createElement(TypeIcon, { name: "pencil", size: 14, color: note ? "var(--accent-text)" : "var(--text-dim)" }),
+            "\u5099\u8A3B"
           ),
           /* @__PURE__ */ React.createElement(
             "div",
@@ -9762,18 +9784,19 @@ function SettingsPage({
               style: {
                 flexShrink: 0,
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
-                gap: 4,
-                padding: "8px 10px",
+                gap: 2,
+                padding: "6px 8px",
                 borderRadius: 8,
                 background: "var(--bg-card-alt)",
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: 600,
                 color: "var(--text-dim)",
                 cursor: "pointer"
               }
             },
-            /* @__PURE__ */ React.createElement(TypeIcon, { name: "download", size: 15, color: "var(--text-dim)" }),
+            /* @__PURE__ */ React.createElement(TypeIcon, { name: "download", size: 14, color: "var(--text-dim)" }),
             "\u532F\u51FA"
           )
         );
@@ -9785,6 +9808,84 @@ function SettingsPage({
           onClick: () => setDriveBackupList(null)
         },
         "\u95DC\u9589"
+      ))
+    )
+  ), driveNoteEdit !== null && /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-picker-backdrop": "true",
+      style: styles.centerDialogBackdrop,
+      onClick: () => setDriveNoteEdit(null)
+    },
+    /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: { ...styles.centerDialogCard, padding: "20px 20px 16px" },
+        onClick: (e) => e.stopPropagation()
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 600, marginBottom: 4 } }, "\u5099\u4EFD\u5099\u8A3B"),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 14 } }, driveNoteEdit.displayTime),
+      /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          type: "text",
+          value: driveNoteEdit.note,
+          onChange: (e) => setDriveNoteEdit((s) => ({ ...s, note: e.target.value })),
+          placeholder: "\u4F8B\u5982:\u5E74\u5EA6\u7D50\u7B97\u524D\u3001\u63DB\u624B\u6A5F\u524D\u22EF\u22EF",
+          maxLength: 50,
+          autoFocus: true,
+          style: {
+            width: "100%",
+            boxSizing: "border-box",
+            padding: "10px 12px",
+            fontSize: 14,
+            borderRadius: 8,
+            border: "1px solid var(--border)",
+            background: "var(--bg-card)",
+            color: "var(--text)",
+            outline: "none"
+          }
+        }
+      ),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 6 } }, "\u6700\u591A 50 \u5B57,\u7559\u7A7A\u53EF\u6E05\u9664\u5099\u8A3B"),
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 16 } }, /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          style: {
+            flex: 1,
+            padding: "10px 0",
+            borderRadius: 8,
+            border: "1px solid var(--border)",
+            background: "var(--bg-card)",
+            color: "var(--text-dim)",
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: "pointer"
+          },
+          onClick: () => setDriveNoteEdit(null)
+        },
+        "\u53D6\u6D88"
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          style: {
+            flex: 1,
+            padding: "10px 0",
+            borderRadius: 8,
+            border: "none",
+            background: "var(--mint)",
+            color: "var(--on-mint)",
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: "pointer"
+          },
+          onClick: () => {
+            const { fileId, note } = driveNoteEdit;
+            driveSaveNote(fileId, (note || "").trim());
+            setDriveNoteEdit(null);
+          }
+        },
+        "\u5132\u5B58"
       ))
     )
   ), showCleanupSheet && /* @__PURE__ */ React.createElement(
@@ -9958,6 +10059,22 @@ function SettingsPage({
     },
     /* @__PURE__ */ React.createElement("div", { style: styles.pickerItemLabel }, "\u6BCF ", d, " \u5929\u63D0\u9192"),
     backupReminderDays === d && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--mint-text)", fontSize: 14 } }, "\u2713")
+  ))))), showDriveRemindSetup && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowDriveRemindSetup(false) }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.pickerTitle }, "\u96F2\u7AEF\u5099\u4EFD\u63D0\u9192\u983B\u7387"), /* @__PURE__ */ React.createElement("div", { style: styles.pickerList }, [1, 3, 7, 14, 30].map((d) => /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      className: "picker-item",
+      key: d,
+      style: {
+        ...styles.pickerItem,
+        ...driveRemindDays === d ? { background: "rgba(126, 224, 192, 0.08)" } : {}
+      },
+      onClick: () => {
+        setDriveRemind(d);
+        setShowDriveRemindSetup(false);
+      }
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.pickerItemLabel }, "\u6BCF ", d, " \u5929\u63D0\u9192"),
+    driveRemindDays === d && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--mint-text)", fontSize: 14 } }, "\u2713")
   ))))), showSnapshotNameDialog && (() => {
     const scopeOpts = [
       { key: "transactions", label: "\u4EA4\u6613\u7D00\u9304", count: state.transactions.length },
@@ -10071,7 +10188,14 @@ function SettingsPage({
       })
     },
     /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: snapshotsLocked ? "translateX(0)" : "translateX(18px)" } })
-  )))), /* @__PURE__ */ React.createElement("div", { style: { overflowY: "auto", flex: 1, padding: "8px 0" } }, snapshots.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: {
+  )))), /* @__PURE__ */ React.createElement("div", { style: {
+    padding: "8px 20px",
+    fontSize: 11.5,
+    color: "var(--text-faint)",
+    background: "var(--bg-card)",
+    borderBottom: "1px solid var(--border)",
+    lineHeight: 1.5
+  } }, "\u5FEB\u7167\u50C5\u9084\u539F\u300C\u8CC7\u6599\u300D(\u4EA4\u6613 / \u5E33\u6236 / \u5206\u985E),\u4E0D\u542B\u4E3B\u984C\u3001\u6392\u5E8F\u7B49\u504F\u597D\u8A2D\u5B9A\u3002\u5B8C\u6574\u5099\u4EFD\u8ACB\u7528\u300C\u96F2\u7AEF\u5099\u4EFD\u300D\u6216\u300C\u532F\u51FA\u5099\u4EFD\u6A94\u300D\u3002"), /* @__PURE__ */ React.createElement("div", { style: { overflowY: "auto", flex: 1, padding: "8px 0" } }, snapshots.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: {
     padding: "40px 24px",
     textAlign: "center",
     display: "flex",
@@ -11159,109 +11283,6 @@ function FilterDeleteSheet({ state, setState, onClose, setConfirmDialog, toast, 
       selAccountType === t.value && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--mint)", fontSize: 18 } }, "\u2713")
     )))
   ))));
-}
-function ThirdPartySheet({ onClose, toast }) {
-  const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
-  const defaultServices = [
-    {
-      key: "google",
-      name: "Google \u96F2\u7AEF\u786C\u789F",
-      desc: "\u81EA\u52D5\u5099\u4EFD\u8A18\u5E33\u8CC7\u6599\u5230\u60A8\u7684 Google Drive",
-      color: "#4285F4",
-      letter: "G",
-      status: "\u5373\u5C07\u63A8\u51FA"
-    },
-    {
-      key: "icloud",
-      name: "iCloud",
-      desc: "\u5099\u4EFD\u5230 iCloud\uFF08\u50C5\u652F\u63F4 iOS\uFF09",
-      color: "#8a8a8a",
-      letter: "",
-      iconName: "box",
-      status: "\u5373\u5C07\u63A8\u51FA"
-    },
-    {
-      key: "dropbox",
-      name: "Dropbox",
-      desc: "\u5099\u4EFD\u5230 Dropbox",
-      color: "#0061FF",
-      letter: "D",
-      status: "\u5373\u5C07\u63A8\u51FA"
-    }
-  ];
-  const [editMode, setEditMode] = useState(false);
-  const [order, setOrder] = useState(() => {
-    const defaults = defaultServices.map((s) => s.key);
-    try {
-      const raw = localStorage.getItem("ledger_thirdparty_order");
-      if (raw) {
-        const saved = JSON.parse(raw);
-        const defSet = new Set(defaults);
-        const filtered = Array.isArray(saved) ? saved.filter((k) => defSet.has(k)) : [];
-        const missing = defaults.filter((k) => !filtered.includes(k));
-        return [...filtered, ...missing];
-      }
-    } catch {
-    }
-    return defaults;
-  });
-  React.useEffect(() => {
-    try {
-      localStorage.setItem("ledger_thirdparty_order", JSON.stringify(order));
-    } catch {
-    }
-  }, [order]);
-  const moveService = (key, dir) => {
-    setOrder((prev) => {
-      const i = prev.indexOf(key);
-      if (i < 0) return prev;
-      const j = i + dir;
-      if (j < 0 || j >= prev.length) return prev;
-      const next = [...prev];
-      [next[i], next[j]] = [next[j], next[i]];
-      return next;
-    });
-  };
-  const serviceMap = new Map(defaultServices.map((s) => [s.key, s]));
-  const services = order.map((k) => serviceMap.get(k)).filter(Boolean);
-  return /* @__PURE__ */ React.createElement(
-    "div",
-    {
-      "data-sheet": "true",
-      style: {
-        ...styles.sheet,
-        transform: `translateX(${swipe.dragX}px)`,
-        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
-      },
-      ref: swipe.ref
-    },
-    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: { width: 50 } }), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, "\u4E32\u9023\u7B2C\u4E09\u65B9\u9023\u7D50"), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 50, display: "flex", justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode }))),
-    /* @__PURE__ */ React.createElement(EditModeBanner, { editMode, setEditMode }),
-    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll, "data-scroll-container": true }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", padding: "0 4px 16px", lineHeight: 1.6 } }, "\u9023\u7D50\u7B2C\u4E09\u65B9\u96F2\u7AEF\u670D\u52D9\uFF0C\u53EF\u81EA\u52D5\u540C\u6B65\u8207\u5099\u4EFD\u4F60\u7684\u8A18\u5E33\u8CC7\u6599\uFF0C\u63DB\u624B\u6A5F\u6216\u91CD\u88DD App \u6642\u4E5F\u80FD\u8F15\u9B06\u9084\u539F\u3002"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, services.map((s, i) => /* @__PURE__ */ React.createElement(
-      Block,
-      {
-        key: s.key,
-        blockKey: s.key,
-        editMode,
-        isFirst: i === 0,
-        isLast: i === services.length - 1,
-        onMoveUp: () => moveService(s.key, -1),
-        onMoveDown: () => moveService(s.key, 1),
-        onReorder: (newOrder) => setOrder(newOrder),
-        inline: true
-      },
-      /* @__PURE__ */ React.createElement(
-        "div",
-        {
-          style: styles.thirdPartyCard,
-          onClick: () => !editMode && toast(`${s.name} ${s.status}`)
-        },
-        /* @__PURE__ */ React.createElement("div", { style: { ...styles.thirdPartyLogo, background: s.color } }, s.letter ? /* @__PURE__ */ React.createElement("span", { style: { color: "#fff", fontSize: 18, fontWeight: 700 } }, s.letter) : /* @__PURE__ */ React.createElement(TypeIcon, { name: s.iconName || "box", size: 20, color: "#fff" })),
-        /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: styles.thirdPartyName }, s.name), /* @__PURE__ */ React.createElement("div", { style: styles.thirdPartyDesc }, s.desc)),
-        /* @__PURE__ */ React.createElement("div", { style: styles.thirdPartyBadge }, s.status)
-      )
-    ))), !editMode && /* @__PURE__ */ React.createElement("div", { style: { ...styles.settingsGroup, marginTop: 20 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsGroupTitle }, "\u76EE\u524D\u53EF\u7528\u7684\u5099\u4EFD\u65B9\u5F0F"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-dim)", lineHeight: 1.7, padding: "8px 4px" } }, "\u2022 \u5728\u300C\u8A2D\u5B9A \u2192 \u8CC7\u6599\u300D\u53EF\u300C\u532F\u51FA JSON \u5099\u4EFD\u300D\uFF0C\u532F\u51FA\u5F8C\u7684\u6A94\u6848\u53EF\u624B\u52D5\u4E0A\u50B3\u5230\u60A8\u504F\u597D\u7684\u96F2\u7AEF\uFF08\u5982 Google Drive\u3001Dropbox\uFF09", /* @__PURE__ */ React.createElement("br", null), "\u2022 \u65E5\u5F8C\u9700\u9084\u539F\u6642\uFF0C\u53EF\u5C07\u6A94\u6848\u532F\u5165\u56DE App", /* @__PURE__ */ React.createElement("br", null), "\u2022 \u7B2C\u4E09\u65B9\u81EA\u52D5\u4E32\u63A5\u529F\u80FD\u6B63\u5728\u958B\u767C\u4E2D")))
-  );
 }
 function LoadMoreSentinel({ remain, onLoadMore }) {
   const ref = React.useRef(null);
