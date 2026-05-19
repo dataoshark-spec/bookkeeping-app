@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515AO";
+const APP_VERSION = "1150515AP";
 const BLOCK_ORDER_KEY = "ledger_block_order_v13";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -27,7 +27,7 @@ const NUM_FONT_STACKS = {
 };
 const LEND_BUCKET_ACCOUNT_NAME = "\u4EE3\u588A\u66AB\u5B58";
 const GDRIVE_CLIENT_ID = "487079350281-7p3b3230jbkmhtrh9ikh8daqsrg759d2.apps.googleusercontent.com";
-const GDRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
+const GDRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email";
 const GDRIVE_TOKEN_KEY = "ledger_gdrive_token_v1";
 const GDRIVE_EMAIL_KEY = "ledger_gdrive_email_v1";
 const GDRIVE_AUTO_KEY = "ledger_gdrive_auto_v1";
@@ -1125,6 +1125,21 @@ function TypeIcon({ name, size = 22, color = "#fff" }) {
     // 連結鏈條
     case "link":
       return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M10 14 A4 4 0 0 1 10 8 L13 5 A4 4 0 0 1 19 11 L17 13" }), /* @__PURE__ */ React.createElement("path", { d: "M14 10 A4 4 0 0 1 14 16 L11 19 A4 4 0 0 1 5 13 L7 11" }));
+    // 雲(基本雲朵)
+    case "cloud":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M7 18 A4 4 0 0 1 6.5 10.1 A5.5 5.5 0 0 1 17 9 A3.6 3.6 0 0 1 17.5 18 Z" }));
+    // 雲端上傳(雲 + 向上箭頭)
+    case "cloud-up":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M7 17 A4 4 0 0 1 6.5 9.1 A5.5 5.5 0 0 1 17 8 A3.6 3.6 0 0 1 17.5 17" }), /* @__PURE__ */ React.createElement("path", { d: "M12 21 L12 12 M9 15 L12 12 L15 15" }));
+    // 雲端下載(雲 + 向下箭頭)
+    case "cloud-down":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M7 14 A4 4 0 0 1 6.5 6.1 A5.5 5.5 0 0 1 17 5 A3.6 3.6 0 0 1 17.5 14" }), /* @__PURE__ */ React.createElement("path", { d: "M12 11 L12 21 M9 18 L12 21 L15 18" }));
+    // 雲端已同步(雲 + 勾)
+    case "cloud-check":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M7 17 A4 4 0 0 1 6.5 9.1 A5.5 5.5 0 0 1 17 8 A3.6 3.6 0 0 1 17.5 17 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M9.6 12 L11.2 13.6 L14.4 10.2" }));
+    // 雲端同步(雲 + 循環箭頭)
+    case "cloud-sync":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M6.5 19 A4.2 4.2 0 0 1 6 10.8 A5.7 5.7 0 0 1 17 9.6 A3.8 3.8 0 0 1 17.5 19 Z" }), /* @__PURE__ */ React.createElement("g", { strokeWidth: "1.2" }, /* @__PURE__ */ React.createElement("path", { d: "M14 12.1 A2.6 2.6 0 1 0 14.4 15.4" })), /* @__PURE__ */ React.createElement("path", { d: "M13 10.3 L14.5 12 L12.5 12.6 Z", strokeWidth: "1.2", fill: "currentColor" }));
     // 警告（三角驚嘆）
     case "warning":
       return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M12 3 L22 20 L2 20 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M12 10 L12 15 M12 17.5 L12 18" }));
@@ -9246,7 +9261,7 @@ function SettingsPage({
           style: styles.settingsItem,
           onClick: () => !editMode && !driveSyncing && driveSignIn()
         },
-        /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "link", size: 20, color: "#4285F4" })),
+        /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud", size: 20, color: "#4285F4" })),
         /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u9023\u7D50 Google Drive"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, "\u5099\u4EFD\u8CC7\u6599\u5230\u96F2\u7AEF,\u63DB\u624B\u6A5F / \u6E05\u9664\u700F\u89BD\u5668\u4E5F\u4E0D\u6015\u907A\u5931")),
         driveSyncing ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)" } }, "\u9023\u7D50\u4E2D\u2026") : /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
       ) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: {
@@ -9254,16 +9269,16 @@ function SettingsPage({
         background: "var(--bg-card)",
         borderRadius: 10,
         marginBottom: 8
-      } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "link", size: 20, color: "#4285F4" }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600 } }, "Google Drive \u5DF2\u9023\u7D50"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, driveEmail || "(\u5E33\u865F)"))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 8 } }, "\u4E0A\u6B21\u5099\u4EFD:", lastSyncTxt)), /* @__PURE__ */ React.createElement(
+      } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-check", size: 20, color: "#4285F4" }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600 } }, "Google Drive \u5DF2\u9023\u7D50"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, driveEmail || "(\u5E33\u865F)"))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 8 } }, "\u4E0A\u6B21\u5099\u4EFD:", lastSyncTxt)), /* @__PURE__ */ React.createElement(
         "div",
         {
           style: { ...styles.settingsItem, opacity: driveSyncing ? 0.5 : 1 },
           onClick: () => !editMode && !driveSyncing && driveSyncNow(false)
         },
-        /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "upload", size: 20, color: "var(--mint-text)" })),
+        /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-up", size: 20, color: "var(--mint-text)" })),
         /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, driveSyncing ? "\u540C\u6B65\u4E2D\u2026" : "\u7ACB\u5373\u5099\u4EFD\u5230\u96F2\u7AEF"),
         /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
-      ), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && toggleDriveAuto() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "spark", size: 20, color: "#c9962d" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u81EA\u52D5\u5099\u4EFD"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, driveAuto ? "\u8CC7\u6599\u8B8A\u52D5\u6642\u81EA\u52D5\u4E0A\u50B3" : "\u95DC\u9589(\u6539\u7528\u4E0B\u65B9\u63D0\u9192)")), /* @__PURE__ */ React.createElement("div", { style: {
+      ), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && toggleDriveAuto() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-sync", size: 20, color: "#e0a82e" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u81EA\u52D5\u5099\u4EFD"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, driveAuto ? "\u8CC7\u6599\u8B8A\u52D5\u6642\u81EA\u52D5\u4E0A\u50B3" : "\u95DC\u9589(\u6539\u7528\u4E0B\u65B9\u63D0\u9192)")), /* @__PURE__ */ React.createElement("div", { style: {
         width: 44,
         height: 26,
         borderRadius: 13,
@@ -9307,7 +9322,7 @@ function SettingsPage({
           style: { ...styles.settingsItem, opacity: driveSyncing ? 0.5 : 1 },
           onClick: () => !editMode && !driveSyncing && driveRestoreLatest()
         },
-        /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "download", size: 20, color: "#a8c8f5" })),
+        /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-down", size: 20, color: "#6b5fd9" })),
         /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u4E0B\u8F09\u96F2\u7AEF\u6700\u65B0\u5099\u4EFD"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, "\u7528\u96F2\u7AEF\u6700\u65B0\u4E00\u4EFD\u8986\u84CB\u672C\u6A5F\u8CC7\u6599")),
         /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
       ), /* @__PURE__ */ React.createElement(
@@ -9319,7 +9334,7 @@ function SettingsPage({
         /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "clipboard", size: 20, color: "var(--accent-text)" })),
         /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u9078\u64C7\u96F2\u7AEF\u5099\u4EFD\u9084\u539F"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, "\u5F9E\u6B77\u53F2\u5099\u4EFD\u6E05\u55AE\u6311\u4E00\u4EFD\u9084\u539F")),
         /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
-      ), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && driveSignOut() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "link", size: 20, color: "var(--text-faint)" })), /* @__PURE__ */ React.createElement("div", { style: { ...styles.settingsLabel, color: "var(--text-dim)" } }, "\u89E3\u9664 Google Drive \u9023\u7D50"), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A"))), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && setShowThirdParty(true) }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "link", size: 20, color: "#a8c8f5" })), /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u4E32\u9023\u7B2C\u4E09\u65B9\u9023\u7D50"), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")));
+      ), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && driveSignOut() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "link", size: 20, color: "var(--text-faint)" })), /* @__PURE__ */ React.createElement("div", { style: { ...styles.settingsLabel, color: "var(--text-dim)" } }, "\u89E3\u9664 Google Drive \u9023\u7D50"), /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A"))));
     }
     if (blockKey === "dataStat") {
       const catCount = (state.categories.expense?.length || 0) + (state.categories.income?.length || 0);
@@ -9706,7 +9721,7 @@ function SettingsPage({
         let displayTime = f.name;
         const m = f.name.match(/ledger-backup-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/);
         if (m) {
-          displayTime = `${m[1]}/${m[2]}/${m[3]} ${m[4]}:${m[5]}`;
+          displayTime = `${m[1]}/${m[2]}/${m[3]} ${m[4]}:${m[5]}:${m[6]}`;
         } else if (f.createdTime) {
           displayTime = new Date(f.createdTime).toLocaleString("zh-TW");
         }
