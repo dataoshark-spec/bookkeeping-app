@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515AZ";
+const APP_VERSION = "1150515BA";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -1203,9 +1203,6 @@ function TypeIcon({ name, size = 22, color = "#fff" }) {
     // 雲端同步(雲 + 循環箭頭)
     case "cloud-sync":
       return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M6.5 19 A4.2 4.2 0 0 1 6 10.8 A5.7 5.7 0 0 1 17 9.6 A3.8 3.8 0 0 1 17.5 19 Z" }), /* @__PURE__ */ React.createElement("g", { strokeWidth: "1.2" }, /* @__PURE__ */ React.createElement("path", { d: "M14 12.1 A2.6 2.6 0 1 0 14.4 15.4" })), /* @__PURE__ */ React.createElement("path", { d: "M13 10.3 L14.5 12 L12.5 12.6 Z", strokeWidth: "1.2", fill: "currentColor" }));
-    // 還原(逆時針循環箭頭)
-    case "restore":
-      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M5.5 12 A6.5 6.5 0 1 1 7.5 16.7" }), /* @__PURE__ */ React.createElement("path", { d: "M3.2 8.4 L5.5 12 L9 9.6", fill: color, stroke: "none" }));
     // 勾選
     case "check":
       return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M5 12.5 L10 17.5 L19 6.5" }));
@@ -3796,12 +3793,21 @@ function ConfirmDialogRenderer({ dialog, onClose }) {
       color: "var(--text-dim)",
       lineHeight: 1.6,
       whiteSpace: "pre-wrap"
-    } }, ml.before && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, renderHL(ml.before)), Array.isArray(ml.items) && ml.items.length > 0 && (styled ? /* @__PURE__ */ React.createElement("div", { style: { margin: "0 0 10px" } }, ml.items.map((it, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: {
-      display: "flex",
-      gap: 8,
-      padding: "9px 2px",
-      borderTop: "1px solid var(--border)"
-    } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", flexShrink: 0, lineHeight: 1.5 } }, "\u30FB"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, color: "var(--text)", fontWeight: 500, lineHeight: 1.5 } }, renderHL(it))))) : /* @__PURE__ */ React.createElement("div", { style: {
+    } }, ml.before && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, renderHL(ml.before)), Array.isArray(ml.items) && ml.items.length > 0 && (styled ? /* @__PURE__ */ React.createElement("div", { style: { margin: "0 0 12px", display: "flex", flexDirection: "column", gap: 10 } }, ml.items.map((it, i) => {
+      const itemText = it && typeof it === "object" ? it.text : it;
+      const itemCard = !!(it && typeof it === "object" && it.card);
+      return /* @__PURE__ */ React.createElement("div", { key: i, style: {
+        color: "var(--text)",
+        fontWeight: 500,
+        lineHeight: 1.7,
+        ...itemCard ? {
+          background: "var(--bg-card-alt)",
+          border: "1px solid var(--border)",
+          borderRadius: 10,
+          padding: "10px 12px"
+        } : { padding: "0 2px" }
+      } }, renderHL(itemText));
+    })) : /* @__PURE__ */ React.createElement("div", { style: {
       margin: "0 0 10px",
       display: "flex",
       flexDirection: "column",
@@ -8958,12 +8964,12 @@ function SettingsPage({
       title: "\u89E3\u9664 Google Drive \u9023\u7D50",
       messageList: {
         styled: true,
-        before: "\u89E3\u9664\u5F8C\u6703\u767C\u751F\u9019\u4E9B\u4E8B:",
+        before: "\u89E3\u9664\u5F8C\u6703\u767C\u751F\u9019\u4E9B\u4E8B\uFF1A",
         items: [
-          "\u5C07\u4E0D\u518D\u81EA\u52D5\u5099\u4EFD\u5230\u96F2\u7AEF",
-          "\u96F2\u7AEF\u4E0A\u5DF2\u5099\u4EFD\u7684\u6A94\u6848\u4E0D\u6703\u88AB\u522A\u9664,\u4E4B\u5F8C\u91CD\u65B0\u9023\u7D50\u5373\u53EF\u9084\u539F"
+          { text: "\u5C07 \u4E0D\u518D\u81EA\u52D5\u5099\u4EFD \u5230\u96F2\u7AEF", card: true },
+          "\u96F2\u7AEF\u4E0A\u5DF2\u5099\u4EFD\u7684\u6A94\u6848 \u4E0D\u6703\u88AB\u522A\u9664\n\u4E4B\u5F8C\u91CD\u65B0\u9023\u7D50\u5373\u53EF\u9084\u539F"
         ],
-        after: "\u78BA\u5B9A\u8981\u89E3\u9664\u9023\u7D50\u55CE?"
+        after: "\u78BA\u5B9A\u8981\u89E3\u9664\u9023\u7D50\u55CE\uFF1F"
       },
       highlightWords: ["\u4E0D\u518D\u81EA\u52D5\u5099\u4EFD"],
       highlightWordsSafe: ["\u4E0D\u6703\u88AB\u522A\u9664"],
@@ -9324,7 +9330,20 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
   };
   const lastAnyBackupAt = Math.max(lastBackupAt || 0, driveLastSync || 0);
   const daysSinceBackup = lastAnyBackupAt > 0 ? Math.floor((Date.now() - lastAnyBackupAt) / 864e5) : null;
-  const needsBackup = daysSinceBackup === null || daysSinceBackup >= backupReminderDays;
+  const getInstallAt = () => {
+    try {
+      let v = localStorage.getItem("ledger_install_at");
+      if (!v) {
+        v = String(Date.now());
+        localStorage.setItem("ledger_install_at", v);
+      }
+      return parseInt(v, 10) || Date.now();
+    } catch {
+      return Date.now();
+    }
+  };
+  const daysSinceInstall = Math.floor((Date.now() - getInstallAt()) / 864e5);
+  const needsBackup = daysSinceBackup === null ? daysSinceInstall >= 7 : daysSinceBackup >= backupReminderDays;
   const lastBackupText = lastAnyBackupAt > 0 ? new Date(lastAnyBackupAt).toLocaleDateString("zh-TW", { year: "numeric", month: "2-digit", day: "2-digit" }) : "\u5F9E\u672A\u5099\u4EFD";
   const updateReminderDays = (days) => {
     setBackupReminderDays(days);
@@ -9914,7 +9933,7 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
                 gap: 6
               }
             },
-            /* @__PURE__ */ React.createElement(TypeIcon, { name: "restore", size: 16, color: "var(--on-mint)" }),
+            /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-down", size: 17, color: "var(--on-mint)" }),
             "\u9084\u539F\u9019\u4EFD\u5099\u4EFD"
           ),
           /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8 } }, /* @__PURE__ */ React.createElement(
