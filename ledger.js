@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515AM";
+const APP_VERSION = "1150515AO";
 const BLOCK_ORDER_KEY = "ledger_block_order_v13";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -27,7 +27,7 @@ const NUM_FONT_STACKS = {
 };
 const LEND_BUCKET_ACCOUNT_NAME = "\u4EE3\u588A\u66AB\u5B58";
 const GDRIVE_CLIENT_ID = "487079350281-7p3b3230jbkmhtrh9ikh8daqsrg759d2.apps.googleusercontent.com";
-const GDRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+const GDRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
 const GDRIVE_TOKEN_KEY = "ledger_gdrive_token_v1";
 const GDRIVE_EMAIL_KEY = "ledger_gdrive_email_v1";
 const GDRIVE_AUTO_KEY = "ledger_gdrive_auto_v1";
@@ -148,22 +148,24 @@ const GDrive = {
       return "";
     }
   },
-  // 列出 app 在 Drive 建立的備份檔(依時間新到舊)
+  // 列出 appDataFolder 內的備份檔(依時間新到舊)
+  // appDataFolder 是 Google Drive 給 app 的專屬隱藏空間:
+  // 使用者無法在 Drive 介面看到、改名或刪除,app 永遠存取得到
   async listBackups(token) {
     const q = encodeURIComponent("name contains 'ledger-backup-' and trashed = false");
-    const url = "https://www.googleapis.com/drive/v3/files?q=" + q + "&orderBy=createdTime desc&fields=files(id,name,createdTime,size)&pageSize=50";
+    const url = "https://www.googleapis.com/drive/v3/files?q=" + q + "&spaces=appDataFolder&orderBy=createdTime desc&fields=files(id,name,createdTime,size)&pageSize=50";
     const r = await fetch(url, { headers: { Authorization: "Bearer " + token } });
     if (!r.ok) throw new Error("\u8B80\u53D6\u96F2\u7AEF\u6A94\u6848\u6E05\u55AE\u5931\u6557 (" + r.status + ")");
     const d = await r.json();
     return d.files || [];
   },
-  // 上傳一份新備份(multipart);payloadStr 是 JSON 字串
+  // 上傳一份新備份到 appDataFolder(multipart);payloadStr 是 JSON 字串
   async uploadBackup(token, payloadStr) {
     const now = /* @__PURE__ */ new Date();
     const pad = (n) => String(n).padStart(2, "0");
     const name = "ledger-backup-" + now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()) + "-" + pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds()) + ".json";
     const boundary = "ledgerbnd" + Date.now();
-    const metadata = { name, mimeType: "application/json" };
+    const metadata = { name, mimeType: "application/json", parents: ["appDataFolder"] };
     const body = "--" + boundary + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" + JSON.stringify(metadata) + "\r\n--" + boundary + "\r\nContent-Type: application/json\r\n\r\n" + payloadStr + "\r\n--" + boundary + "--";
     const r = await fetch(
       "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,createdTime",
@@ -8945,6 +8947,28 @@ function SettingsPage({
       }
     });
   };
+  const driveExportBackup = async (fileId, displayName) => {
+    setDriveSyncing(true);
+    try {
+      const token = await GDrive.ensureToken();
+      const text = await GDrive.downloadBackup(token, fileId);
+      const blob = new Blob([text], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const safeName = (displayName || "backup").replace(/[\/\\:]/g, "-");
+      a.download = `\u8A18\u5E33\u96F2\u7AEF\u5099\u4EFD_${safeName}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast("\u5DF2\u532F\u51FA\u5230\u300C\u4E0B\u8F09\u300D\u8CC7\u6599\u593E");
+    } catch (e) {
+      toast("\u532F\u51FA\u5931\u6557:" + (e && e.message || "\u672A\u77E5\u932F\u8AA4"));
+    } finally {
+      setDriveSyncing(false);
+    }
+  };
   const driveRestoreLatest = async () => {
     setDriveSyncing(true);
     try {
@@ -9691,26 +9715,52 @@ function SettingsPage({
           "div",
           {
             key: f.id,
-            onClick: () => {
-              setDriveBackupList(null);
-              driveRestoreFrom(f.id, displayTime);
-            },
             style: {
               display: "flex",
               alignItems: "center",
-              gap: 10,
-              padding: "12px 12px",
+              gap: 8,
+              padding: "8px 8px 8px 12px",
               marginBottom: 6,
               background: "var(--bg-card)",
               borderRadius: 10,
-              cursor: "pointer",
               minHeight: 56,
               boxSizing: "border-box"
             }
           },
           /* @__PURE__ */ React.createElement(TypeIcon, { name: "clipboard", size: 18, color: "var(--accent-text)" }),
-          /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600 } }, displayTime), sizeKB !== null && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, sizeKB, " KB")),
-          /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
+          /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: { flex: 1, minWidth: 0, cursor: "pointer" },
+              onClick: () => {
+                setDriveBackupList(null);
+                driveRestoreFrom(f.id, displayTime);
+              }
+            },
+            /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600 } }, displayTime),
+            /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, sizeKB !== null ? `${sizeKB} KB \xB7 ` : "", "\u9EDE\u6B64\u9084\u539F")
+          ),
+          /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              onClick: () => driveExportBackup(f.id, displayTime),
+              style: {
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "8px 10px",
+                borderRadius: 8,
+                background: "var(--bg-card-alt)",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "var(--text-dim)",
+                cursor: "pointer"
+              }
+            },
+            /* @__PURE__ */ React.createElement(TypeIcon, { name: "download", size: 15, color: "var(--text-dim)" }),
+            "\u532F\u51FA"
+          )
         );
       })),
       /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 16px" } }, /* @__PURE__ */ React.createElement(
