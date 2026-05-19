@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515BB";
+const APP_VERSION = "1150515BC";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -8558,6 +8558,7 @@ function SettingsPage({
   const reminderSetupSwipe = useSwipeToClose(() => setShowReminderSetup(false));
   const snapshotNameSwipe = useSwipeToClose(() => setShowSnapshotNameDialog(false));
   const snapshotsSwipe = useSwipeToClose(() => setShowSnapshots(false));
+  const driveBackupListSwipe = useSwipeToCloseAny(() => setDriveBackupList(null));
   const persistSnapshots = (list) => {
     setSnapshots(list);
     try {
@@ -8920,6 +8921,7 @@ function SettingsPage({
   const [driveLinked, setDriveLinked] = useState(() => GDrive.isLinked());
   const [driveEmail, setDriveEmail] = useState(() => GDrive.getEmail());
   const [driveSyncing, setDriveSyncing] = useState(false);
+  const [driveBackingUp, setDriveBackingUp] = useState(false);
   const [driveAuto, setDriveAuto] = useState(() => {
     try {
       return localStorage.getItem(GDRIVE_AUTO_KEY) === "1";
@@ -8995,6 +8997,7 @@ function SettingsPage({
   const driveSyncNow = async (silent) => {
     if (driveSyncing) return;
     setDriveSyncing(true);
+    setDriveBackingUp(true);
     if (!silent) toast("\u958B\u59CB\u5099\u4EFD\u22EF");
     try {
       const token = await GDrive.ensureToken();
@@ -9019,6 +9022,7 @@ function SettingsPage({
       }
     } finally {
       setDriveSyncing(false);
+      setDriveBackingUp(false);
     }
   };
   const toggleDriveAuto = () => {
@@ -9172,13 +9176,11 @@ function SettingsPage({
       return;
     }
     if (!driveAuto || !driveLinked) return;
-    if (_autoSyncTimerRef.current) clearTimeout(_autoSyncTimerRef.current);
+    if (_autoSyncTimerRef.current) return;
     _autoSyncTimerRef.current = setTimeout(() => {
+      _autoSyncTimerRef.current = null;
       driveSyncNow(true);
     }, 8e3);
-    return () => {
-      if (_autoSyncTimerRef.current) clearTimeout(_autoSyncTimerRef.current);
-    };
   }, [state, driveAuto, driveLinked]);
   const _remindShownRef = React.useRef(false);
   useEffect(() => {
@@ -9502,9 +9504,9 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
         },
         /* @__PURE__ */ React.createElement("div", { style: {
           ...styles.settingsIcon,
-          animation: driveSyncing ? "ledgerSpin 1s linear infinite" : void 0
+          animation: driveBackingUp ? "ledgerSpin 1s linear infinite" : void 0
         } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-up", size: 20, color: "var(--mint-text)" })),
-        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, driveSyncing ? /* @__PURE__ */ React.createElement("span", null, "\u5099\u4EFD\u4E2D", /* @__PURE__ */ React.createElement("span", { style: { animation: "ledgerDots 1.2s ease-in-out infinite" } }, "\u22EF")) : "\u7ACB\u5373\u5099\u4EFD\u5230\u96F2\u7AEF"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, driveSyncing ? "\u6B63\u5728\u4E0A\u50B3\u5230 Google Drive,\u8ACB\u7A0D\u5019" : "\u624B\u52D5\u4E0A\u50B3\u4E00\u4EFD\u5099\u4EFD\u5230 Google Drive")),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, driveBackingUp ? /* @__PURE__ */ React.createElement("span", null, "\u5099\u4EFD\u4E2D", /* @__PURE__ */ React.createElement("span", { style: { animation: "ledgerDots 1.2s ease-in-out infinite" } }, "\u22EF")) : "\u7ACB\u5373\u5099\u4EFD\u5230\u96F2\u7AEF"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, driveBackingUp ? "\u6B63\u5728\u4E0A\u50B3\u5230 Google Drive,\u8ACB\u7A0D\u5019" : "\u624B\u52D5\u4E0A\u50B3\u4E00\u4EFD\u5099\u4EFD\u5230 Google Drive")),
         /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
       ), /* @__PURE__ */ React.createElement("div", { style: styles.settingsItem, onClick: () => !editMode && toggleDriveAuto() }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-sync", size: 20, color: "#e0a82e" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u81EA\u52D5\u5099\u4EFD"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, driveAuto ? "\u8CC7\u6599\u4E00\u8B8A\u52D5\u5C31\u81EA\u52D5\u4E0A\u50B3\u5230 Google Drive" : "\u95DC\u9589(\u5982\u672A\u958B\u555F,\u81EA\u52D5\u6539\u7528\u4E0B\u65B9\u63D0\u9192\u529F\u80FD)")), /* @__PURE__ */ React.createElement("div", { style: {
         width: 44,
@@ -9929,11 +9931,18 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
           maxHeight: "75vh",
           display: "flex",
           flexDirection: "column",
-          paddingBottom: "env(safe-area-inset-bottom, 0px)"
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          transform: `translateY(${driveBackupListSwipe.dragY}px)`,
+          transition: driveBackupListSwipe.dragY ? "none" : "transform 0.2s"
         },
-        onClick: (e) => e.stopPropagation()
+        onClick: (e) => e.stopPropagation(),
+        onTouchStart: driveBackupListSwipe.onTouchStart,
+        onTouchMove: driveBackupListSwipe.onTouchMove,
+        onTouchEnd: driveBackupListSwipe.onTouchEnd,
+        onTouchCancel: driveBackupListSwipe.onTouchCancel
       },
-      /* @__PURE__ */ React.createElement("div", { style: { padding: "16px 16px 6px", fontSize: 16, fontWeight: 700 } }, "\u9078\u64C7\u96F2\u7AEF\u5099\u4EFD\u9084\u539F"),
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "center", padding: "8px 0 2px" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: "var(--border)" } })),
+      /* @__PURE__ */ React.createElement("div", { style: { padding: "8px 16px 6px", fontSize: 16, fontWeight: 700 } }, "\u9078\u64C7\u96F2\u7AEF\u5099\u4EFD\u9084\u539F"),
       /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 10px", fontSize: 12, color: "var(--text-dim)", lineHeight: 1.6 } }, "\u9EDE\u6574\u5217\u5373\u53EF\u9084\u539F(\u6703\u8986\u84CB\u76EE\u524D\u8CC7\u6599)\u3002", driveBackupList && driveBackupList.length > 0 && /* @__PURE__ */ React.createElement("span", null, `\u76EE\u524D ${driveBackupList.length} / ${GDRIVE_MAX_BACKUPS} \u4EFD,\u6EFF\u4E86\u6703\u81EA\u52D5\u8986\u84CB\u6700\u820A\u7684,\u4E0D\u4F54\u984D\u5916\u7A7A\u9593\u3002`)),
       /* @__PURE__ */ React.createElement("div", { style: { overflowY: "auto", padding: "4px 16px 16px" } }, driveBackupList.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { padding: "30px 0", textAlign: "center", color: "var(--text-faint)", fontSize: 13 } }, "\u96F2\u7AEF\u5C1A\u7121\u5099\u4EFD\u6A94") : driveBackupList.map((f) => {
         let displayTime = f.name;
@@ -9995,7 +10004,7 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap"
-          } }, note) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 2 } }, sizeKB !== null ? `${sizeKB} KB` : "\u5099\u4EFD\u6A94")),
+          } }, note) : null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "var(--text-faint)" } }, sizeKB !== null ? `${sizeKB} KB \xB7 ` : "", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", fontWeight: 600 } }, "\u9EDE\u6B64\u9084\u539F"))),
           iconBtn(
             "pencil",
             note ? "var(--accent-text)" : "var(--text-dim)",
@@ -10326,16 +10335,12 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
     );
   })))), showSnapshotNameDialog && (() => {
     const scopeOpts = [
-      { key: "transactions", label: "\u4EA4\u6613\u7D00\u9304", count: state.transactions.length },
-      { key: "accounts", label: "\u5E33\u6236", count: state.accounts.length },
-      { key: "categories", label: "\u5206\u985E", count: (state.categories.expense?.length || 0) + (state.categories.income?.length || 0) },
-      { key: "accountTypes", label: "\u5E33\u6236\u985E\u578B", count: state.accountTypes.length }
+      { label: "\u4EA4\u6613\u7D00\u9304", count: state.transactions.length },
+      { label: "\u5E33\u6236", count: state.accounts.length },
+      { label: "\u5206\u985E", count: (state.categories.expense?.length || 0) + (state.categories.income?.length || 0) },
+      { label: "\u5E33\u6236\u985E\u578B", count: state.accountTypes.length }
     ];
-    const toggleScope = (key) => {
-      setSnapshotScopes((s) => ({ ...s, [key]: !s[key] }));
-    };
-    const anyChecked = Object.values(snapshotScopes).some(Boolean);
-    return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: () => setShowSnapshotNameDialog(false) }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.centerDialogCard, padding: "20px 20px 16px" }, onClick: (e) => e.stopPropagation(), ...snapshotNameSwipe }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 600, marginBottom: 6 } }, "\u5132\u5B58\u5FEB\u7167"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginBottom: 14 } }, "\u70BA\u9019\u500B\u5FEB\u7167\u547D\u540D\u4E26\u9078\u64C7\u8981\u5132\u5B58\u7684\u985E\u5225"), /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: () => setShowSnapshotNameDialog(false) }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.centerDialogCard, padding: "20px 20px 16px" }, onClick: (e) => e.stopPropagation(), ...snapshotNameSwipe }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 600, marginBottom: 6 } }, "\u5132\u5B58\u5FEB\u7167"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginBottom: 14 } }, "\u70BA\u9019\u500B\u5FEB\u7167\u547D\u540D,\u5B8C\u6574\u4FDD\u5B58\u76EE\u524D\u6240\u6709\u8CC7\u6599"), /* @__PURE__ */ React.createElement(
       "input",
       {
         type: "text",
@@ -10360,41 +10365,28 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
           marginBottom: 14
         }
       }
-    ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 8 } }, "\u5132\u5B58\u54EA\u4E9B\u985E\u5225\uFF1A"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 6 } }, scopeOpts.map((opt) => /* @__PURE__ */ React.createElement(
+    ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 8 } }, "\u9019\u500B\u5FEB\u7167\u6703\u5B8C\u6574\u4FDD\u5B58\uFF1A"), /* @__PURE__ */ React.createElement("div", { style: {
+      background: "var(--bg-card-alt)",
+      border: "1px solid var(--border)",
+      borderRadius: 10,
+      padding: "6px 12px",
+      marginBottom: 6
+    } }, scopeOpts.map((opt, i) => /* @__PURE__ */ React.createElement(
       "div",
       {
-        key: opt.key,
-        onClick: () => toggleScope(opt.key),
+        key: opt.label,
         style: {
           display: "flex",
           alignItems: "center",
-          gap: 10,
-          padding: "10px 12px",
-          background: snapshotScopes[opt.key] ? "rgba(126, 224, 192, 0.08)" : "var(--bg)",
-          border: snapshotScopes[opt.key] ? "1px solid var(--mint)" : "1px solid var(--border)",
-          borderRadius: 10,
-          cursor: "pointer",
-          WebkitTapHighlightColor: "transparent",
-          transition: "background 0.15s, border-color 0.15s"
+          gap: 8,
+          padding: "8px 0",
+          borderTop: i === 0 ? "none" : "1px solid var(--border)"
         }
       },
-      /* @__PURE__ */ React.createElement("div", { style: {
-        width: 18,
-        height: 18,
-        borderRadius: 4,
-        background: snapshotScopes[opt.key] ? "var(--mint)" : "transparent",
-        border: snapshotScopes[opt.key] ? "1px solid var(--mint)" : "1.5px solid var(--text-faint)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "var(--on-mint)",
-        fontSize: 12,
-        fontWeight: 700,
-        flexShrink: 0
-      } }, snapshotScopes[opt.key] ? "\u2713" : ""),
+      /* @__PURE__ */ React.createElement(TypeIcon, { name: "check", size: 14, color: "var(--mint-text)" }),
       /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontSize: 14, color: "var(--text)" } }, opt.label),
       /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--text-faint)" } }, opt.count)
-    ))), /* @__PURE__ */ React.createElement("div", { style: { height: 1, background: "var(--border)", margin: "22px 0 18px", opacity: 0.6 } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement(
+    ))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", lineHeight: 1.6, marginBottom: 4 } }, "\u5B8C\u6574\u4FDD\u5B58\u80FD\u78BA\u4FDD\u9084\u539F\u6642\u8CC7\u6599\u4E00\u81F4,\u4E0D\u6703\u6709\u4EA4\u6613\u627E\u4E0D\u5230\u5E33\u6236\u7684\u60C5\u5F62\u3002"), /* @__PURE__ */ React.createElement("div", { style: { height: 1, background: "var(--border)", margin: "18px 0 18px", opacity: 0.6 } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement(
       "button",
       {
         style: { flex: 1, padding: 10, background: "transparent", color: "var(--text-dim)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 14 },
@@ -10407,15 +10399,14 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
         style: {
           flex: 1,
           padding: 10,
-          background: anyChecked ? "var(--mint)" : "var(--bg)",
-          color: anyChecked ? "#1a1a1a" : "var(--text-faint)",
+          background: "var(--mint)",
+          color: "var(--on-mint)",
           border: "none",
           borderRadius: 10,
           fontSize: 14,
           fontWeight: 600,
-          cursor: anyChecked ? "pointer" : "not-allowed"
+          cursor: "pointer"
         },
-        disabled: !anyChecked,
         onClick: () => {
           createSnapshot(snapshotNameInput);
           setShowSnapshotNameDialog(false);
