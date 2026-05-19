@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515AS";
+const APP_VERSION = "1150515AT";
 const BLOCK_ORDER_KEY = "ledger_block_order_v13";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -70,13 +70,23 @@ const GDrive = {
         reject(new Error("Google \u767B\u5165\u670D\u52D9\u5C1A\u672A\u8F09\u5165,\u8ACB\u6AA2\u67E5\u7DB2\u8DEF\u5F8C\u91CD\u8A66"));
         return;
       }
+      let settled = false;
+      const done = (fn, arg) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        fn(arg);
+      };
+      const timer = setTimeout(() => {
+        done(reject, new Error("CANCELLED"));
+      }, 12e4);
       try {
         const client = google.accounts.oauth2.initTokenClient({
           client_id: GDRIVE_CLIENT_ID,
           scope: GDRIVE_SCOPE,
           callback: (resp) => {
             if (resp.error) {
-              reject(new Error(resp.error));
+              done(reject, new Error(resp.error));
               return;
             }
             const expiresAt = Date.now() + (resp.expires_in || 3600) * 1e3;
@@ -87,12 +97,16 @@ const GDrive = {
               }));
             } catch {
             }
-            resolve(resp.access_token);
+            done(resolve, resp.access_token);
+          },
+          // 使用者關閉/取消授權視窗時觸發(新版 GSI 支援),避免 callback 永不呼叫
+          error_callback: (err) => {
+            done(reject, new Error(err && err.type || "CANCELLED"));
           }
         });
         client.requestAccessToken({ prompt: "consent" });
       } catch (e) {
-        reject(e);
+        done(reject, e);
       }
     });
   },
@@ -103,13 +117,23 @@ const GDrive = {
         reject(new Error("Google \u670D\u52D9\u672A\u8F09\u5165"));
         return;
       }
+      let settled = false;
+      const done = (fn, arg) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        fn(arg);
+      };
+      const timer = setTimeout(() => {
+        done(reject, new Error("\u5237\u65B0\u903E\u6642"));
+      }, 6e4);
       try {
         const client = google.accounts.oauth2.initTokenClient({
           client_id: GDRIVE_CLIENT_ID,
           scope: GDRIVE_SCOPE,
           callback: (resp) => {
             if (resp.error) {
-              reject(new Error(resp.error));
+              done(reject, new Error(resp.error));
               return;
             }
             const expiresAt = Date.now() + (resp.expires_in || 3600) * 1e3;
@@ -120,12 +144,15 @@ const GDrive = {
               }));
             } catch {
             }
-            resolve(resp.access_token);
+            done(resolve, resp.access_token);
+          },
+          error_callback: (err) => {
+            done(reject, new Error(err && err.type || "\u5237\u65B0\u5931\u6557"));
           }
         });
         client.requestAccessToken({ prompt: "" });
       } catch (e) {
-        reject(e);
+        done(reject, e);
       }
     });
   },
@@ -8858,7 +8885,9 @@ function SettingsPage({
       setDriveEmail(email);
       toast("\u5DF2\u9023\u7D50 Google Drive");
     } catch (e) {
-      toast("\u9023\u7D50\u5931\u6557:" + (e && e.message || "\u672A\u77E5\u932F\u8AA4"));
+      const msg = e && e.message || "\u672A\u77E5\u932F\u8AA4";
+      const cancelled = /CANCELLED|popup_closed|popup_failed_to_open|access_denied|user_cancel/i.test(msg);
+      if (!cancelled) toast("\u9023\u7D50\u5931\u6557:" + msg);
     } finally {
       setDriveSyncing(false);
     }
