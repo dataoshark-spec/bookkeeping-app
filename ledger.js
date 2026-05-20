@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520CN";
+const APP_VERSION = "1150520CQ";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -2709,8 +2709,9 @@ function App() {
         { type: "remove", icon: "note", label: "\u79FB\u9664", detail: "\u6240\u6709\u4EA4\u6613\u7D00\u9304" },
         { type: "remove", icon: "bank", label: "\u79FB\u9664", detail: "\u6240\u6709\u5E33\u6236", resetTo: "\u6062\u5FA9\u9810\u8A2D" },
         { type: "remove", icon: "bag", label: "\u79FB\u9664", detail: "\u6240\u6709\u5206\u985E", resetTo: "\u6062\u5FA9\u9810\u8A2D" },
+        { type: "remove", icon: "chart", label: "\u79FB\u9664", detail: "\u6240\u6709\u80A1\u7968\u3001\u6301\u80A1\u3001\u4EA4\u6613\u7D00\u9304" },
         { type: "keep", icon: "clipboard", label: "\u4FDD\u7559", detail: "\u5FEB\u7167\u5099\u4EFD" },
-        { type: "keep", icon: "gear", label: "\u4FDD\u7559", detail: "\u4ECB\u9762\u6392\u5E8F" }
+        { type: "keep", icon: "gear", label: "\u4FDD\u7559", detail: "\u4ECB\u9762\u6392\u5E8F\u8207\u7CFB\u7D71\u8A2D\u5B9A" }
       ],
       itemsFooter: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F",
       onConfirm: () => {
@@ -2734,7 +2735,7 @@ function App() {
           amountColor: "var(--pink-text)",
           lines: [
             `\u5DF2\u79FB\u9664 ${prevTxnCount} \u7B46\u4EA4\u6613\u3001${prevAcctCount} \u500B\u5E33\u6236`,
-            "\u5E33\u6236 / \u5206\u985E\u5DF2\u91CD\u7F6E\u70BA\u9810\u8A2D",
+            "\u5E33\u6236 / \u5206\u985E / \u80A1\u7968\u985E\u578B \u5DF2\u91CD\u7F6E\u70BA\u9810\u8A2D",
             "\u5FEB\u7167\u5099\u4EFD\u8207\u4ECB\u9762\u6392\u5E8F\u5DF2\u4FDD\u7559"
           ]
         }, 2800);
@@ -9052,8 +9053,12 @@ function SettingsPage({
     "ledger_last_acct_transfer_to",
     "ledger_default_buy_account_v1",
     // 股票買入預設帳戶
-    "ledger_default_sell_account_v1"
+    "ledger_default_sell_account_v1",
     // 股票賣出預設帳戶
+    "ledger_backup_reminder_days",
+    // [v555CP] 備份提醒頻率(7/14/30 天)
+    "ledger_drive_folder"
+    // [v555CP] Google Drive 資料夾連結(URL)
   ];
   const collectPreferences = () => {
     const prefs = {};
@@ -9182,12 +9187,12 @@ function SettingsPage({
         styled: true,
         before: "\u89E3\u9664\u5F8C\u6703\u767C\u751F\u9019\u4E9B\u4E8B\uFF1A",
         items: [
-          { text: "\u5C07 \u4E0D\u518D\u81EA\u52D5\u5099\u4EFD \u5230\u96F2\u7AEF", card: true },
+          { text: "\u5C07 \u95DC\u9589 Google Drive \u96F2\u7AEF\u529F\u80FD", card: true },
           "\u96F2\u7AEF\u4E0A\u5DF2\u5099\u4EFD\u7684\u6A94\u6848 \u4E0D\u6703\u88AB\u522A\u9664\n\u4E4B\u5F8C\u91CD\u65B0\u9023\u7D50\u5373\u53EF\u9084\u539F"
         ],
         after: "\u78BA\u5B9A\u8981\u89E3\u9664\u9023\u7D50\u55CE\uFF1F"
       },
-      highlightWords: ["\u4E0D\u518D\u81EA\u52D5\u5099\u4EFD"],
+      highlightWords: ["\u95DC\u9589 Google Drive \u96F2\u7AEF\u529F\u80FD"],
       highlightWordsSafe: ["\u4E0D\u6703\u88AB\u522A\u9664"],
       confirmText: "\u89E3\u9664\u9023\u7D50",
       danger: true,
@@ -10246,7 +10251,7 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
             onClick: () => !editMode && !dangerLocked && onReset()
           },
           /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "warning", size: 22, color: "var(--pink-text)" })),
-          /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.settingsLabel, color: "var(--pink-text)", fontSize: 16, fontWeight: 600, marginBottom: 8 } }, "\u6E05\u9664\u6240\u6709\u8CC7\u6599"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text)", opacity: 0.75, lineHeight: 1.7 } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 2 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", opacity: 1, fontWeight: 600 } }, "\u79FB\u9664"), /* @__PURE__ */ React.createElement("span", { style: { margin: "0 8px", opacity: 0.55 } }, "\xB7"), /* @__PURE__ */ React.createElement("span", null, "\u4EA4\u6613\u7D00\u9304"), /* @__PURE__ */ React.createElement("span", { style: { margin: "0 6px", opacity: 0.45 } }, "\uFF0F"), /* @__PURE__ */ React.createElement("span", null, "\u5E33\u6236"), /* @__PURE__ */ React.createElement("span", { style: { margin: "0 6px", opacity: 0.45 } }, "\uFF0F"), /* @__PURE__ */ React.createElement("span", null, "\u5206\u985E")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", opacity: 1, fontWeight: 600 } }, "\u4FDD\u7559"), /* @__PURE__ */ React.createElement("span", { style: { margin: "0 8px", opacity: 0.55 } }, "\xB7"), /* @__PURE__ */ React.createElement("span", null, "\u5FEB\u7167\u5099\u4EFD"), /* @__PURE__ */ React.createElement("span", { style: { margin: "0 6px", opacity: 0.45 } }, "\uFF0F"), /* @__PURE__ */ React.createElement("span", null, "\u4ECB\u9762\u6392\u5E8F")))),
+          /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.settingsLabel, color: "var(--pink-text)", fontSize: 16, fontWeight: 600, marginBottom: 8 } }, "\u6E05\u9664\u6240\u6709\u8CC7\u6599"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text)", opacity: 0.75, lineHeight: 1.7 } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 2 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", opacity: 1, fontWeight: 600 } }, "\u79FB\u9664"), /* @__PURE__ */ React.createElement("span", { style: { margin: "0 8px", opacity: 0.55 } }, "\xB7"), /* @__PURE__ */ React.createElement("span", null, "\u4EA4\u6613\u7D00\u9304"), /* @__PURE__ */ React.createElement("span", { style: { margin: "0 6px", opacity: 0.45 } }, "\uFF0F"), /* @__PURE__ */ React.createElement("span", null, "\u5E33\u6236"), /* @__PURE__ */ React.createElement("span", { style: { margin: "0 6px", opacity: 0.45 } }, "\uFF0F"), /* @__PURE__ */ React.createElement("span", null, "\u5206\u985E"), /* @__PURE__ */ React.createElement("span", { style: { margin: "0 6px", opacity: 0.45 } }, "\uFF0F"), /* @__PURE__ */ React.createElement("span", null, "\u80A1\u7968")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", opacity: 1, fontWeight: 600 } }, "\u4FDD\u7559"), /* @__PURE__ */ React.createElement("span", { style: { margin: "0 8px", opacity: 0.55 } }, "\xB7"), /* @__PURE__ */ React.createElement("span", null, "\u5FEB\u7167\u5099\u4EFD"), /* @__PURE__ */ React.createElement("span", { style: { margin: "0 6px", opacity: 0.45 } }, "\uFF0F"), /* @__PURE__ */ React.createElement("span", null, "\u4ECB\u9762\u6392\u5E8F"), /* @__PURE__ */ React.createElement("span", { style: { margin: "0 6px", opacity: 0.45 } }, "\uFF0F"), /* @__PURE__ */ React.createElement("span", null, "\u7CFB\u7D71\u8A2D\u5B9A")))),
           /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
         )
       );
@@ -16027,7 +16032,7 @@ function AccountGroupManageSheet({ state, setState, toast, toastRich, initialGro
             flexShrink: 0
           } }, checked && /* @__PURE__ */ React.createElement(TypeIcon, { name: "check", size: 12, color: "#fff" })),
           /* @__PURE__ */ React.createElement("div", { style: { width: 26, height: 26, borderRadius: 7, background: typeMeta.color || "#f5c29c", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: typeMeta.icon || "box", size: 14, color: "#fff" })),
-          /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "var(--text)" } }, a.name), owner && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)" } }, "\u76EE\u524D\u5728\u300C", owner, "\u300D(\u52FE\u9078\u5F8C\u6703\u79FB\u5165\u6B64\u6A19\u7C64)"))
+          /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "var(--text)" } }, a.name), owner && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)" } }, "\u76EE\u524D\u5728\u300C", owner, "\u300D\uFF08\u52FE\u9078\u5F8C\u6703\u79FB\u5165\u6B64\u6A19\u7C64\uFF09"))
         );
       })))),
       /* @__PURE__ */ React.createElement("div", { style: styles.stickyFooterBar }, /* @__PURE__ */ React.createElement("button", { style: { ...styles.saveBtn, background: "var(--mint)", color: "var(--on-mint)", marginTop: 0 }, onClick: save }, editing === "new" ? "\u65B0\u589E" : "\u5132\u5B58"), editing !== "new" ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8 } }, /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, flex: 1, marginTop: 0 }, onClick: () => removeGroup(editing.id) }, "\u522A\u9664\u5B50\u6A19\u7C64"), /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, flex: 1, marginTop: 0, background: "transparent", border: "1px solid var(--border)", color: "var(--text-dim)" }, onClick: cancelEdit }, "\u53D6\u6D88")) : /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, marginTop: 8, background: "transparent", border: "1px solid var(--border)", color: "var(--text-dim)" }, onClick: cancelEdit }, "\u53D6\u6D88"))
@@ -17589,7 +17594,12 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
       setState((s) => ({
         ...s,
         accounts: s.accounts.filter((a) => a.id !== id),
-        transactions: s.transactions.filter((t) => !allRelatedTxnIds.has(t.id))
+        transactions: s.transactions.filter((t) => !allRelatedTxnIds.has(t.id)),
+        // [v555CQ] 同步從子標籤移除已刪帳戶的 stale id
+        accountGroups: (s.accountGroups || []).map((g) => ({
+          ...g,
+          accountIds: (g.accountIds || []).filter((aid) => aid !== id)
+        }))
       }));
       cancel();
       toast("\u5DF2\u522A\u9664");
@@ -17606,7 +17616,15 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
         confirmText: "\u522A\u9664",
         danger: true,
         onConfirm: () => {
-          setState((s) => ({ ...s, accounts: s.accounts.filter((a) => a.id !== id) }));
+          setState((s) => ({
+            ...s,
+            accounts: s.accounts.filter((a) => a.id !== id),
+            // [v555CQ] 同步從子標籤移除已刪帳戶的 stale id
+            accountGroups: (s.accountGroups || []).map((g) => ({
+              ...g,
+              accountIds: (g.accountIds || []).filter((aid) => aid !== id)
+            }))
+          }));
           cancel();
           toast("\u5DF2\u522A\u9664");
         },
@@ -17655,7 +17673,12 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
           accounts: s.accounts.filter((a) => a.id !== id),
           transactions: s.transactions.filter((t) => !allRelatedTxnIds.has(t.id)),
           holdings: s.holdings.filter((h) => h.accountId !== id),
-          trades: s.trades.filter((t) => !accountHoldingIds.has(t.holdingId))
+          trades: s.trades.filter((t) => !accountHoldingIds.has(t.holdingId)),
+          // [v555CQ] 同步從子標籤移除已刪帳戶的 stale id
+          accountGroups: (s.accountGroups || []).map((g) => ({
+            ...g,
+            accountIds: (g.accountIds || []).filter((aid) => aid !== id)
+          }))
         };
       });
       cancel();
@@ -17730,7 +17753,12 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
           trades: s.trades.filter((t) => {
             const h = s.holdings.find((hh) => hh.id === t.holdingId);
             return !h || h.accountId !== id;
-          })
+          }),
+          // [v555CQ] 同步從子標籤移除已刪帳戶的 stale id
+          accountGroups: (s.accountGroups || []).map((g) => ({
+            ...g,
+            accountIds: (g.accountIds || []).filter((aid) => aid !== id)
+          }))
         };
       });
       cancel();
