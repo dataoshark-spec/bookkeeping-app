@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515BR";
+const APP_VERSION = "1150515BS";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -348,6 +348,10 @@ const DEFAULT_ACCOUNT_TYPES = [
   { value: "receivable", label: "\u61C9\u6536", icon: "coin", color: "#f5d84a" },
   { value: "debt", label: "\u8CA0\u50B5", icon: "home", color: "#e88a8a" },
   { value: "other", label: "\u5176\u4ED6", icon: "box", color: "#f5c29c" }
+];
+const DEFAULT_STOCK_MARKETS = [
+  { id: "sm_tw", label: "\u53F0\u80A1" },
+  { id: "sm_us", label: "\u7F8E\u80A1" }
 ];
 const TYPE_ICONS = [
   "cash",
@@ -1229,7 +1233,8 @@ function App() {
           categories: d.categories || JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
           accountTypes: d.accountTypes?.length ? d.accountTypes : [...DEFAULT_ACCOUNT_TYPES],
           holdings: d.holdings || [],
-          trades: d.trades || []
+          trades: d.trades || [],
+          stockMarkets: d.stockMarkets?.length ? d.stockMarkets : [...DEFAULT_STOCK_MARKETS]
         };
       }
     } catch {
@@ -1240,7 +1245,8 @@ function App() {
       categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
       accountTypes: [...DEFAULT_ACCOUNT_TYPES],
       holdings: [],
-      trades: []
+      trades: [],
+      stockMarkets: [...DEFAULT_STOCK_MARKETS]
     };
   });
   const [page, setPage] = useState("home");
@@ -2680,7 +2686,8 @@ function App() {
           categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
           accountTypes: [...DEFAULT_ACCOUNT_TYPES],
           holdings: [],
-          trades: []
+          trades: [],
+          stockMarkets: [...DEFAULT_STOCK_MARKETS]
         });
         toastRich({
           title: "\u5DF2\u6E05\u9664\u6240\u6709\u8CC7\u6599",
@@ -8660,7 +8667,8 @@ function SettingsPage({
       categories: state.categories,
       accountTypes: state.accountTypes,
       holdings: state.holdings,
-      trades: state.trades
+      trades: state.trades,
+      stockMarkets: state.stockMarkets
     });
     const snap = {
       id: "snap_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
@@ -8737,6 +8745,7 @@ function SettingsPage({
     const snapAcctType = Array.isArray(snapData.accountTypes) ? snapData.accountTypes : [];
     const snapHoldings = Array.isArray(snapData.holdings) ? snapData.holdings : [];
     const snapTrades = Array.isArray(snapData.trades) ? snapData.trades : [];
+    const snapStockMarkets = Array.isArray(snapData.stockMarkets) ? snapData.stockMarkets : [...DEFAULT_STOCK_MARKETS];
     const changes = [
       {
         icon: "list",
@@ -8781,7 +8790,8 @@ function SettingsPage({
           categories: snapCat,
           accountTypes: snapAcctType,
           holdings: snapHoldings,
-          trades: snapTrades
+          trades: snapTrades,
+          stockMarkets: snapStockMarkets
         };
         try {
           localStorage.setItem("ledger_v16", JSON.stringify(newState));
@@ -8947,6 +8957,7 @@ function SettingsPage({
     accountTypes: state.accountTypes,
     holdings: state.holdings,
     trades: state.trades,
+    stockMarkets: state.stockMarkets,
     preferences: collectPreferences(),
     exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
     exportVersion: 3
@@ -9385,7 +9396,8 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
             categories: data.categories || JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
             accountTypes: Array.isArray(data.accountTypes) && data.accountTypes.length ? data.accountTypes : [...DEFAULT_ACCOUNT_TYPES],
             holdings: Array.isArray(data.holdings) ? data.holdings : [],
-            trades: Array.isArray(data.trades) ? data.trades : []
+            trades: Array.isArray(data.trades) ? data.trades : [],
+            stockMarkets: Array.isArray(data.stockMarkets) && data.stockMarkets.length ? data.stockMarkets : [...DEFAULT_STOCK_MARKETS]
           };
           try {
             localStorage.setItem("ledger_v16", JSON.stringify(newState));
@@ -9632,6 +9644,15 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
         color: at.color,
         count: state.accounts.filter((a) => a.type === at.value).length
       })).filter((x) => x.count > 0);
+      const holdings = state.holdings || [];
+      const stockMarkets = state.stockMarkets || DEFAULT_STOCK_MARKETS;
+      const holdingByMarket = stockMarkets.map((m) => {
+        const count = holdings.filter((h) => {
+          const acct = state.accounts.find((a) => a.id === h.accountId);
+          return acct && (acct.stockMarketId || "sm_tw") === m.id;
+        }).length;
+        return { label: m.label, color: "var(--mint-text)", count };
+      }).filter((x) => x.count > 0);
       const statRows = [
         {
           key: "txn",
@@ -9653,6 +9674,14 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
           value: state.accounts.length,
           details: acctByType.map((x) => ({ label: x.label, color: x.color, count: x.count }))
         },
+        ...holdings.length > 0 ? [{
+          key: "holding",
+          icon: "chart",
+          color: "var(--mint-text)",
+          label: "\u6301\u80A1",
+          value: holdings.length,
+          details: holdingByMarket
+        }] : [],
         {
           key: "cat",
           icon: "bag",
@@ -10735,6 +10764,82 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
     ));
   }))));
 }
+function CleanupTxnList({ matching, state }) {
+  const sorted = React.useMemo(() => {
+    return [...matching].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  }, [matching]);
+  const ROW_HEIGHT = 52;
+  const VIEWPORT_HEIGHT = 280;
+  const BUFFER = 5;
+  const [scrollTop, setScrollTop] = React.useState(0);
+  const startIdx = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - BUFFER);
+  const visibleCount = Math.ceil(VIEWPORT_HEIGHT / ROW_HEIGHT) + BUFFER * 2;
+  const endIdx = Math.min(sorted.length, startIdx + visibleCount);
+  const acctName = (id) => {
+    const a = state.accounts.find((x) => x.id === id);
+    return a ? a.name : "?";
+  };
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: {
+        height: VIEWPORT_HEIGHT,
+        overflowY: "auto",
+        background: "var(--bg)",
+        borderRadius: 8,
+        border: "1px solid var(--border-soft)"
+      },
+      onScroll: (e) => setScrollTop(e.target.scrollTop)
+    },
+    /* @__PURE__ */ React.createElement("div", { style: { height: sorted.length * ROW_HEIGHT, position: "relative" } }, sorted.slice(startIdx, endIdx).map((txn, i) => {
+      const realIdx = startIdx + i;
+      const isExp = txn.type === "expense";
+      const isInc = txn.type === "income";
+      const isTrans = txn.transferRole;
+      const sign = isInc ? "+" : isExp ? "-" : "";
+      const amountColor = isInc ? "var(--mint-text)" : isExp ? "var(--pink-text)" : "var(--accent-text)";
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: txn.id,
+          style: {
+            position: "absolute",
+            top: realIdx * ROW_HEIGHT,
+            left: 0,
+            right: 0,
+            height: ROW_HEIGHT,
+            display: "flex",
+            alignItems: "center",
+            padding: "0 12px",
+            borderBottom: "1px solid var(--border-soft)",
+            gap: 8
+          }
+        },
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 13,
+          fontWeight: 500,
+          color: "var(--text)",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
+        } }, isTrans ? "\u8F49\u5E33" : txn.subCategory || txn.category || "(\u672A\u5206\u985E)"), /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 11,
+          color: "var(--text-faint)",
+          marginTop: 2,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
+        } }, txn.date, " \xB7 ", acctName(txn.accountId))),
+        /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 14,
+          fontWeight: 600,
+          color: amountColor,
+          fontFamily: "var(--num-font)"
+        } }, sign, Math.abs(txn.amount || 0).toLocaleString())
+      );
+    }))
+  );
+}
 function CleanupHistorySheet({ state, onClose, onCleanup, setConfirmDialog }) {
   const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
   const [cutoffDate, setCutoffDate] = useState(() => todayStr());
@@ -10839,8 +10944,7 @@ function CleanupHistorySheet({ state, onClose, onCleanup, setConfirmDialog }) {
       { label: "2 \u5E74\u524D", years: 2 },
       { label: "3 \u5E74\u524D", years: 3 },
       { label: "4 \u5E74\u524D", years: 4 },
-      { label: "5 \u5E74\u524D", years: 5 },
-      { label: "6 \u5E74\u524D", years: 6 }
+      { label: "5 \u5E74\u524D", years: 5 }
     ].map((opt) => {
       const d = /* @__PURE__ */ new Date();
       d.setFullYear(d.getFullYear() - opt.years);
@@ -10866,7 +10970,7 @@ function CleanupHistorySheet({ state, onClose, onCleanup, setConfirmDialog }) {
         },
         opt.label
       );
-    })), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, fontSize: 12, color: "var(--text-faint)" } }, fmtDate(cutoffDate), " 00:00 \u4E4B\u524D\u7684\u7D00\u9304\u5C07\u88AB\u6E05\u9664")), /* @__PURE__ */ React.createElement("div", { style: { ...styles.block, padding: "14px 14px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 10 } }, "\u9810\u89BD"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "var(--text-dim)" } }, "\u5168\u7D00\u9304"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: "var(--text)" } }, "\u5171 ", totalCount, " \u7B46")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "var(--text-dim)" } }, "\u7B26\u5408\u7BE9\u9078\u689D\u4EF6"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 20, fontWeight: 700, color: matchCount > 0 ? "var(--mint)" : "var(--text-faint)" } }, matchCount, " ", /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--text-faint)", fontWeight: 400 } }, "\u7B46"))), matchCount > 0 && affectedAccounts.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { borderTop: "1px solid var(--border)", marginTop: 8, paddingTop: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginBottom: 8 } }, "\u5F71\u97FF\u7684\u5E33\u6236 (", affectedAccounts.length, ")"), affectedAccounts.slice(0, 6).map((a) => {
+    })), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, fontSize: 12, color: "var(--text-faint)", lineHeight: 1.5 } }, "\u9078\u5FEB\u6377\u9215\u5F8C\u4ECD\u53EF\u9EDE\u4E0A\u65B9\u65E5\u671F\u6846 \u5FAE\u8ABF\u65E5\u671F ", /* @__PURE__ */ React.createElement("br", null), fmtDate(cutoffDate), " 00:00 \u4E4B\u524D\u7684\u7D00\u9304\u5C07\u88AB\u6E05\u9664")), /* @__PURE__ */ React.createElement("div", { style: { ...styles.block, padding: "14px 14px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 10 } }, "\u9810\u89BD"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "var(--text-dim)" } }, "\u5168\u7D00\u9304"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: "var(--text)" } }, "\u5171 ", totalCount, " \u7B46")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "var(--text-dim)" } }, "\u7B26\u5408\u7BE9\u9078\u689D\u4EF6"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 20, fontWeight: 700, color: matchCount > 0 ? "var(--mint)" : "var(--text-faint)" } }, matchCount, " ", /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--text-faint)", fontWeight: 400 } }, "\u7B46"))), matchCount > 0 && affectedAccounts.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { borderTop: "1px solid var(--border)", marginTop: 8, paddingTop: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginBottom: 8 } }, "\u5F71\u97FF\u7684\u5E33\u6236 (", affectedAccounts.length, ")"), affectedAccounts.slice(0, 6).map((a) => {
       const delta = balanceDelta.get(a.id) || 0;
       return /* @__PURE__ */ React.createElement("div", { key: a.id, style: { display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)" } }, a.name), /* @__PURE__ */ React.createElement("span", { style: { color: delta > 0 ? "var(--mint)" : delta < 0 ? "var(--pink)" : "var(--text-faint)", fontWeight: 500 } }, delta > 0 ? "+" : "", delta.toLocaleString()));
     }), affectedAccounts.length > 6 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", textAlign: "center", marginTop: 4 } }, "\u2026\u9084\u6709 ", affectedAccounts.length - 6, " \u500B")))), /* @__PURE__ */ React.createElement("div", { style: { ...styles.block, padding: "14px 14px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 500 } }, "\u4FDD\u7559\u76EE\u524D\u91D1\u984D"), /* @__PURE__ */ React.createElement(
@@ -10876,7 +10980,7 @@ function CleanupHistorySheet({ state, onClose, onCleanup, setConfirmDialog }) {
         onClick: () => setPreserveBalance((v) => !v)
       },
       /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: preserveBalance ? "translateX(18px)" : "translateX(0)" } })
-    )), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", lineHeight: 1.6 } }, preserveBalance ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)" } }, "\u26A0"), " ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--highlight)" } }, "\u5E33\u6236\u9918\u984D\u7DAD\u6301\u4E0D\u8B8A"), " \uFF08\u4E26\u5C07\u6DE8\u984D\u5BEB\u5165\u5E33\u6236\u8D77\u59CB\u9918\u984D\uFF09") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)" } }, "\u26A0"), " \u76F4\u63A5\u6E05\u9664\uFF08", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--highlight)" } }, "\u5E33\u6236\u9918\u984D"), " \u6703\u4F9D\u5269\u4E0B\u7684 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--highlight)" } }, "\u7D00\u9304\u91CD\u65B0\u8A08\u7B97"), "\uFF09"))), /* @__PURE__ */ React.createElement("div", { style: { height: 20 } })),
+    )), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", lineHeight: 1.6 } }, preserveBalance ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)" } }, "\u26A0"), " ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--highlight)" } }, "\u5E33\u6236\u9918\u984D\u7DAD\u6301\u4E0D\u8B8A"), " (\u4E26\u5C07\u6DE8\u984D\u5BEB\u5165\u5E33\u6236\u8D77\u59CB\u9918\u984D)") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)" } }, "\u26A0"), " \u76F4\u63A5\u6E05\u9664(", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--highlight)" } }, "\u5E33\u6236\u9918\u984D"), " \u6703\u4F9D\u5269\u4E0B\u7684 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--highlight)" } }, "\u7D00\u9304\u91CD\u65B0\u8A08\u7B97"), ")"))), matchCount > 0 && /* @__PURE__ */ React.createElement("div", { style: { ...styles.block, padding: "14px 14px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)" } }, "\u5C07\u88AB\u6E05\u9664\u7684\u7D00\u9304"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)" } }, "\u5171 ", matchCount, " \u7B46")), /* @__PURE__ */ React.createElement(CleanupTxnList, { matching, state })), /* @__PURE__ */ React.createElement("div", { style: { height: 20 } })),
     /* @__PURE__ */ React.createElement("div", { style: {
       flexShrink: 0,
       padding: "14px 4px calc(14px + env(safe-area-inset-bottom, 0px))",
@@ -10906,6 +11010,151 @@ function CleanupHistorySheet({ state, onClose, onCleanup, setConfirmDialog }) {
     ))
   );
 }
+function FilterDeleteTxnList({ matching, state, selectedIds, setSelectedIds, locked, allRelatedIds }) {
+  const sorted = React.useMemo(() => {
+    return [...matching].sort((a, b) => {
+      const dc = (b.date || "").localeCompare(a.date || "");
+      if (dc !== 0) return dc;
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
+  }, [matching]);
+  const ROW_HEIGHT = 56;
+  const VIEWPORT_HEIGHT = 320;
+  const BUFFER = 5;
+  const [scrollTop, setScrollTop] = React.useState(0);
+  const startIdx = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - BUFFER);
+  const visibleCount = Math.ceil(VIEWPORT_HEIGHT / ROW_HEIGHT) + BUFFER * 2;
+  const endIdx = Math.min(sorted.length, startIdx + visibleCount);
+  const toggleOne = (id) => {
+    if (locked) return;
+    const next = new Set(selectedIds);
+    const txn = state.transactions.find((t) => t.id === id);
+    const relatedIds = /* @__PURE__ */ new Set([id]);
+    if (txn && txn.transferId) {
+      for (const t of state.transactions) {
+        if (t.transferId === txn.transferId) relatedIds.add(t.id);
+      }
+    }
+    if (next.has(id)) {
+      relatedIds.forEach((rid) => next.delete(rid));
+    } else {
+      relatedIds.forEach((rid) => {
+        if (allRelatedIds.has(rid)) next.add(rid);
+      });
+    }
+    setSelectedIds(next);
+  };
+  const toggleAll = () => {
+    if (locked) return;
+    if (selectedIds.size === allRelatedIds.size) {
+      setSelectedIds(/* @__PURE__ */ new Set());
+    } else {
+      setSelectedIds(new Set(allRelatedIds));
+    }
+  };
+  const allSelected = selectedIds.size === allRelatedIds.size && allRelatedIds.size > 0;
+  return /* @__PURE__ */ React.createElement("div", { style: { marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" } }, !locked && /* @__PURE__ */ React.createElement("div", { style: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+    padding: "4px 2px"
+  } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "var(--text-faint)" } }, "\u9EDE\u9078\u7D00\u9304\u53EF\u52FE\u9078 / \u53D6\u6D88"), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: toggleAll,
+      style: {
+        padding: "4px 10px",
+        borderRadius: 6,
+        background: "transparent",
+        border: "1px solid var(--border)",
+        color: "var(--text-dim)",
+        fontSize: 11,
+        cursor: "pointer"
+      }
+    },
+    allSelected ? "\u5168\u90E8\u53D6\u6D88" : "\u5168\u90E8\u9078\u53D6"
+  )), /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: {
+        height: Math.min(VIEWPORT_HEIGHT, sorted.length * ROW_HEIGHT + 4),
+        overflowY: "auto",
+        background: "var(--bg)",
+        borderRadius: 8,
+        border: "1px solid var(--border-soft)"
+      },
+      onScroll: (e) => setScrollTop(e.target.scrollTop)
+    },
+    /* @__PURE__ */ React.createElement("div", { style: { height: sorted.length * ROW_HEIGHT, position: "relative" } }, sorted.slice(startIdx, endIdx).map((t, i) => {
+      const realIdx = startIdx + i;
+      const isExpense = t.type === "expense";
+      const isIncome = t.type === "income";
+      const amtSign = isExpense ? "-" : isIncome ? "+" : "";
+      const amtColor = isExpense ? "var(--pink-text)" : isIncome ? "var(--mint-text)" : "var(--accent-text)";
+      const label = t.transferRole === "out" ? "\u8F49\u51FA" : t.transferRole === "in" ? "\u8F49\u5165" : t.transferRole === "fee" ? "\u624B\u7E8C\u8CBB" : t.subCategory ? `${t.category || ""} \u203A ${t.subCategory}` : t.category || "\u672A\u5206\u985E";
+      const acct = state.accounts.find((a) => a.id === t.accountId);
+      const acctName = acct?.name || t._deletedAccountName || "";
+      const isSelected = selectedIds.has(t.id);
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: t.id,
+          onClick: () => toggleOne(t.id),
+          style: {
+            position: "absolute",
+            top: realIdx * ROW_HEIGHT,
+            left: 0,
+            right: 0,
+            height: ROW_HEIGHT,
+            display: "flex",
+            alignItems: "center",
+            padding: "0 10px",
+            borderBottom: "1px solid var(--border-soft)",
+            gap: 10,
+            cursor: locked ? "default" : "pointer",
+            background: !locked && isSelected ? "rgba(245,168,200,0.08)" : "transparent",
+            opacity: !locked && !isSelected ? 0.5 : 1,
+            transition: "background 0.15s, opacity 0.15s"
+          }
+        },
+        !locked && /* @__PURE__ */ React.createElement("div", { style: {
+          width: 18,
+          height: 18,
+          borderRadius: 4,
+          border: `1.5px solid ${isSelected ? "var(--pink)" : "var(--border)"}`,
+          background: isSelected ? "var(--pink)" : "transparent",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0
+        } }, isSelected && /* @__PURE__ */ React.createElement(TypeIcon, { name: "check", size: 12, color: "#fff" })),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 12,
+          color: "var(--text)",
+          fontWeight: 500,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
+        } }, label), /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 11,
+          color: "var(--text-faint)",
+          marginTop: 2,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
+        } }, t.date, acctName ? ` \xB7 ${acctName}` : "", t.note ? ` \xB7 ${t.note}` : "")),
+        /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 13,
+          fontWeight: 600,
+          color: amtColor,
+          fontFamily: "var(--num-font)",
+          flexShrink: 0
+        } }, amtSign, fmt(t.amount))
+      );
+    }))
+  ));
+}
 function FilterDeleteSheet({ state, setState, onClose, setConfirmDialog, toast, toastRich }) {
   const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
   const [filterType, setFilterType] = useState("account");
@@ -10933,6 +11182,8 @@ function FilterDeleteSheet({ state, setState, onClose, setConfirmDialog, toast, 
   const [dateStart, setDateStart] = useState("");
   const [dateEnd, setDateEnd] = useState("");
   const [selAccountType, setSelAccountType] = useState("");
+  const [selectedIds, setSelectedIds] = useState(() => /* @__PURE__ */ new Set());
+  const [preserveBalance, setPreserveBalance] = useState(true);
   const filterTypeOptions = [
     { key: "account", label: "\u5E33\u6236", icon: "bank", color: "#a8c8f5" },
     { key: "category", label: "\u5927\u5206\u985E", icon: "folder", color: "#f5c29c" },
@@ -11025,6 +11276,10 @@ function FilterDeleteSheet({ state, setState, onClose, setConfirmDialog, toast, 
   }, [matching, state.transactions]);
   const matchCount = allRelatedIds.size;
   const totalCount = state.transactions.length;
+  React.useEffect(() => {
+    setSelectedIds(new Set(allRelatedIds));
+  }, [allRelatedIds]);
+  const selectedCount = selectedIds.size;
   const allCategories = React.useMemo(() => {
     const map = /* @__PURE__ */ new Map();
     for (const type of Object.keys(state.categories || {})) {
@@ -11079,7 +11334,7 @@ function FilterDeleteSheet({ state, setState, onClose, setConfirmDialog, toast, 
     return Array.from(map.values());
   }, [state.categories, state.transactions]);
   const handleConfirm = () => {
-    if (matchCount === 0 || locked) return;
+    if (selectedCount === 0 || locked) return;
     let conditionDesc = "";
     if (filterType === "account") {
       const a = state.accounts.find((x) => x.id === selAccount);
@@ -11120,7 +11375,7 @@ function FilterDeleteSheet({ state, setState, onClose, setConfirmDialog, toast, 
       const t = state.accountTypes.find((x) => x.value === selAccountType);
       conditionDesc = `\u5E33\u6236\u985E\u578B:\u300C${t?.label || "?"}\u300D`;
     }
-    const matchedTxns = state.transactions.filter((t) => allRelatedIds.has(t.id));
+    const matchedTxns = state.transactions.filter((t) => selectedIds.has(t.id));
     matchedTxns.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
     const PREVIEW_LIMIT = 5;
     const previewTxns = matchedTxns.slice(0, PREVIEW_LIMIT);
@@ -11148,32 +11403,61 @@ function FilterDeleteSheet({ state, setState, onClose, setConfirmDialog, toast, 
       const note = t.note ? ` \xB7 ${t.note}` : "";
       return `${dateShort}  ${t.category || ""}${sub}${acctPart}${note}  ${amtStr}`;
     });
+    const balanceDelta = /* @__PURE__ */ new Map();
+    if (preserveBalance) {
+      for (const t of matchedTxns) {
+        if (!t.transferId && t.accountId) {
+          const delta = t.type === "income" ? t.amount || 0 : -(t.amount || 0);
+          balanceDelta.set(t.accountId, (balanceDelta.get(t.accountId) || 0) + delta);
+        }
+        if (t.transferRole === "out" && t.accountId) {
+          balanceDelta.set(t.accountId, (balanceDelta.get(t.accountId) || 0) - (t.amount || 0));
+        } else if (t.transferRole === "in" && t.accountId) {
+          balanceDelta.set(t.accountId, (balanceDelta.get(t.accountId) || 0) + (t.amount || 0));
+        } else if (t.transferRole === "fee" && t.accountId) {
+          balanceDelta.set(t.accountId, (balanceDelta.get(t.accountId) || 0) - (t.amount || 0));
+        }
+      }
+    }
+    const isPartialSelect = selectedCount < matchCount;
+    const titleSuffix = isPartialSelect ? `(\u5DF2\u52FE\u9078 ${selectedCount} / ${matchCount})` : "";
     setConfirmDialog({
       title: "\u78BA\u8A8D\u522A\u9664",
       messageList: {
-        before: `\u7B26\u5408\u689D\u4EF6 ${conditionDesc} \u7684\u7D00\u9304\u5171 ${matchCount} \u7B46,\u5C07\u6C38\u4E45\u522A\u9664:`,
+        before: `\u7B26\u5408\u689D\u4EF6 ${conditionDesc} ${titleSuffix},\u5C07\u6C38\u4E45\u522A\u9664 ${selectedCount} \u7B46:`,
         items: [
           ...previewLines,
           ...moreCount > 0 ? [`\u22EF \u4EE5\u53CA\u5176\u4ED6 ${moreCount} \u7B46`] : []
         ],
-        after: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F,\u5EFA\u8B70\u5148\u300C\u5132\u5B58\u5FEB\u7167\u300D"
+        after: preserveBalance ? "\u5E33\u6236\u9918\u984D\u5C07\u7DAD\u6301\u4E0D\u8B8A(\u6DE8\u984D\u5BEB\u5165\u8D77\u59CB\u9918\u984D)\n\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F,\u5EFA\u8B70\u5148\u300C\u5132\u5B58\u5FEB\u7167\u300D" : "\u5E33\u6236\u9918\u984D\u6703\u4F9D\u5269\u4E0B\u7684\u7D00\u9304\u91CD\u65B0\u8A08\u7B97\n\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F,\u5EFA\u8B70\u5148\u300C\u5132\u5B58\u5FEB\u7167\u300D"
       },
-      confirmText: `\u522A\u9664 ${matchCount} \u7B46`,
+      confirmText: `\u522A\u9664 ${selectedCount} \u7B46`,
       danger: true,
       onConfirm: () => {
-        setState((s) => ({
-          ...s,
-          transactions: s.transactions.filter((t) => !allRelatedIds.has(t.id))
-        }));
+        setState((s) => {
+          let nextAccounts = s.accounts;
+          if (preserveBalance && balanceDelta.size > 0) {
+            nextAccounts = s.accounts.map((a) => {
+              const d = balanceDelta.get(a.id);
+              if (d == null) return a;
+              return { ...a, initAmount: (Number(a.initAmount) || 0) + d };
+            });
+          }
+          return {
+            ...s,
+            transactions: s.transactions.filter((t) => !selectedIds.has(t.id)),
+            accounts: nextAccounts
+          };
+        });
         if (toastRich) {
           toastRich({
-            title: `\u5DF2\u522A\u9664 ${matchCount} \u7B46`,
-            amount: "\u2713",
+            title: "\u5DF2\u522A\u9664\u7D00\u9304",
+            amount: `${selectedCount} \u7B46`,
             amountColor: "var(--pink-text)",
-            lines: [conditionDesc]
+            lines: [conditionDesc, preserveBalance ? "\u5E33\u6236\u9918\u984D\u5DF2\u4FDD\u7559" : ""].filter(Boolean)
           }, 1800);
         } else {
-          toast(`\u5DF2\u522A\u9664 ${matchCount} \u7B46`);
+          toast(`\u5DF2\u522A\u9664 ${selectedCount} \u7B46`);
         }
         onClose();
       }
@@ -11369,68 +11653,29 @@ function FilterDeleteSheet({ state, setState, onClose, setConfirmDialog, toast, 
     fontSize: 22,
     fontWeight: 700,
     color: matchCount > 0 ? "var(--pink)" : "var(--text-faint)"
-  } }, matchCount), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", fontSize: 13, marginLeft: 4 } }, "/ ", totalCount, " \u7B46"))), matchCount === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginTop: 6 } }, "\u9078\u64C7\u689D\u4EF6\u5F8C\u6703\u5373\u6642\u66F4\u65B0\u9810\u89BD"), matchCount > 0 && (() => {
-    const sorted = [...matching].sort((a, b) => {
-      const dc = (b.date || "").localeCompare(a.date || "");
-      if (dc !== 0) return dc;
-      return (b.createdAt || 0) - (a.createdAt || 0);
-    });
-    const PREVIEW_LIMIT = 5;
-    const visible = sorted.slice(0, PREVIEW_LIMIT);
-    const remain = sorted.length - visible.length;
-    return /* @__PURE__ */ React.createElement("div", { style: {
-      marginTop: 12,
-      paddingTop: 12,
-      borderTop: "1px solid var(--border)"
-    } }, visible.map((t, idx) => {
-      const isExpense = t.type === "expense";
-      const isIncome = t.type === "income";
-      const amtSign = isExpense ? "-" : isIncome ? "+" : "";
-      const amtColor = isExpense ? "var(--pink-text)" : isIncome ? "var(--mint-text)" : "var(--text)";
-      const label = t.transferRole === "out" ? "\u8F49\u51FA" : t.transferRole === "in" ? "\u8F49\u5165" : t.transferRole === "fee" ? "\u624B\u7E8C\u8CBB" : t.subCategory ? `${t.category || ""} \u203A ${t.subCategory}` : t.category || "\u672A\u5206\u985E";
-      return /* @__PURE__ */ React.createElement(
-        "div",
-        {
-          key: t.id,
-          style: {
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 10,
-            padding: "6px 0",
-            borderBottom: idx < visible.length - 1 || remain > 0 ? "1px solid var(--border)" : "none"
-          }
-        },
-        /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: {
-          fontSize: 12,
-          color: "var(--text)",
-          fontWeight: 500,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis"
-        } }, label), /* @__PURE__ */ React.createElement("div", { style: {
-          fontSize: 11,
-          color: "var(--text-faint)",
-          marginTop: 1,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis"
-        } }, t.date, t.note ? ` \xB7 ${t.note}` : "")),
-        /* @__PURE__ */ React.createElement("div", { style: {
-          fontSize: 13,
-          fontWeight: 600,
-          color: amtColor,
-          fontFamily: "var(--num-font)",
-          flexShrink: 0
-        } }, amtSign, fmt(t.amount))
-      );
-    }), remain > 0 && /* @__PURE__ */ React.createElement("div", { style: {
-      fontSize: 12,
-      color: "var(--text-faint)",
-      textAlign: "center",
-      padding: "8px 0 2px"
-    } }, "\u4EE5\u53CA\u5176\u4ED6 ", remain, " \u7B46"));
-  })()), /* @__PURE__ */ React.createElement("div", { style: {
+  } }, matchCount), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", fontSize: 13, marginLeft: 4 } }, "/ ", totalCount, " \u7B46"))), !locked && matchCount > 0 && selectedCount !== matchCount && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--text-dim)" } }, "\u5DF2\u52FE\u9078"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: "var(--pink-text)" } }, selectedCount, " ", /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "var(--text-faint)", fontWeight: 400 } }, "\u7B46"))), matchCount === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginTop: 6 } }, "\u9078\u64C7\u689D\u4EF6\u5F8C\u6703\u5373\u6642\u66F4\u65B0\u9810\u89BD"), matchCount > 0 && /* @__PURE__ */ React.createElement(
+    FilterDeleteTxnList,
+    {
+      matching,
+      state,
+      selectedIds,
+      setSelectedIds,
+      locked,
+      allRelatedIds
+    }
+  )), /* @__PURE__ */ React.createElement("div", { style: {
+    padding: "12px 14px",
+    background: "var(--bg-card)",
+    borderRadius: 10,
+    marginBottom: 10
+  } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: "var(--text)" } }, "\u4FDD\u7559\u76EE\u524D\u9918\u984D"), /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: { ...styles.toggleTrack, background: preserveBalance ? "var(--mint)" : "var(--bg)" },
+      onClick: () => setPreserveBalance((v) => !v)
+    },
+    /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: preserveBalance ? "translateX(18px)" : "translateX(0)" } })
+  )), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", lineHeight: 1.6 } }, preserveBalance ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)" } }, "\u26A0"), " ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--highlight)" } }, "\u5E33\u6236\u9918\u984D\u7DAD\u6301\u4E0D\u8B8A"), " (\u6DE8\u984D\u5BEB\u5165\u5E33\u6236\u8D77\u59CB\u9918\u984D)") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)" } }, "\u26A0"), " \u76F4\u63A5\u522A\u9664(", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--highlight)" } }, "\u5E33\u6236\u9918\u984D"), " \u6703\u4F9D\u5269\u4E0B\u7684 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--highlight)" } }, "\u7D00\u9304\u91CD\u65B0\u8A08\u7B97"), ")"))), /* @__PURE__ */ React.createElement("div", { style: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
@@ -11476,21 +11721,21 @@ function FilterDeleteSheet({ state, setState, onClose, setConfirmDialog, toast, 
     "button",
     {
       onClick: handleConfirm,
-      disabled: matchCount === 0 || locked,
+      disabled: selectedCount === 0 || locked,
       style: {
         width: "100%",
         padding: "14px 0",
         borderRadius: 10,
         border: "none",
-        background: matchCount === 0 || locked ? "var(--bg-card)" : "var(--pink)",
-        color: matchCount === 0 || locked ? "var(--text-faint)" : "#fff",
+        background: selectedCount === 0 || locked ? "var(--bg-card)" : "var(--pink)",
+        color: selectedCount === 0 || locked ? "var(--text-faint)" : "#fff",
         fontSize: 15,
         fontWeight: 700,
-        cursor: matchCount === 0 || locked ? "not-allowed" : "pointer",
-        opacity: matchCount === 0 || locked ? 0.5 : 1
+        cursor: selectedCount === 0 || locked ? "not-allowed" : "pointer",
+        opacity: selectedCount === 0 || locked ? 0.5 : 1
       }
     },
-    locked ? "\u8ACB\u5148\u89E3\u9396" : matchCount === 0 ? "\u6C92\u6709\u7B26\u5408\u7684\u7D00\u9304" : `\u522A\u9664 ${matchCount} \u7B46\u7D00\u9304`
+    locked ? "\u8ACB\u5148\u89E3\u9396" : selectedCount === 0 ? "\u8ACB\u52FE\u9078\u8981\u522A\u9664\u7684\u7D00\u9304" : `\u522A\u9664 ${selectedCount} \u7B46\u7D00\u9304`
   ))), showFilterTypePicker && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.pickerBackdrop, onClick: () => setShowFilterTypePicker(false) }, /* @__PURE__ */ React.createElement(
     "div",
     {
@@ -16264,6 +16509,312 @@ function AccountTypeManageSheet({ state, setState, toast, toastRich, onClose, se
     ))
   );
 }
+function StockMarketManageSheet({ state, setState, toast, toastRich, onClose, setConfirmDialog }) {
+  const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
+  const list = state.stockMarkets || DEFAULT_STOCK_MARKETS;
+  const [editingIdx, setEditingIdx] = useState(null);
+  const [label, setLabel] = useState("");
+  const [editMode, setEditMode] = useState(false);
+  const [labelLocked, setLabelLocked] = useState(false);
+  const startNew = () => {
+    setEditingIdx("new");
+    setLabel("");
+    setLabelLocked(false);
+  };
+  const startEdit = (idx) => {
+    setEditingIdx(idx);
+    setLabel(list[idx].label);
+    setLabelLocked(true);
+  };
+  const cancelEdit = () => {
+    setEditingIdx(null);
+    setLabel("");
+    setLabelLocked(false);
+  };
+  const handleSave = () => {
+    const trimmed = label.trim();
+    if (!trimmed) {
+      toast("\u8ACB\u8F38\u5165\u540D\u7A31");
+      return;
+    }
+    const isDup = list.some((m, i) => {
+      if (editingIdx === "new") return m.label === trimmed;
+      return m.label === trimmed && i !== editingIdx;
+    });
+    if (isDup) {
+      toastRich({
+        title: "\u540D\u7A31\u5DF2\u88AB\u4F7F\u7528",
+        amount: "\u2713",
+        amountColor: "var(--pink)",
+        icon: "warn",
+        lines: [`\u5DF2\u6709\u540D\u70BA\u300C${trimmed}\u300D\u7684\u985E\u578B`]
+      }, 1800);
+      return;
+    }
+    if (editingIdx === "new") {
+      const newId = "sm_" + Date.now().toString(36);
+      const next = [...list, { id: newId, label: trimmed }];
+      setState((s) => ({ ...s, stockMarkets: next }));
+      toastRich({
+        title: "\u5DF2\u65B0\u589E\u985E\u578B",
+        amount: "\u2713",
+        amountColor: "var(--mint)",
+        lines: [trimmed]
+      }, 1500);
+    } else {
+      if (list[editingIdx].label === trimmed) {
+        toastRich({
+          title: "\u6C92\u6709\u4EFB\u4F55\u8B8A\u66F4",
+          amount: null,
+          lines: []
+        }, 700);
+        cancelEdit();
+        return;
+      }
+      const next = list.map((m, i) => i === editingIdx ? { ...m, label: trimmed } : m);
+      setState((s) => ({ ...s, stockMarkets: next }));
+      toastRich({
+        title: "\u5DF2\u66F4\u65B0\u540D\u7A31",
+        amount: "\u2713",
+        amountColor: "var(--mint)",
+        lines: [trimmed]
+      }, 1500);
+    }
+    cancelEdit();
+  };
+  const handleDelete = (idx) => {
+    const target = list[idx];
+    if (target.id === "sm_tw" || target.id === "sm_us") {
+      toastRich({
+        title: "\u7121\u6CD5\u522A\u9664",
+        amount: "\u2713",
+        amountColor: "var(--pink)",
+        icon: "warn",
+        lines: ["\u9810\u8A2D\u7684 \u53F0\u80A1 / \u7F8E\u80A1 \u7121\u6CD5\u522A\u9664"]
+      }, 2e3);
+      return;
+    }
+    const usingAccts = state.accounts.filter((a) => a.stockMarketId === target.id);
+    const usingCount2 = usingAccts.length;
+    setConfirmDialog({
+      title: "\u522A\u9664\u80A1\u7968\u985E\u578B",
+      messageList: {
+        styled: true,
+        before: `\u78BA\u5B9A\u8981\u522A\u9664\u300C${target.label}\u300D\u55CE\uFF1F`,
+        items: usingCount2 > 0 ? [
+          { text: `\u6709 ${usingCount2} \u500B\u5E33\u6236 \u6B63\u5728\u4F7F\u7528\u6B64\u985E\u578B`, card: true },
+          `\u522A\u9664\u5F8C,\u9019\u4E9B\u5E33\u6236\u6703 \u6539\u70BA\u53F0\u80A1 \u5206\u985E`
+        ] : [
+          "\u6B64\u985E\u578B \u6C92\u6709\u5E33\u6236 \u5728\u4F7F\u7528"
+        ]
+      },
+      highlightWords: usingCount2 > 0 ? [`${usingCount2} \u500B\u5E33\u6236`, "\u6539\u70BA\u53F0\u80A1"] : ["\u6C92\u6709\u5E33\u6236"],
+      confirmText: "\u78BA\u5B9A\u522A\u9664",
+      confirmStyle: "danger",
+      onConfirm: () => {
+        const next = list.filter((_, i) => i !== idx);
+        const nextAccounts = state.accounts.map(
+          (a) => a.stockMarketId === target.id ? { ...a, stockMarketId: "sm_tw" } : a
+        );
+        setState((s) => ({ ...s, stockMarkets: next, accounts: nextAccounts }));
+        toastRich({
+          title: "\u5DF2\u522A\u9664\u985E\u578B",
+          amount: "\u2713",
+          amountColor: "var(--mint)",
+          lines: [target.label, usingCount2 > 0 ? `${usingCount2} \u500B\u5E33\u6236 \u5DF2\u6539\u70BA \u53F0\u80A1` : ""].filter(Boolean)
+        }, 1800);
+        cancelEdit();
+      }
+    });
+  };
+  const moveUp = (idx) => {
+    if (idx === 0) return;
+    const next = [...list];
+    [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+    setState((s) => ({ ...s, stockMarkets: next }));
+  };
+  const moveDown = (idx) => {
+    if (idx === list.length - 1) return;
+    const next = [...list];
+    [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+    setState((s) => ({ ...s, stockMarkets: next }));
+  };
+  const usingCount = (id) => state.accounts.filter((a) => (a.stockMarketId || "sm_tw") === id).length;
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-sheet": "true",
+      style: {
+        ...styles.sheet,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: { width: 50 } }), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, "\u80A1\u7968\u985E\u578B\u7BA1\u7406"), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 50, display: "flex", justifyContent: "flex-end" } }, editingIdx === null && /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode }))),
+    /* @__PURE__ */ React.createElement(EditModeBanner, { editMode, setEditMode }),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll, "data-scroll-container": true }, editingIdx !== null ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", null, "\u985E\u578B\u540D\u7A31"), /* @__PURE__ */ React.createElement("div", { style: styles.lockRow }, /* @__PURE__ */ React.createElement("span", { style: { ...styles.lockLabel, color: labelLocked ? "var(--text-dim)" : "var(--mint)", display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: labelLocked ? "lock" : "unlock", size: 12, color: labelLocked ? "var(--text-dim)" : "var(--mint)" }), labelLocked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: { ...styles.toggleTrack, background: labelLocked ? "var(--bg-card)" : "var(--mint)" },
+        onClick: () => setLabelLocked((v) => !v)
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: labelLocked ? "translateX(0)" : "translateX(18px)" } })
+    ))), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "text",
+        style: { ...styles.field, opacity: labelLocked ? 0.55 : 1 },
+        value: label,
+        onChange: (e) => setLabel(e.target.value),
+        placeholder: "\u4F8B\u5982:\u6E2F\u80A1\u3001\u65E5\u80A1\u3001\u52A0\u5BC6\u8CA8\u5E63",
+        readOnly: labelLocked,
+        maxLength: 10
+      }
+    ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 20 } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: handleSave,
+        style: {
+          flex: 1,
+          padding: "12px",
+          background: "var(--mint)",
+          color: "#1a1a1a",
+          border: "none",
+          borderRadius: 10,
+          fontSize: 15,
+          fontWeight: 600,
+          cursor: "pointer"
+        }
+      },
+      editingIdx === "new" ? "\u65B0\u589E" : "\u5132\u5B58"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: cancelEdit,
+        style: {
+          flex: 1,
+          padding: "12px",
+          background: "transparent",
+          color: "var(--text)",
+          border: "1px solid var(--border)",
+          borderRadius: 10,
+          fontSize: 15,
+          fontWeight: 500,
+          cursor: "pointer"
+        }
+      },
+      "\u53D6\u6D88"
+    )), editingIdx !== "new" && list[editingIdx] && list[editingIdx].id !== "sm_tw" && list[editingIdx].id !== "sm_us" && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => handleDelete(editingIdx),
+        style: {
+          width: "100%",
+          padding: "12px",
+          marginTop: 12,
+          background: "transparent",
+          color: "var(--pink-text)",
+          border: "1px solid var(--pink-text)",
+          borderRadius: 10,
+          fontSize: 14,
+          fontWeight: 500,
+          cursor: "pointer"
+        }
+      },
+      "\u522A\u9664\u6B64\u985E\u578B"
+    )) : /* @__PURE__ */ React.createElement(React.Fragment, null, list.map((m, i) => {
+      const count = usingCount(m.id);
+      const isDefault = m.id === "sm_tw" || m.id === "sm_us";
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: m.id,
+          onClick: () => !editMode && startEdit(i),
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "12px 14px",
+            borderRadius: 10,
+            background: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            marginBottom: 8,
+            cursor: editMode ? "default" : "pointer",
+            minHeight: 60,
+            boxSizing: "border-box"
+          }
+        },
+        /* @__PURE__ */ React.createElement(TypeIcon, { name: "chart", size: 18, color: "var(--mint-text)" }),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 500, color: "var(--text)" } }, m.label, isDefault && /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, fontSize: 11, color: "var(--text-faint)" } }, "(\u9810\u8A2D)")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, count > 0 ? `${count} \u500B\u5E33\u6236\u4F7F\u7528\u4E2D` : "\u5C1A\u7121\u5E33\u6236\u4F7F\u7528")),
+        editMode ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: (e) => {
+              e.stopPropagation();
+              moveUp(i);
+            },
+            disabled: i === 0,
+            style: {
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: i === 0 ? "transparent" : "var(--bg)",
+              border: "1px solid var(--border)",
+              color: i === 0 ? "var(--text-faint)" : "var(--text)",
+              cursor: i === 0 ? "not-allowed" : "pointer",
+              opacity: i === 0 ? 0.4 : 1
+            }
+          },
+          "\u25B2"
+        ), /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: (e) => {
+              e.stopPropagation();
+              moveDown(i);
+            },
+            disabled: i === list.length - 1,
+            style: {
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: i === list.length - 1 ? "transparent" : "var(--bg)",
+              border: "1px solid var(--border)",
+              color: i === list.length - 1 ? "var(--text-faint)" : "var(--text)",
+              cursor: i === list.length - 1 ? "not-allowed" : "pointer",
+              opacity: i === list.length - 1 ? 0.4 : 1
+            }
+          },
+          "\u25BC"
+        )) : /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 14 } }, "\u203A")
+      );
+    }), !editMode && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: startNew,
+        style: {
+          width: "100%",
+          padding: "14px",
+          marginTop: 8,
+          background: "transparent",
+          color: "var(--mint-text)",
+          border: "1px dashed var(--mint-text)",
+          borderRadius: 10,
+          fontSize: 14,
+          fontWeight: 500,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6
+        }
+      },
+      /* @__PURE__ */ React.createElement(TypeIcon, { name: "plus", size: 14, color: "var(--mint-text)" }),
+      "\u65B0\u589E\u985E\u578B"
+    )))
+  );
+}
 function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSell, onBuyHolding, onSellHolding, onUpdateMarketValue, onOpenHolding }) {
   const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
   const [currentMonth, setCurrentMonth] = useState(todayStr().slice(0, 7));
@@ -16646,6 +17197,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
   const [showInitCalc, setShowInitCalc] = useState(false);
   const [virtual, setVirtual] = useState(initial ? !!initial.virtual : false);
   const [investSubType, setInvestSubType] = useState(initial ? initial.investSubType || "stock" : "stock");
+  const [stockMarketId, setStockMarketId] = useState(initial ? initial.stockMarketId || "sm_tw" : "sm_tw");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showTypeManage, setShowTypeManage] = useState(false);
   const [actionMenu, setActionMenu] = useState(null);
@@ -16673,6 +17225,8 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
   const [typeLocked, setTypeLocked] = useState(() => !!initial);
   const [subTypeLocked, setSubTypeLocked] = useState(() => !!initial);
   const [virtualLocked, setVirtualLocked] = useState(() => !!initial);
+  const [showStockMarketPicker, setShowStockMarketPicker] = useState(false);
+  const [showStockMarketManage, setShowStockMarketManage] = useState(false);
   const reorderAccounts = (newIdOrder) => {
     setState((s) => {
       const map = new Map(s.accounts.map((a) => [a.id, a]));
@@ -16701,6 +17255,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
     setInitAmount("");
     setVirtual(false);
     setInvestSubType("stock");
+    setStockMarketId("sm_tw");
     setNameLocked(false);
     setAmountLocked(false);
     setTypeLocked(false);
@@ -16717,6 +17272,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
     setInitAmount(a.initAmount != null ? String(a.initAmount) : "");
     setVirtual(!!a.virtual);
     setInvestSubType(a.investSubType || "stock");
+    setStockMarketId(a.stockMarketId || "sm_tw");
     setNameLocked(true);
     setAmountLocked(true);
     setTypeLocked(true);
@@ -16758,7 +17314,10 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
     if (editingId === "new") {
       const newAcct = { id: "a_" + uid().slice(2, 10), name: trimmedName, type, initAmount: initAmt, createdAt: Date.now() };
       if (virtual) newAcct.virtual = true;
-      if (type === "invest") newAcct.investSubType = investSubType;
+      if (type === "invest") {
+        newAcct.investSubType = investSubType;
+        if (investSubType === "stock") newAcct.stockMarketId = stockMarketId;
+      }
       setState((s) => ({ ...s, accounts: [...s.accounts, newAcct] }));
       if (toastRich) {
         toastRich({
@@ -16810,8 +17369,14 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
           const updated = { ...a, name: newName, type, initAmount: initAmt };
           if (type === "invest") {
             updated.investSubType = investSubType;
+            if (investSubType === "stock") {
+              updated.stockMarketId = stockMarketId;
+            } else {
+              delete updated.stockMarketId;
+            }
           } else {
             delete updated.investSubType;
+            delete updated.stockMarketId;
           }
           if (virtual) {
             updated.virtual = true;
@@ -17245,7 +17810,32 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
         }
       },
       opt.label
-    )))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "var(--text)" } }, "\u865B\u64EC\u6A19\u7C64"), /* @__PURE__ */ React.createElement("div", { style: styles.lockRow }, /* @__PURE__ */ React.createElement("span", { style: { ...styles.lockLabel, color: virtualLocked ? "var(--text-dim)" : "var(--mint)", display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: virtualLocked ? "lock" : "unlock", size: 12, color: virtualLocked ? "var(--text-dim)" : "var(--mint)" }), virtualLocked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+    ))), investSubType === "stock" && (() => {
+      const markets = state.stockMarkets || DEFAULT_STOCK_MARKETS;
+      const current = markets.find((m) => m.id === stockMarketId) || markets[0];
+      return /* @__PURE__ */ React.createElement("div", { style: { marginTop: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--text-dim)" } }, "\u80A1\u7968\u985E\u578B"), !subTypeLocked && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "var(--text-faint)" } }, "\u9EDE\u4E0B\u65B9\u9078\u64C7\u5668\u53EF\u65B0\u589E\u985E\u578B")), /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          onClick: () => {
+            if (!subTypeLocked) setShowStockMarketPicker(true);
+          },
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 12px",
+            borderRadius: 10,
+            background: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            cursor: subTypeLocked ? "not-allowed" : "pointer",
+            opacity: subTypeLocked ? 0.55 : 1
+          }
+        },
+        /* @__PURE__ */ React.createElement(TypeIcon, { name: "chart", size: 16, color: "var(--mint-text)" }),
+        /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontSize: 14, color: "var(--text)", fontWeight: 500 } }, current ? current.label : "\u53F0\u80A1"),
+        /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 14 } }, "\u203A")
+      ));
+    })()), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "var(--text)" } }, "\u865B\u64EC\u6A19\u7C64"), /* @__PURE__ */ React.createElement("div", { style: styles.lockRow }, /* @__PURE__ */ React.createElement("span", { style: { ...styles.lockLabel, color: virtualLocked ? "var(--text-dim)" : "var(--mint)", display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: virtualLocked ? "lock" : "unlock", size: 12, color: virtualLocked ? "var(--text-dim)" : "var(--mint)" }), virtualLocked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
       "div",
       {
         style: { ...styles.toggleTrack, background: virtualLocked ? "var(--bg-card)" : "var(--mint)" },
@@ -17611,6 +18201,110 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
         mainColor: "var(--mint)",
         onMainColor: "#1a1a1a",
         onClose: () => setShowInitCalc(false)
+      }
+    ),
+    showStockMarketPicker && (() => {
+      const markets = state.stockMarkets || DEFAULT_STOCK_MARKETS;
+      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: { ...styles.sheetBackdrop, zIndex: 350 },
+          onClick: () => setShowStockMarketPicker(false)
+        }
+      ), /* @__PURE__ */ React.createElement("div", { style: {
+        position: "fixed",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: "var(--bg-card)",
+        borderRadius: "20px 20px 0 0",
+        padding: "14px 16px 28px",
+        zIndex: 351,
+        maxHeight: "60vh",
+        overflowY: "auto",
+        animation: "sheetSlideUp 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)"
+      } }, /* @__PURE__ */ React.createElement("div", { style: {
+        width: 36,
+        height: 4,
+        background: "var(--border)",
+        borderRadius: 2,
+        margin: "0 auto 12px"
+      } }), /* @__PURE__ */ React.createElement("div", { style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: 14
+      } }, /* @__PURE__ */ React.createElement("div", { style: { width: 32 } }), /* @__PURE__ */ React.createElement("div", { style: {
+        fontSize: 16,
+        fontWeight: 600,
+        color: "var(--text)"
+      } }, "\u9078\u64C7\u80A1\u7968\u985E\u578B"), /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          onClick: () => {
+            setShowStockMarketPicker(false);
+            setShowStockMarketManage(true);
+          },
+          style: {
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            fontSize: 18
+          },
+          title: "\u7BA1\u7406\u985E\u578B"
+        },
+        "\u2699\uFE0F"
+      )), markets.map((m) => {
+        const isActive = m.id === stockMarketId;
+        return /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            key: m.id,
+            onClick: () => {
+              setStockMarketId(m.id);
+              setShowStockMarketPicker(false);
+            },
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "12px 14px",
+              borderRadius: 10,
+              background: isActive ? "rgba(126,224,192,0.15)" : "transparent",
+              border: `1px solid ${isActive ? "var(--mint)" : "var(--border)"}`,
+              marginBottom: 8,
+              cursor: "pointer"
+            }
+          },
+          /* @__PURE__ */ React.createElement(TypeIcon, { name: "chart", size: 16, color: isActive ? "var(--mint-text)" : "var(--text-dim)" }),
+          /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontSize: 14, fontWeight: isActive ? 600 : 500, color: isActive ? "var(--mint-text)" : "var(--text)" } }, m.label),
+          isActive && /* @__PURE__ */ React.createElement(TypeIcon, { name: "check", size: 16, color: "var(--mint-text)" })
+        );
+      }), /* @__PURE__ */ React.createElement("div", { style: {
+        marginTop: 10,
+        padding: "10px 12px",
+        fontSize: 12,
+        color: "var(--text-faint)",
+        textAlign: "center",
+        lineHeight: 1.6
+      } }, "\u9EDE \u2699\uFE0F \u53EF\u65B0\u589E / \u7DE8\u8F2F / \u522A\u9664\u985E\u578B")));
+    })(),
+    showStockMarketManage && /* @__PURE__ */ React.createElement(
+      StockMarketManageSheet,
+      {
+        state,
+        setState,
+        toast,
+        toastRich,
+        onClose: () => {
+          setShowStockMarketManage(false);
+          setShowStockMarketPicker(true);
+        },
+        setConfirmDialog
       }
     )
   );
