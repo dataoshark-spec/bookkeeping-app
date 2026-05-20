@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520BX";
+const APP_VERSION = "1150520BY";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -8198,7 +8198,7 @@ function StatsPage({ state, catIcon, currentMonth, setCurrentMonth, editMode, se
   const renderDonut = (data, total, opts = {}) => {
     const { onSliceClick, highlighted, centerLabel, centerValue } = opts;
     if (total === 0) {
-      return /* @__PURE__ */ React.createElement("svg", { style: { width: "min(72vw, 300px)", aspectRatio: "1 / 1" }, viewBox: "0 0 100 100" }, /* @__PURE__ */ React.createElement("circle", { cx: "50", cy: "50", r: "30.5", fill: "none", stroke: "var(--border)", strokeWidth: "7" }), /* @__PURE__ */ React.createElement("text", { x: "50", y: "54", textAnchor: "middle", fontSize: "5", fill: "var(--text-faint)", style: { letterSpacing: "0.3px" } }, "\u6C92\u6709\u8CC7\u6599"));
+      return /* @__PURE__ */ React.createElement("svg", { style: { width: "min(80vw, 320px)", aspectRatio: "1 / 1" }, viewBox: "0 0 100 100" }, /* @__PURE__ */ React.createElement("circle", { cx: "50", cy: "50", r: "30.5", fill: "none", stroke: "var(--border)", strokeWidth: "7" }), /* @__PURE__ */ React.createElement("text", { x: "50", y: "54", textAnchor: "middle", fontSize: "5", fill: "var(--text-faint)", style: { letterSpacing: "0.3px" } }, "\u6C92\u6709\u8CC7\u6599"));
     }
     const cx = 50, cy = 50;
     const ringR = 30.5;
@@ -8231,7 +8231,7 @@ function StatsPage({ state, catIcon, currentMonth, setCurrentMonth, editMode, se
       const large = ed - sd > 180 ? 1 : 0;
       return `M ${x1} ${y1} A ${ringR} ${ringR} 0 ${large} 1 ${x2} ${y2}`;
     };
-    return /* @__PURE__ */ React.createElement("svg", { style: { width: "min(72vw, 300px)", aspectRatio: "1 / 1", overflow: "visible" }, viewBox: "0 0 100 100" }, /* @__PURE__ */ React.createElement("defs", null, /* @__PURE__ */ React.createElement("filter", { id: "donutGlow", x: "-30%", y: "-30%", width: "160%", height: "160%" }, /* @__PURE__ */ React.createElement("feGaussianBlur", { stdDeviation: "0.8", result: "blur" }), /* @__PURE__ */ React.createElement("feMerge", null, /* @__PURE__ */ React.createElement("feMergeNode", { in: "blur" }), /* @__PURE__ */ React.createElement("feMergeNode", { in: "SourceGraphic" }))), /* @__PURE__ */ React.createElement("filter", { id: "centerTextShadow", x: "-20%", y: "-20%", width: "140%", height: "140%" }, /* @__PURE__ */ React.createElement("feGaussianBlur", { in: "SourceAlpha", stdDeviation: "0.4" }), /* @__PURE__ */ React.createElement("feOffset", { dx: "0", dy: "0.3", result: "offsetblur" }), /* @__PURE__ */ React.createElement("feComponentTransfer", null, /* @__PURE__ */ React.createElement("feFuncA", { type: "linear", slope: "0.18" })), /* @__PURE__ */ React.createElement("feMerge", null, /* @__PURE__ */ React.createElement("feMergeNode", null), /* @__PURE__ */ React.createElement("feMergeNode", { in: "SourceGraphic" })))), slices.map((s) => {
+    return /* @__PURE__ */ React.createElement("svg", { style: { width: "min(80vw, 320px)", aspectRatio: "1 / 1", overflow: "visible" }, viewBox: "0 0 100 100" }, /* @__PURE__ */ React.createElement("defs", null, /* @__PURE__ */ React.createElement("filter", { id: "donutGlow", x: "-30%", y: "-30%", width: "160%", height: "160%" }, /* @__PURE__ */ React.createElement("feGaussianBlur", { stdDeviation: "0.8", result: "blur" }), /* @__PURE__ */ React.createElement("feMerge", null, /* @__PURE__ */ React.createElement("feMergeNode", { in: "blur" }), /* @__PURE__ */ React.createElement("feMergeNode", { in: "SourceGraphic" }))), /* @__PURE__ */ React.createElement("filter", { id: "centerTextShadow", x: "-20%", y: "-20%", width: "140%", height: "140%" }, /* @__PURE__ */ React.createElement("feGaussianBlur", { in: "SourceAlpha", stdDeviation: "0.4" }), /* @__PURE__ */ React.createElement("feOffset", { dx: "0", dy: "0.3", result: "offsetblur" }), /* @__PURE__ */ React.createElement("feComponentTransfer", null, /* @__PURE__ */ React.createElement("feFuncA", { type: "linear", slope: "0.18" })), /* @__PURE__ */ React.createElement("feMerge", null, /* @__PURE__ */ React.createElement("feMergeNode", null), /* @__PURE__ */ React.createElement("feMergeNode", { in: "SourceGraphic" })))), slices.map((s) => {
       const color = CHART_COLORS[s.idx % CHART_COLORS.length];
       const isHi = highlighted != null && highlighted === s.cat;
       const isDim = highlighted != null && highlighted !== s.cat;
@@ -8503,7 +8503,7 @@ function StatsPage({ state, catIcon, currentMonth, setCurrentMonth, editMode, se
           },
           "\u6536\u5165"
         )),
-        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "center", padding: "12px 0 20px" } }, renderDonut(displayData, displayTotal, {
+        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "center", padding: "4px 0 8px" } }, renderDonut(displayData, displayTotal, {
           highlighted: selectedCat,
           centerLabel,
           centerValue,
@@ -9746,9 +9746,10 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
         count: state.accounts.filter((a) => a.type === at.value).length
       })).filter((x) => x.count > 0);
       const holdings = state.holdings || [];
+      const activeHoldings = holdings.filter((h) => holdingShares(h, state.trades) > 0);
       const stockMarkets = state.stockMarkets || DEFAULT_STOCK_MARKETS;
       const holdingByMarket = stockMarkets.map((m) => {
-        const count = holdings.filter((h) => {
+        const count = activeHoldings.filter((h) => {
           const acct = state.accounts.find((a) => a.id === h.accountId);
           return acct && (acct.stockMarketId || "sm_tw") === m.id;
         }).length;
@@ -9775,12 +9776,12 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
           value: state.accounts.length,
           details: acctByType.map((x) => ({ label: x.label, color: x.color, count: x.count }))
         },
-        ...holdings.length > 0 ? [{
+        ...activeHoldings.length > 0 ? [{
           key: "holding",
           icon: "chart",
           color: "var(--mint-text)",
           label: "\u6301\u80A1",
-          value: holdings.length,
+          value: activeHoldings.length,
           details: holdingByMarket
         }] : [],
         {
@@ -16766,8 +16767,9 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
     const typeChanged = type !== original.type;
     const initAmtChanged = initAmt !== (original.initAmount || 0);
     const subTypeChanged = type === "invest" && investSubType !== (original.investSubType || "stock");
+    const stockMarketChanged = type === "invest" && investSubType === "stock" && stockMarketId !== (original.stockMarketId || "sm_tw");
     const virtualChanged = !!virtual !== !!original.virtual;
-    if (!nameChanged && !typeChanged && !initAmtChanged && !subTypeChanged && !virtualChanged) {
+    if (!nameChanged && !typeChanged && !initAmtChanged && !subTypeChanged && !stockMarketChanged && !virtualChanged) {
       if (toastRich) {
         toastRich({
           title: "\u6C92\u6709\u4EFB\u4F55\u8B8A\u66F4",
@@ -18200,7 +18202,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     gap: 24,
-    margin: "8px 0 4px"
+    margin: "4px 0 0"
   },
   monthNav: {
     width: 30,
@@ -18452,7 +18454,7 @@ const styles = {
     background: "var(--bg-card)",
     borderRadius: 22,
     padding: 4,
-    marginBottom: 14
+    marginBottom: 8
   },
   scopeBtn: {
     flex: 1,
@@ -18585,8 +18587,8 @@ const styles = {
     background: "var(--bg)",
     position: "relative",
     zIndex: 2,
-    // 上方漸層淡出,避免硬邊界
-    boxShadow: "0 -18px 18px -6px var(--bg)"
+    // 用 1px 細分隔線取代漸層 shadow(漸層在 light theme 會造成霧感)
+    borderTop: "1px solid var(--border-soft)"
   },
   // 資料統計專用(僅供查看,字體/高度縮小)
   statItem: {
