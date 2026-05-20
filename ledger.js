@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520CG";
+const APP_VERSION = "1150520CH";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -1297,16 +1297,7 @@ function App() {
     _autoBkRunningRef.current = true;
     try {
       const token = await GDrive.ensureToken();
-      const payload = JSON.stringify({
-        transactions: state.transactions,
-        accounts: state.accounts,
-        categories: state.categories,
-        accountTypes: state.accountTypes,
-        holdings: state.holdings,
-        trades: state.trades,
-        exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
-        exportVersion: 3
-      }, null, 2);
+      const payload = buildExportPayload();
       await GDrive.uploadBackup(token, payload);
       await GDrive.pruneOldBackups(token);
       const ts = Date.now();
@@ -9077,7 +9068,7 @@ function SettingsPage({
       }
     });
   };
-  const buildExportPayload = () => JSON.stringify({
+  const buildExportPayload2 = () => JSON.stringify({
     transactions: state.transactions,
     accounts: state.accounts,
     categories: state.categories,
@@ -9220,7 +9211,7 @@ function SettingsPage({
     if (!silent) toast("\u958B\u59CB\u5099\u4EFD\u22EF");
     try {
       const token = await GDrive.ensureToken();
-      const payload = buildExportPayload();
+      const payload = buildExportPayload2();
       await GDrive.uploadBackup(token, payload);
       await GDrive.pruneOldBackups(token);
       const now = Date.now();
@@ -9558,7 +9549,7 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
     return () => clearTimeout(timer);
   }, [driveLinked, driveAuto, driveLastSync, driveRemindMode]);
   const doExport = () => {
-    const data = buildExportPayload();
+    const data = buildExportPayload2();
     try {
       const blob = new Blob([data], { type: "application/json" });
       const url = URL.createObjectURL(blob);
@@ -9598,7 +9589,7 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
   };
   const [exportTextDialog, setExportTextDialog] = useState(null);
   const doCopyJSON = () => {
-    const data = buildExportPayload();
+    const data = buildExportPayload2();
     setExportTextDialog(data);
   };
   const fileInputRef = React.useRef(null);
