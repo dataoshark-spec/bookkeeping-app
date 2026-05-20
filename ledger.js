@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515BS";
+const APP_VERSION = "1150515BT";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -11277,8 +11277,19 @@ function FilterDeleteSheet({ state, setState, onClose, setConfirmDialog, toast, 
   const matchCount = allRelatedIds.size;
   const totalCount = state.transactions.length;
   React.useEffect(() => {
-    setSelectedIds(new Set(allRelatedIds));
+    if (locked) {
+      setSelectedIds(new Set(allRelatedIds));
+    } else {
+      setSelectedIds(/* @__PURE__ */ new Set());
+    }
   }, [allRelatedIds]);
+  React.useEffect(() => {
+    if (locked) {
+      setSelectedIds(new Set(allRelatedIds));
+    } else {
+      setSelectedIds(/* @__PURE__ */ new Set());
+    }
+  }, [locked]);
   const selectedCount = selectedIds.size;
   const allCategories = React.useMemo(() => {
     const map = /* @__PURE__ */ new Map();
@@ -11450,12 +11461,25 @@ function FilterDeleteSheet({ state, setState, onClose, setConfirmDialog, toast, 
           };
         });
         if (toastRich) {
+          const deltaLines = [];
+          if (preserveBalance && balanceDelta.size > 0) {
+            for (const [acctId, d] of balanceDelta) {
+              const acct = state.accounts.find((a) => a.id === acctId);
+              const name = acct?.name || "?";
+              const sign = d > 0 ? "+" : "";
+              deltaLines.push(`${name} \u8D77\u59CB ${sign}${d.toLocaleString()}`);
+            }
+          }
           toastRich({
             title: "\u5DF2\u522A\u9664\u7D00\u9304",
             amount: `${selectedCount} \u7B46`,
             amountColor: "var(--pink-text)",
-            lines: [conditionDesc, preserveBalance ? "\u5E33\u6236\u9918\u984D\u5DF2\u4FDD\u7559" : ""].filter(Boolean)
-          }, 1800);
+            lines: [
+              conditionDesc,
+              preserveBalance ? "\u5E33\u6236\u9918\u984D\u5DF2\u4FDD\u7559" : "",
+              ...deltaLines
+            ].filter(Boolean)
+          }, 2800);
         } else {
           toast(`\u5DF2\u522A\u9664 ${selectedCount} \u7B46`);
         }
@@ -11645,37 +11669,6 @@ function FilterDeleteSheet({ state, setState, onClose, setConfirmDialog, toast, 
     color: "var(--text-dim)",
     lineHeight: 1.6
   } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink)", fontWeight: 600 } }, "\u26A0 \u6B64\u529F\u80FD\u6703\u6C38\u4E45\u522A\u9664\u7B26\u5408\u689D\u4EF6\u7684\u7D00\u9304"), /* @__PURE__ */ React.createElement("br", null), "\u57F7\u884C\u524D\u5EFA\u8B70\u5148\u300C\u5132\u5B58\u5FEB\u7167\u300D\u505A\u5099\u4EFD"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "var(--text-dim)", marginBottom: 8 } }, "\u7BE9\u9078\u985E\u578B"), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: pickerBtnStyle, onClick: () => setShowFilterTypePicker(true) }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text)" } }, filterTypeOptions.find((o) => o.key === filterType)?.label || "\u8ACB\u9078\u64C7"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 18 } }, "\u203A"))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "var(--text-dim)", marginBottom: 8 } }, "\u689D\u4EF6"), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 20 } }, renderConditionUI()), /* @__PURE__ */ React.createElement("div", { style: {
-    background: "var(--bg-card)",
-    borderRadius: 10,
-    padding: "14px 14px",
-    marginBottom: 16
-  } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-dim)", marginBottom: 6 } }, "\u9810\u89BD"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "var(--text)" } }, "\u7B26\u5408\u689D\u4EF6"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: {
-    fontSize: 22,
-    fontWeight: 700,
-    color: matchCount > 0 ? "var(--pink)" : "var(--text-faint)"
-  } }, matchCount), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", fontSize: 13, marginLeft: 4 } }, "/ ", totalCount, " \u7B46"))), !locked && matchCount > 0 && selectedCount !== matchCount && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--text-dim)" } }, "\u5DF2\u52FE\u9078"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: "var(--pink-text)" } }, selectedCount, " ", /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "var(--text-faint)", fontWeight: 400 } }, "\u7B46"))), matchCount === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginTop: 6 } }, "\u9078\u64C7\u689D\u4EF6\u5F8C\u6703\u5373\u6642\u66F4\u65B0\u9810\u89BD"), matchCount > 0 && /* @__PURE__ */ React.createElement(
-    FilterDeleteTxnList,
-    {
-      matching,
-      state,
-      selectedIds,
-      setSelectedIds,
-      locked,
-      allRelatedIds
-    }
-  )), /* @__PURE__ */ React.createElement("div", { style: {
-    padding: "12px 14px",
-    background: "var(--bg-card)",
-    borderRadius: 10,
-    marginBottom: 10
-  } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: "var(--text)" } }, "\u4FDD\u7559\u76EE\u524D\u9918\u984D"), /* @__PURE__ */ React.createElement(
-    "div",
-    {
-      style: { ...styles.toggleTrack, background: preserveBalance ? "var(--mint)" : "var(--bg)" },
-      onClick: () => setPreserveBalance((v) => !v)
-    },
-    /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: preserveBalance ? "translateX(18px)" : "translateX(0)" } })
-  )), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", lineHeight: 1.6 } }, preserveBalance ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)" } }, "\u26A0"), " ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--highlight)" } }, "\u5E33\u6236\u9918\u984D\u7DAD\u6301\u4E0D\u8B8A"), " (\u6DE8\u984D\u5BEB\u5165\u5E33\u6236\u8D77\u59CB\u9918\u984D)") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)" } }, "\u26A0"), " \u76F4\u63A5\u522A\u9664(", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--highlight)" } }, "\u5E33\u6236\u9918\u984D"), " \u6703\u4F9D\u5269\u4E0B\u7684 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--highlight)" } }, "\u7D00\u9304\u91CD\u65B0\u8A08\u7B97"), ")"))), /* @__PURE__ */ React.createElement("div", { style: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
@@ -11717,7 +11710,38 @@ function FilterDeleteSheet({ state, setState, onClose, setConfirmDialog, toast, 
       transition: "transform 0.2s",
       boxShadow: "0 1px 3px rgba(0,0,0,0.2)"
     } })
-  )), /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement("div", { style: {
+    background: "var(--bg-card)",
+    borderRadius: 10,
+    padding: "14px 14px",
+    marginBottom: 16
+  } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-dim)", marginBottom: 6 } }, "\u9810\u89BD"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "var(--text)" } }, "\u7B26\u5408\u689D\u4EF6"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: {
+    fontSize: 22,
+    fontWeight: 700,
+    color: matchCount > 0 ? "var(--pink)" : "var(--text-faint)"
+  } }, matchCount), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", fontSize: 13, marginLeft: 4 } }, "/ ", totalCount, " \u7B46"))), !locked && matchCount > 0 && selectedCount !== matchCount && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--text-dim)" } }, "\u5DF2\u52FE\u9078"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: "var(--pink-text)" } }, selectedCount, " ", /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "var(--text-faint)", fontWeight: 400 } }, "\u7B46"))), matchCount === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginTop: 6 } }, "\u9078\u64C7\u689D\u4EF6\u5F8C\u6703\u5373\u6642\u66F4\u65B0\u9810\u89BD"), matchCount > 0 && /* @__PURE__ */ React.createElement(
+    FilterDeleteTxnList,
+    {
+      matching,
+      state,
+      selectedIds,
+      setSelectedIds,
+      locked,
+      allRelatedIds
+    }
+  )), /* @__PURE__ */ React.createElement("div", { style: {
+    padding: "12px 14px",
+    background: "var(--bg-card)",
+    borderRadius: 10,
+    marginBottom: 10
+  } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: "var(--text)" } }, "\u4FDD\u7559\u76EE\u524D\u9918\u984D"), /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: { ...styles.toggleTrack, background: preserveBalance ? "var(--mint)" : "var(--bg)" },
+      onClick: () => setPreserveBalance((v) => !v)
+    },
+    /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: preserveBalance ? "translateX(18px)" : "translateX(0)" } })
+  )), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", lineHeight: 1.6 } }, preserveBalance ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)" } }, "\u26A0"), " ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--highlight)" } }, "\u5E33\u6236\u9918\u984D\u7DAD\u6301\u4E0D\u8B8A"), " (\u6DE8\u984D\u5BEB\u5165\u5E33\u6236\u8D77\u59CB\u9918\u984D)") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)" } }, "\u26A0"), " \u76F4\u63A5\u522A\u9664(", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--highlight)" } }, "\u5E33\u6236\u9918\u984D"), " \u6703\u4F9D\u5269\u4E0B\u7684 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--highlight)" } }, "\u7D00\u9304\u91CD\u65B0\u8A08\u7B97"), ")"))), /* @__PURE__ */ React.createElement(
     "button",
     {
       onClick: handleConfirm,
