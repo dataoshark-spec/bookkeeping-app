@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515BN";
+const APP_VERSION = "1150515BR";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -541,16 +541,6 @@ const todayStr = () => {
   const d = /* @__PURE__ */ new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
-const formatCreatedAt = (ts) => {
-  if (!ts) return "\u5EFA\u7ACB\u6642\u9593\u672A\u77E5";
-  const d = new Date(ts);
-  const Y = d.getFullYear();
-  const M = String(d.getMonth() + 1).padStart(2, "0");
-  const D = String(d.getDate()).padStart(2, "0");
-  const h = String(d.getHours()).padStart(2, "0");
-  const m = String(d.getMinutes()).padStart(2, "0");
-  return `${Y}/${M}/${D} ${h}:${m} \u5EFA\u7ACB`;
-};
 let __globalToast = null;
 let __globalToastRich = null;
 const setGlobalToast = (fn) => {
@@ -558,9 +548,6 @@ const setGlobalToast = (fn) => {
 };
 const setGlobalToastRich = (fn) => {
   __globalToastRich = fn;
-};
-const callGlobalToast = (msg) => {
-  if (__globalToast) __globalToast(msg);
 };
 const callGlobalToastRich = (data, ms) => {
   if (__globalToastRich) __globalToastRich(data, ms);
@@ -602,11 +589,6 @@ const avgCostMatch = (holdingId, sellShares, trades, holdings) => {
   const avg = holdingAvgCost(holding, trades);
   return { matchedCost: sellShares * avg };
 };
-const holdingPnl = (holding, trades) => {
-  const cost = holdingCost(holding, trades);
-  const market = holding.marketValue || 0;
-  return market - cost;
-};
 const investAccountSummary = (account, holdings, trades) => {
   const accountHoldings = holdings.filter((h) => h.accountId === account.id);
   if (accountHoldings.length === 0) return null;
@@ -618,10 +600,6 @@ const investAccountSummary = (account, holdings, trades) => {
     totalCost += holdingCost(h, trades);
   }
   return { totalMarket, totalCost, totalPnl: totalMarket - totalCost };
-};
-const acctDisplayName = (account) => {
-  if (!account) return "";
-  return account.name;
 };
 const acctDisplayNameStr = (account) => {
   if (!account) return "";
@@ -1881,7 +1859,7 @@ function App() {
     if (isEditing) {
       if (isUnchanged) {
         toastRich({
-          title: "\u672A\u8B8A\u66F4",
+          title: "\u6C92\u6709\u4EFB\u4F55\u8B8A\u66F4",
           amount: null,
           lines: []
         }, 700);
@@ -2714,6 +2692,7 @@ function App() {
             "\u5FEB\u7167\u5099\u4EFD\u8207\u4ECB\u9762\u6392\u5E8F\u5DF2\u4FDD\u7559"
           ]
         }, 2800);
+        setDangerLocked(true);
       }
     });
   };
@@ -2747,7 +2726,7 @@ function App() {
     const d = /* @__PURE__ */ new Date(`${cutoffDate}T00:00:00`);
     const dateStr = `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
     toastRich({
-      title: "\u2713 \u5DF2\u6E05\u7406\u6B77\u53F2\u7D00\u9304",
+      title: "\u5DF2\u6E05\u7406\u6B77\u53F2\u7D00\u9304",
       amount: `${oldTxns.length} \u7B46`,
       amountColor: "var(--mint-text)",
       lines: [
@@ -5184,7 +5163,7 @@ function EditHoldingFieldDialog({ holding, field, relTxnCount, toast, onClose, o
     if (isSymbolMode) {
       const newSym = raw.toUpperCase();
       if (!newSym) {
-        toast && toast("\u4EE3\u865F\u4E0D\u80FD\u7A7A\u767D");
+        toast && toast("\u8ACB\u8F38\u5165\u4EE3\u865F");
         return;
       }
       if (newSym === holding.symbol) {
@@ -5330,7 +5309,7 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
         changed: sharesChanged
       },
       {
-        icon: "wallet",
+        icon: "coin",
         label: "\u7E3D\u6210\u672C",
         from: (trade.totalCost || 0).toLocaleString(),
         to: newCost.toLocaleString(),
@@ -8601,7 +8580,7 @@ function SettingsPage({
   const [showFilterDeleteSheet, setShowFilterDeleteSheet] = useState(false);
   const [showReminderSetup, setShowReminderSetup] = useState(false);
   const [showDriveRemindSetup, setShowDriveRemindSetup] = useState(false);
-  const [dangerLocked, setDangerLocked] = useState(true);
+  const [dangerLocked, setDangerLocked2] = useState(true);
   const [showFontPreview, setShowFontPreview] = useState(false);
   const [showFontPicker, setShowFontPicker] = useState(false);
   const [driveInput, setDriveInput] = useState(driveFolderUrl);
@@ -8647,7 +8626,17 @@ function SettingsPage({
     try {
       localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(list));
     } catch (e) {
-      toast("\u5132\u5B58\u5931\u6557\uFF08\u7A7A\u9593\u4E0D\u8DB3\uFF1F\uFF09");
+      if (toastRich) {
+        toastRich({
+          title: "\u5132\u5B58\u5931\u6557",
+          amount: "\u2713",
+          amountColor: "var(--pink-text)",
+          icon: "warn",
+          lines: ["\u53EF\u80FD\u662F \u5132\u5B58\u7A7A\u9593\u5DF2\u6EFF ", "\u8ACB\u522A\u9664\u90E8\u5206\u820A\u5FEB\u7167\u6216\u5099\u4EFD\u6A94"]
+        }, 2400);
+      } else {
+        toast("\u5132\u5B58\u5931\u6557(\u7A7A\u9593\u4E0D\u8DB3?)");
+      }
     }
   };
   const createSnapshot = (customName) => {
@@ -8715,11 +8704,31 @@ function SettingsPage({
       } else if (snap.data) {
         snapData = snap.data;
       } else {
-        toast("\u5FEB\u7167\u8CC7\u6599\u7F3A\u5931,\u7121\u6CD5\u9084\u539F");
+        if (toastRich) {
+          toastRich({
+            title: "\u7121\u6CD5\u9084\u539F\u5FEB\u7167",
+            amount: "\u2713",
+            amountColor: "var(--pink-text)",
+            icon: "warn",
+            lines: ["\u5FEB\u7167 \u8CC7\u6599\u7F3A\u5931 ", "\u8ACB\u9078\u64C7\u5176\u4ED6\u5FEB\u7167\u6216\u5F9E\u96F2\u7AEF\u9084\u539F"]
+          }, 2400);
+        } else {
+          toast("\u5FEB\u7167\u8CC7\u6599\u7F3A\u5931,\u7121\u6CD5\u9084\u539F");
+        }
         return;
       }
     } catch (e) {
-      toast("\u5FEB\u7167\u8CC7\u6599\u640D\u6BC0,\u7121\u6CD5\u9084\u539F");
+      if (toastRich) {
+        toastRich({
+          title: "\u7121\u6CD5\u9084\u539F\u5FEB\u7167",
+          amount: "\u2713",
+          amountColor: "var(--pink-text)",
+          icon: "warn",
+          lines: ["\u5FEB\u7167 \u8CC7\u6599\u640D\u6BC0 ", "\u8ACB\u9078\u64C7\u5176\u4ED6\u5FEB\u7167\u6216\u5F9E\u96F2\u7AEF\u9084\u539F"]
+        }, 2400);
+      } else {
+        toast("\u5FEB\u7167\u8CC7\u6599\u640D\u6BC0,\u7121\u6CD5\u9084\u539F");
+      }
       return;
     }
     const snapTxn = Array.isArray(snapData.transactions) ? snapData.transactions : [];
@@ -8777,7 +8786,17 @@ function SettingsPage({
         try {
           localStorage.setItem("ledger_v16", JSON.stringify(newState));
         } catch (e) {
-          toast("\u5BEB\u5165\u5931\u6557,\u5132\u5B58\u7A7A\u9593\u53EF\u80FD\u5DF2\u6EFF");
+          if (toastRich) {
+            toastRich({
+              title: "\u9084\u539F\u5931\u6557",
+              amount: "\u2713",
+              amountColor: "var(--pink-text)",
+              icon: "warn",
+              lines: ["\u53EF\u80FD\u662F \u5132\u5B58\u7A7A\u9593\u5DF2\u6EFF ", "\u8ACB\u522A\u9664\u90E8\u5206\u820A\u5FEB\u7167\u6216\u5099\u4EFD\u6A94"]
+            }, 2400);
+          } else {
+            toast("\u5BEB\u5165\u5931\u6557,\u5132\u5B58\u7A7A\u9593\u53EF\u80FD\u5DF2\u6EFF");
+          }
           return;
         }
         try {
@@ -8803,7 +8822,7 @@ function SettingsPage({
   const saveRenameSnapshot = () => {
     const newName = renameInput.trim();
     if (!newName) {
-      toast("\u540D\u7A31\u4E0D\u80FD\u70BA\u7A7A");
+      toast("\u8ACB\u8F38\u5165\u540D\u7A31");
       return;
     }
     const target = snapshots.find((s) => s.id === renamingSnapId);
@@ -8851,6 +8870,7 @@ function SettingsPage({
         } else {
           toast("\u5DF2\u522A\u9664\u5FEB\u7167");
         }
+        setSnapshotsLocked(true);
       }
     });
   };
@@ -8861,63 +8881,6 @@ function SettingsPage({
       localStorage.setItem("ledger_last_backup", String(now));
     } catch {
     }
-  };
-  const syncDefaultCategories = () => {
-    let addCats = 0;
-    let addSubs = 0;
-    ["expense", "income"].forEach((type) => {
-      const defs = DEFAULT_CATEGORIES[type] || [];
-      const cur = state.categories[type] || [];
-      defs.forEach((defCat) => {
-        const curCat = cur.find((c) => c.label === defCat.label);
-        if (!curCat) {
-          addCats++;
-          addSubs += (defCat.subs || []).length;
-        } else {
-          (defCat.subs || []).forEach((s) => {
-            if (!(curCat.subs || []).includes(s)) addSubs++;
-          });
-        }
-      });
-    });
-    if (addCats === 0 && addSubs === 0) {
-      toast("\u5206\u985E\u5DF2\u662F\u6700\u65B0\uFF0C\u6C92\u6709\u9700\u8981\u88DC\u7684\u9805\u76EE");
-      return;
-    }
-    setConfirmDialog({
-      title: "\u540C\u6B65\u9810\u8A2D\u5206\u985E",
-      message: `\u6703\u88DC\u4E0A\u7F3A\u5C11\u7684 ${addCats} \u500B\u5927\u5206\u985E\u3001${addSubs} \u500B\u5B50\u5206\u985E
-
-\u5DF2\u6709\u7684\u5206\u985E\uFF0F\u5B50\u5206\u985E\u4E0D\u6703\u88AB\u522A\u9664\u6216\u8B8A\u52D5\uFF0C\u53EA\u662F\u628A\u9810\u8A2D\u88E1\u6709\u3001\u4F60\u9019\u908A\u6C92\u6709\u7684\u88DC\u9032\u4F86
-
-\u78BA\u5B9A\u540C\u6B65\u55CE\uFF1F`,
-      confirmText: "\u540C\u6B65",
-      danger: false,
-      onConfirm: () => {
-        setState((s) => {
-          const nextCats = { expense: [], income: [] };
-          ["expense", "income"].forEach((type) => {
-            const defs = DEFAULT_CATEGORIES[type] || [];
-            const cur = s.categories[type] || [];
-            const merged = cur.map((curCat) => {
-              const defCat = defs.find((d) => d.label === curCat.label);
-              if (!defCat) return curCat;
-              const existSubs = curCat.subs || [];
-              const missingSubs = (defCat.subs || []).filter((s2) => !existSubs.includes(s2));
-              return missingSubs.length ? { ...curCat, subs: [...existSubs, ...missingSubs] } : curCat;
-            });
-            defs.forEach((defCat) => {
-              if (!merged.find((c) => c.label === defCat.label)) {
-                merged.push(JSON.parse(JSON.stringify(defCat)));
-              }
-            });
-            nextCats[type] = merged;
-          });
-          return { ...s, categories: nextCats };
-        });
-        toast(`\u5DF2\u88DC\u4E0A ${addCats} \u500B\u5927\u5206\u985E\u3001${addSubs} \u500B\u5B50\u5206\u985E`);
-      }
-    });
   };
   const EXPORTABLE_PREF_KEYS = [
     "ledger_theme_v1",
@@ -9036,7 +8999,12 @@ function SettingsPage({
       }
       setDriveLinked(true);
       setDriveEmail(email);
-      toastRich({ title: "\u5DF2\u9023\u7D50 Google Drive", amount: "\u2713", amountColor: "var(--mint)", lines: [email] }, 1600);
+      toastRich({
+        title: "\u5DF2\u9023\u7D50\u96F2\u7AEF",
+        amount: "\u2713",
+        amountColor: "var(--mint-text)",
+        lines: ["Google Drive", email]
+      }, 1800);
     } catch (e) {
       const msg = e && e.message || "\u672A\u77E5\u932F\u8AA4";
       const cancelled = /CANCELLED|popup_closed|popup_failed_to_open|access_denied|user_cancel/i.test(msg);
@@ -9047,7 +9015,7 @@ function SettingsPage({
   };
   const driveSignOut = () => {
     setConfirmDialog({
-      title: "\u89E3\u9664 Google Drive \u9023\u7D50",
+      title: "\u89E3\u9664\u96F2\u7AEF\u9023\u7D50",
       messageList: {
         styled: true,
         before: "\u89E3\u9664\u5F8C\u6703\u767C\u751F\u9019\u4E9B\u4E8B\uFF1A",
@@ -9210,7 +9178,17 @@ function SettingsPage({
       URL.revokeObjectURL(url);
       toast("\u5DF2\u532F\u51FA\u5230\u300C\u4E0B\u8F09\u300D\u8CC7\u6599\u593E");
     } catch (e) {
-      toast("\u532F\u51FA\u5931\u6557:" + (e && e.message || "\u672A\u77E5\u932F\u8AA4"));
+      if (toastRich) {
+        toastRich({
+          title: "\u532F\u51FA\u5931\u6557",
+          amount: "\u2713",
+          amountColor: "var(--pink-text)",
+          icon: "warn",
+          lines: [cloudErrText(e && e.message || "\u672A\u77E5\u932F\u8AA4")]
+        }, 2400);
+      } else {
+        toast("\u532F\u51FA\u5931\u6557:" + (e && e.message || "\u672A\u77E5\u932F\u8AA4"));
+      }
     } finally {
       setDriveSyncing(false);
     }
@@ -9225,7 +9203,17 @@ function SettingsPage({
       );
       toast(note ? "\u5DF2\u5132\u5B58\u5099\u8A3B" : "\u5DF2\u6E05\u9664\u5099\u8A3B");
     } catch (e) {
-      toast("\u5132\u5B58\u5099\u8A3B\u5931\u6557:" + (e && e.message || "\u672A\u77E5\u932F\u8AA4"));
+      if (toastRich) {
+        toastRich({
+          title: "\u5132\u5B58\u5099\u8A3B\u5931\u6557",
+          amount: "\u2713",
+          amountColor: "var(--pink-text)",
+          icon: "warn",
+          lines: [cloudErrText(e && e.message || "\u672A\u77E5\u932F\u8AA4")]
+        }, 2400);
+      } else {
+        toast("\u5132\u5B58\u5099\u8A3B\u5931\u6557:" + (e && e.message || "\u672A\u77E5\u932F\u8AA4"));
+      }
     } finally {
       setDriveSyncing(false);
     }
@@ -9326,45 +9314,34 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       updateLastBackup();
-      toast("\u5DF2\u9001\u51FA\u4E0B\u8F09,\u8ACB\u81F3\u300C\u4E0B\u8F09\u300D\u8CC7\u6599\u593E\u78BA\u8A8D");
+      if (toastRich) {
+        toastRich({
+          title: "\u5DF2\u9001\u51FA\u4E0B\u8F09",
+          amount: "\u2713",
+          amountColor: "var(--mint-text)",
+          lines: ["\u8ACB\u81F3 \u4E0B\u8F09 \u8CC7\u6599\u593E\u78BA\u8A8D", `\u6A94\u540D:\u8A18\u5E33\u5099\u4EFD_${stamp}.json`]
+        }, 2400);
+      } else {
+        toast("\u5DF2\u9001\u51FA\u4E0B\u8F09,\u8ACB\u81F3\u300C\u4E0B\u8F09\u300D\u8CC7\u6599\u593E\u78BA\u8A8D");
+      }
     } catch {
-      toast("\u532F\u51FA\u5931\u6557");
+      if (toastRich) {
+        toastRich({
+          title: "\u532F\u51FA\u5931\u6557",
+          amount: "\u2713",
+          amountColor: "var(--pink-text)",
+          icon: "warn",
+          lines: ["\u53EF\u80FD\u662F\u700F\u89BD\u5668\u9650\u5236", "\u8ACB\u6539\u7528\u300C\u8907\u88FD JSON \u4EE3\u78BC\u300D"]
+        }, 2400);
+      } else {
+        toast("\u532F\u51FA\u5931\u6557");
+      }
     }
   };
   const [exportTextDialog, setExportTextDialog] = useState(null);
   const doCopyJSON = () => {
     const data = buildExportPayload();
     setExportTextDialog(data);
-  };
-  const doExportCSV = () => {
-    const rows = [["\u65E5\u671F", "\u985E\u578B", "\u5927\u5206\u985E", "\u5B50\u5206\u985E", "\u91D1\u984D", "\u5E33\u6236", "\u5099\u8A3B"]];
-    state.transactions.forEach((t) => {
-      const acct = state.accounts.find((a) => a.id === t.accountId)?.name || "";
-      rows.push([
-        t.date,
-        t.type === "income" ? "\u6536\u5165" : "\u652F\u51FA",
-        t.category || "",
-        t.subCategory || "",
-        t.amount,
-        acct,
-        t.note || ""
-      ]);
-    });
-    const csv = "\uFEFF" + rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-    try {
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `\u8A18\u5E33_${todayStr()}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast("\u5DF2\u532F\u51FA CSV\uFF0C\u8ACB\u81F3\u300C\u4E0B\u8F09\u300D\u8CC7\u6599\u593E\u67E5\u770B");
-    } catch {
-      toast("\u532F\u51FA\u5931\u6557");
-    }
   };
   const fileInputRef = React.useRef(null);
   const doImport = () => {
@@ -9374,7 +9351,17 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
     try {
       const data = JSON.parse(text);
       if (!data.transactions || !Array.isArray(data.transactions)) {
-        toast("\u6A94\u6848\u683C\u5F0F\u932F\u8AA4");
+        if (toastRich) {
+          toastRich({
+            title: "\u6A94\u6848\u683C\u5F0F\u932F\u8AA4",
+            amount: "\u2713",
+            amountColor: "var(--pink-text)",
+            icon: "warn",
+            lines: ["\u9019\u4EFD\u6A94\u6848 \u4E0D\u662F\u6709\u6548\u7684\u5099\u4EFD ", "\u8ACB\u78BA\u8A8D\u6A94\u6848\u4F86\u6E90\u6216\u6311\u9078\u5176\u4ED6\u6A94\u6848"]
+          }, 2400);
+        } else {
+          toast("\u6A94\u6848\u683C\u5F0F\u932F\u8AA4");
+        }
         return false;
       }
       const hasPrefs = data.preferences && typeof data.preferences === "object" && Object.keys(data.preferences).length > 0;
@@ -9403,7 +9390,17 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
           try {
             localStorage.setItem("ledger_v16", JSON.stringify(newState));
           } catch (e) {
-            toast("\u5BEB\u5165\u5931\u6557,\u5132\u5B58\u7A7A\u9593\u53EF\u80FD\u5DF2\u6EFF");
+            if (toastRich) {
+              toastRich({
+                title: "\u532F\u5165\u5931\u6557",
+                amount: "\u2713",
+                amountColor: "var(--pink-text)",
+                icon: "warn",
+                lines: ["\u53EF\u80FD\u662F \u5132\u5B58\u7A7A\u9593\u5DF2\u6EFF ", "\u8ACB\u522A\u9664\u90E8\u5206\u820A\u5FEB\u7167\u6216\u5099\u4EFD\u6A94"]
+              }, 2400);
+            } else {
+              toast("\u5BEB\u5165\u5931\u6557,\u5132\u5B58\u7A7A\u9593\u53EF\u80FD\u5DF2\u6EFF");
+            }
             return;
           }
           if (hasPrefs) {
@@ -9414,7 +9411,17 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
       });
       return true;
     } catch {
-      toast("\u6A94\u6848\u8B80\u53D6\u5931\u6557");
+      if (toastRich) {
+        toastRich({
+          title: "\u6A94\u6848\u8B80\u53D6\u5931\u6557",
+          amount: "\u2713",
+          amountColor: "var(--pink-text)",
+          icon: "warn",
+          lines: ["\u7121\u6CD5\u89E3\u6790\u9019\u4EFD\u6A94\u6848", "\u8ACB\u78BA\u8A8D\u6A94\u6848\u4F86\u6E90\u6216\u6311\u9078\u5176\u4ED6\u6A94\u6848"]
+        }, 2400);
+      } else {
+        toast("\u6A94\u6848\u8B80\u53D6\u5931\u6557");
+      }
       return false;
     }
   };
@@ -9430,17 +9437,6 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
   };
   const [showPasteImport, setShowPasteImport] = useState(false);
   const [pasteImportText, setPasteImportText] = useState("");
-  const openDriveFolder = () => {
-    if (!driveFolderUrl) {
-      setShowDriveSetup(true);
-      return;
-    }
-    try {
-      window.open(driveFolderUrl, "_blank");
-    } catch {
-      toast("\u7121\u6CD5\u958B\u555F\uFF0C\u8ACB\u78BA\u8A8D\u7DB2\u5740");
-    }
-  };
   const saveDriveUrl = () => {
     const url = driveInput.trim();
     if (url && !/^https?:\/\//.test(url)) {
@@ -9948,7 +9944,7 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
               style: { ...styles.toggleTrack, background: dangerLocked ? "var(--bg-card)" : "var(--pink)" },
               onClick: (e) => {
                 e.stopPropagation();
-                if (!editMode) setDangerLocked((v) => !v);
+                if (!editMode) setDangerLocked2((v) => !v);
               }
             },
             /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: dangerLocked ? "translateX(0)" : "translateX(18px)" } })
@@ -10275,7 +10271,16 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
       onClick: async () => {
         try {
           await navigator.clipboard.writeText(exportTextDialog);
-          toast("\u5DF2\u8907\u88FD\u5230\u526A\u8CBC\u7C3F");
+          if (toastRich) {
+            toastRich({
+              title: "\u5DF2\u8907\u88FD\u5230\u526A\u8CBC\u7C3F",
+              amount: "\u2713",
+              amountColor: "var(--mint-text)",
+              lines: [`\u5171 ${exportTextDialog.length.toLocaleString()} \u5B57\u5143`, "\u53EF\u8CBC\u5230\u8A18\u4E8B\u672C\u6216 LINE Keep"]
+            }, 2200);
+          } else {
+            toast("\u5DF2\u8907\u88FD\u5230\u526A\u8CBC\u7C3F");
+          }
         } catch {
           toast("\u8ACB\u624B\u52D5\u9577\u6309\u6587\u5B57\u8907\u88FD");
         }
@@ -10307,7 +10312,17 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
       onClick: async () => {
         try {
           if (!navigator.clipboard || !navigator.clipboard.readText) {
-            toast("\u6B64\u700F\u89BD\u5668\u4E0D\u652F\u63F4,\u8ACB\u6539\u7528\u4E0B\u65B9\u8CBC\u4E0A");
+            if (toastRich) {
+              toastRich({
+                title: "\u6B64\u700F\u89BD\u5668\u4E0D\u652F\u63F4",
+                amount: "\u2713",
+                amountColor: "var(--text-faint)",
+                icon: "info",
+                lines: ["\u7121\u6CD5\u76F4\u63A5\u8B80\u53D6\u526A\u8CBC\u7C3F", "\u8ACB\u6539\u7528 \u4E0B\u65B9\u8CBC\u4E0A \u5340\u624B\u52D5\u8CBC\u5165"]
+              }, 2400);
+            } else {
+              toast("\u6B64\u700F\u89BD\u5668\u4E0D\u652F\u63F4,\u8ACB\u6539\u7528\u4E0B\u65B9\u8CBC\u4E0A");
+            }
             return;
           }
           const text = await navigator.clipboard.readText();
@@ -10922,7 +10937,7 @@ function FilterDeleteSheet({ state, setState, onClose, setConfirmDialog, toast, 
     { key: "account", label: "\u5E33\u6236", icon: "bank", color: "#a8c8f5" },
     { key: "category", label: "\u5927\u5206\u985E", icon: "folder", color: "#f5c29c" },
     { key: "subcat", label: "\u5B50\u5206\u985E", icon: "clipboard", color: "#a8e8c8" },
-    { key: "keyword", label: "\u5099\u8A3B\u95DC\u9375\u5B57", icon: "edit", color: "#f5a8c8" },
+    { key: "keyword", label: "\u5099\u8A3B\u95DC\u9375\u5B57", icon: "pencil", color: "#f5a8c8" },
     { key: "amount", label: "\u91D1\u984D\u7BC4\u570D", icon: "coin", color: "#f5d29c" },
     { key: "recordType", label: "\u7D00\u9304\u985E\u578B", icon: "chart", color: "#c8a8f5" },
     { key: "date", label: "\u65E5\u671F\u5340\u9593", icon: "calendar", color: "#a8e8e8" },
@@ -12025,13 +12040,6 @@ function DatePicker({ value, onChange, onClose }) {
     } catch {
     }
   };
-  const updateSelectedColor = (c) => {
-    setSelectedColor(c);
-    try {
-      localStorage.setItem("ledger_dp_selected", c);
-    } catch {
-    }
-  };
   const [y, m] = viewYM.split("-").map(Number);
   const firstDay = new Date(y, m - 1, 1);
   const daysInMonth = new Date(y, m, 0).getDate();
@@ -12216,7 +12224,7 @@ function NotePrefSheet({ pref, onClose, setConfirmDialog, toastRich }) {
             title: "\u5DF2\u91CD\u8A2D\u5099\u8A3B\u6A23\u5F0F",
             amount: "\u2713",
             amountColor: "var(--mint-text)",
-            lines: ["\u6587\u5B57\u8272 / \u80CC\u666F\u8272 / \u5957\u7528\u7BC4\u570D \u5DF2\u9084\u539F\u9810\u8A2D"]
+            lines: ["\u6587\u5B57\u8272 / \u80CC\u666F\u8272 / \u5957\u7528\u7BC4\u570D", "\u7686\u5DF2\u9084\u539F\u70BA\u9810\u8A2D"]
           });
         }
       }
@@ -13041,7 +13049,6 @@ function AddTxnSheet({ state, type, setType, editing, defaultDate, onSave, onDel
     return getDefaultFeeSubByType(type);
   });
   const [showFeeCatPicker, setShowFeeCatPicker] = useState(false);
-  const [showFeeSection, setShowFeeSection] = useState(false);
   const [feeCatStep, setFeeCatStep] = useState(1);
   const [feeCatStepCat, setFeeCatStepCat] = useState(null);
   const userTouchedFeeRef = React.useRef(false);
@@ -16951,7 +16958,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
     }
   };
   const performFullDelete = (info) => {
-    const { id, allRelatedTxnIds } = info;
+    const { id, allRelatedTxnIds, acctName, directCount, holdingsCount, tradesCount } = info;
     setDeleteModeChoice(null);
     setFadingAccountIds((prev) => {
       const next = new Set(prev);
@@ -16970,7 +16977,22 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
         };
       });
       cancel();
-      toast("\u5DF2\u522A\u9664\u5E33\u6236\u8207\u76F8\u95DC\u7D00\u9304");
+      if (toastRich) {
+        const lines = [`\u300C${acctName}\u300D`];
+        const detail = [];
+        if (directCount > 0) detail.push(`${directCount} \u7B46\u7D00\u9304`);
+        if (holdingsCount > 0) detail.push(`${holdingsCount} \u6A94\u6301\u80A1`);
+        if (tradesCount > 0) detail.push(`${tradesCount} \u7B46\u4EA4\u6613`);
+        if (detail.length > 0) lines.push(`\u5DF2\u522A\u9664 ${detail.join("\u3001")}`);
+        toastRich({
+          title: "\u5DF2\u522A\u9664\u5E33\u6236",
+          amount: "\u2713",
+          amountColor: "var(--pink-text)",
+          lines
+        }, 2400);
+      } else {
+        toast("\u5DF2\u522A\u9664\u5E33\u6236\u8207\u76F8\u95DC\u7D00\u9304");
+      }
     }, 280);
   };
   const performKeepRecordsDelete = (info) => {
@@ -17041,15 +17063,6 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
         toast("\u5DF2\u522A\u9664,\u7D00\u9304\u4FDD\u7559");
       }
     }, 280);
-  };
-  const moveAcct = (i, delta) => {
-    const newIdx = i + delta;
-    if (newIdx < 0 || newIdx >= state.accounts.length) return;
-    setState((s) => {
-      const arr = [...s.accounts];
-      [arr[i], arr[newIdx]] = [arr[newIdx], arr[i]];
-      return { ...s, accounts: arr };
-    });
   };
   const swipeBack = () => {
     if (editingId !== null) {
