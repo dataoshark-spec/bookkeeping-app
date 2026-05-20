@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520CA";
+const APP_VERSION = "1150520CD";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -3503,7 +3503,7 @@ function App() {
           // [v555CA] 刪除完成圖示 — 改用垃圾桶,比減號更直覺
           // (原本減號視覺類似「禁止」符號,容易誤解)
           /* @__PURE__ */ React.createElement("svg", { width: "32", height: "32", viewBox: "0 0 24 24", fill: "none", stroke: "#1a1a1a", strokeWidth: "2.2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "3 6 5 6 21 6" }), /* @__PURE__ */ React.createElement("path", { d: "M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" }), /* @__PURE__ */ React.createElement("path", { d: "M10 11v6" }), /* @__PURE__ */ React.createElement("path", { d: "M14 11v6" }), /* @__PURE__ */ React.createElement("path", { d: "M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" }))
-        ) : /* @__PURE__ */ React.createElement("svg", { width: "32", height: "32", viewBox: "0 0 24 24", fill: "none", stroke: "#1a1a1a", strokeWidth: "3.2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "5 12 10 17 19 8" }))), /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, color: "var(--text)", letterSpacing: "0.5px", marginBottom: toastMsg.lines?.length > 0 ? 12 : 0, whiteSpace: "pre-line", textAlign: "center", lineHeight: 1.35 } }, Array.isArray(toastMsg.titleSegments) ? (() => {
+        ) : /* @__PURE__ */ React.createElement("svg", { width: "32", height: "32", viewBox: "0 0 24 24", fill: "none", stroke: "#1a1a1a", strokeWidth: "3.2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "5 12 10 17 19 8" }))), /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, color: toastMsg.titleColor || "var(--text)", letterSpacing: "0.5px", marginBottom: toastMsg.lines?.length > 0 ? 12 : 0, whiteSpace: "pre-line", textAlign: "center", lineHeight: 1.35 } }, Array.isArray(toastMsg.titleSegments) ? (() => {
           let line = 0;
           return toastMsg.titleSegments.map((seg, i) => {
             if (seg === "\n") {
@@ -3515,7 +3515,9 @@ function App() {
               return /* @__PURE__ */ React.createElement("span", { key: i, style: { fontSize: fs } }, seg);
             }
             return /* @__PURE__ */ React.createElement("span", { key: i, style: {
-              fontSize: fs,
+              // [v555CD] seg.size 可覆寫該段字級(預設 fs:第一行19/第二行14)
+              // — 用於強化動作詞如「已刪除」、「已解除」(放大+粉色)
+              fontSize: seg.size || fs,
               color: seg.color || "var(--text)",
               fontWeight: seg.weight || 700
             } }, seg.text);
@@ -9118,7 +9120,17 @@ function SettingsPage({
         setDriveLinked(false);
         setDriveEmail("");
         setDriveLastSync(0);
-        toastRich({ title: "\u5DF2\u89E3\u9664\u9023\u7D50", amount: "\u2713", amountColor: "var(--text-faint)", icon: "minus", lines: ["\u96F2\u7AEF\u5099\u4EFD\u4ECD\u4FDD\u7559"] }, 1600);
+        toastRich({
+          titleSegments: [
+            // [v555CD] 「已解除」強化(同刪除備份家族)
+            { text: "\u5DF2\u89E3\u9664", color: "var(--pink-text)", weight: 800, size: 23 },
+            { text: " \u9023\u7D50" }
+          ],
+          amount: "\u2713",
+          amountColor: "var(--text-faint)",
+          icon: "minus",
+          lines: ["\u96F2\u7AEF\u5099\u4EFD\u4ECD\u4FDD\u7559"]
+        }, 1600);
       }
     });
   };
@@ -9214,7 +9226,17 @@ function SettingsPage({
           await GDrive.deleteBackup(token, fileId);
           const files = await GDrive.listBackups(token);
           setDriveBackupList(files);
-          toastRich({ title: "\u5DF2\u522A\u9664\u9019\u4EFD\u5099\u4EFD", amount: "\u2713", amountColor: "var(--text-faint)", icon: "minus", lines: ["\u5176\u4ED6\u5099\u4EFD\u4E0D\u53D7\u5F71\u97FF"] }, 1500);
+          toastRich({
+            titleSegments: [
+              // [v555CD] 「已刪除」強化:粉色+加粗,讓動作結果更醒目;後文「這份備份」維持一般色,避免整句都粉色看不出重點
+              { text: "\u5DF2\u522A\u9664", color: "var(--pink-text)", weight: 800, size: 23 },
+              { text: " \u9019\u4EFD\u5099\u4EFD" }
+            ],
+            amount: "\u2713",
+            amountColor: "var(--text-faint)",
+            icon: "minus",
+            lines: ["\u5176\u4ED6\u5099\u4EFD\u4E0D\u53D7\u5F71\u97FF"]
+          }, 1500);
         } catch (e) {
           toastRich({ title: "\u522A\u9664\u5931\u6557", amount: "\u2713", amountColor: "var(--pink)", icon: "warn", lines: [cloudErrText(e && e.message)] }, 2200);
         } finally {
@@ -9259,7 +9281,17 @@ function SettingsPage({
           setDriveBackupList(files);
           driveExitSelectMode();
           if (failCount === 0) {
-            toastRich({ title: `\u5DF2\u522A\u9664 ${okCount} \u4EFD\u5099\u4EFD`, amount: "\u2713", amountColor: "var(--text-faint)", icon: "minus", lines: remaining > 0 ? ["\u5176\u9918\u5099\u4EFD\u4E0D\u53D7\u5F71\u97FF"] : ["\u96F2\u7AEF\u5DF2\u7121\u5099\u4EFD"] }, 1600);
+            toastRich({
+              titleSegments: [
+                // [v555CD] 「已刪除」強化(同單份刪除)
+                { text: "\u5DF2\u522A\u9664", color: "var(--pink-text)", weight: 800, size: 23 },
+                { text: ` ${okCount} \u4EFD\u5099\u4EFD` }
+              ],
+              amount: "\u2713",
+              amountColor: "var(--text-faint)",
+              icon: "minus",
+              lines: remaining > 0 ? ["\u5176\u9918\u5099\u4EFD\u4E0D\u53D7\u5F71\u97FF"] : ["\u96F2\u7AEF\u5DF2\u7121\u5099\u4EFD"]
+            }, 1600);
           } else if (okCount === 0) {
             toastRich({ title: "\u522A\u9664\u5931\u6557", amount: "\u2713", amountColor: "var(--pink)", icon: "warn", lines: [`${failCount} \u4EFD\u672A\u6210\u529F\u522A\u9664`] }, 2200);
           } else {
@@ -10150,13 +10182,14 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
           width: "100%",
           background: "var(--bg)",
           borderRadius: "18px 18px 0 0",
-          // [v555CA] 雲端 sheet 高度 — 用 dvh(動態視窗高度,瀏覽器會自動扣 url bar / nav bar)
-          // 100vh 在 Android Chrome 包含 URL bar 區域,實際可見區可能小於 100vh,
-          // 用 100dvh 才能精準取得真實可見高度,再扣 80px tab bar 與 safe-area
-          maxHeight: "calc(100dvh - 80px - env(safe-area-inset-bottom, 0px))",
+          // [v555CB] sheet 上提避開 tab bar — marginBottom 預留 70px(tab bar 高度)+ safe-area。
+          // 之前用 maxHeight 扣 80px 沒效果,因為 alignItems:flex-end 還是把 sheet 推到視窗底,
+          // sheet 最底 80px 還是被 z-index:50 的 tab bar 蓋住,看不到 footer。
+          // 改用 marginBottom 把 sheet 整體往上推,sheet 底端就在 tab bar 上沿,footer 可見。
+          marginBottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
+          maxHeight: "calc(100dvh - 70px - env(safe-area-inset-bottom, 0px))",
           display: "flex",
-          flexDirection: "column",
-          paddingBottom: "env(safe-area-inset-bottom, 0px)"
+          flexDirection: "column"
         },
         onClick: (e) => e.stopPropagation(),
         onTouchStart: driveBackupListSwipe.onTouchStart,
@@ -11172,7 +11205,34 @@ function CleanupHistorySheet({ state, onClose, onCleanup, setConfirmDialog }) {
         },
         opt.label
       );
-    })), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, fontSize: 12, color: "var(--text-faint)", lineHeight: 1.5 } }, "\u9078\u5FEB\u6377\u9215\u5F8C\u4ECD\u53EF\u9EDE\u4E0A\u65B9\u65E5\u671F\u6846 \u5FAE\u8ABF\u65E5\u671F ", /* @__PURE__ */ React.createElement("br", null), fmtDate(cutoffDate), " 00:00 \u4E4B\u524D\u7684\u7D00\u9304\u5C07\u88AB\u6E05\u9664")), /* @__PURE__ */ React.createElement("div", { style: { ...styles.block, padding: "14px 14px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 10 } }, "\u9810\u89BD"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "var(--text-dim)" } }, "\u5168\u7D00\u9304"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: "var(--text)" } }, "\u5171 ", totalCount, " \u7B46")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "var(--text-dim)" } }, "\u7B26\u5408\u7BE9\u9078\u689D\u4EF6"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 20, fontWeight: 700, color: matchCount > 0 ? "var(--mint)" : "var(--text-faint)" } }, matchCount, " ", /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--text-faint)", fontWeight: 400 } }, "\u7B46"))), matchCount > 0 && affectedAccounts.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { borderTop: "1px solid var(--border)", marginTop: 8, paddingTop: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginBottom: 8 } }, "\u5F71\u97FF\u7684\u5E33\u6236 (", affectedAccounts.length, ")"), affectedAccounts.slice(0, 6).map((a) => {
+    }), (() => {
+      const isAnyQuickActive = [1, 2, 3, 4, 5].some((yr) => {
+        const d = /* @__PURE__ */ new Date();
+        d.setFullYear(d.getFullYear() - yr);
+        const t = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        return cutoffDate === t;
+      });
+      const isCustom = !isAnyQuickActive;
+      return /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          style: {
+            flex: 1,
+            minWidth: 0,
+            padding: "5px 0",
+            borderRadius: 14,
+            border: isCustom ? "1px solid var(--mint)" : "1px solid var(--border)",
+            background: isCustom ? "rgba(126,224,192,0.15)" : "transparent",
+            color: isCustom ? "var(--mint)" : "var(--text-dim)",
+            fontSize: 11,
+            cursor: "pointer",
+            whiteSpace: "nowrap"
+          },
+          onClick: () => setShowDatePicker(true)
+        },
+        "\u4F9D\u65E5\u671F"
+      );
+    })()), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, fontSize: 12, color: "var(--text-faint)", lineHeight: 1.5 } }, "\u9078\u5FEB\u6377\u9215\u5F8C\u4ECD\u53EF\u9EDE\u4E0A\u65B9\u65E5\u671F\u6846 \u5FAE\u8ABF\u65E5\u671F ", /* @__PURE__ */ React.createElement("br", null), fmtDate(cutoffDate), " 00:00 \u4E4B\u524D\u7684\u7D00\u9304\u5C07\u88AB\u6E05\u9664")), /* @__PURE__ */ React.createElement("div", { style: { ...styles.block, padding: "14px 14px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 10 } }, "\u9810\u89BD"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "var(--text-dim)" } }, "\u5168\u7D00\u9304"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: "var(--text)" } }, "\u5171 ", totalCount, " \u7B46")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "var(--text-dim)" } }, "\u7B26\u5408\u7BE9\u9078\u689D\u4EF6"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 20, fontWeight: 700, color: matchCount > 0 ? "var(--mint)" : "var(--text-faint)" } }, matchCount, " ", /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--text-faint)", fontWeight: 400 } }, "\u7B46"))), matchCount > 0 && affectedAccounts.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { borderTop: "1px solid var(--border)", marginTop: 8, paddingTop: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginBottom: 8 } }, "\u5F71\u97FF\u7684\u5E33\u6236 (", affectedAccounts.length, ")"), affectedAccounts.slice(0, 6).map((a) => {
       const delta = balanceDelta.get(a.id) || 0;
       return /* @__PURE__ */ React.createElement("div", { key: a.id, style: { display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)" } }, a.name), /* @__PURE__ */ React.createElement("span", { style: { color: delta > 0 ? "var(--mint)" : delta < 0 ? "var(--pink)" : "var(--text-faint)", fontWeight: 500 } }, delta > 0 ? "+" : "", delta.toLocaleString()));
     }), affectedAccounts.length > 6 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", textAlign: "center", marginTop: 4 } }, "\u2026\u9084\u6709 ", affectedAccounts.length - 6, " \u500B")))), /* @__PURE__ */ React.createElement("div", { style: { ...styles.block, padding: "14px 14px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 500 } }, "\u4FDD\u7559\u76EE\u524D\u91D1\u984D"), /* @__PURE__ */ React.createElement(
@@ -16207,7 +16267,7 @@ function StockMarketManageSheet({ state, setState, toast, toastRich, onClose, se
   const usingCount = (id) => state.accounts.filter((a) => {
     if (a.type !== "invest") return false;
     if ((a.investSubType || "stock") !== "stock") return false;
-    const acctMarket = a.stockMarketId || state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID;
+    const acctMarket = a.stockMarketId || DEFAULT_STOCK_MARKET_ID;
     return acctMarket === id;
   }).length;
   return /* @__PURE__ */ React.createElement(
@@ -16297,7 +16357,6 @@ function StockMarketManageSheet({ state, setState, toast, toastRich, onClose, se
       const count = usingCount(m.id);
       const curDefaultId = state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID;
       const isCurrentDefault = m.id === curDefaultId;
-      const isSystem = m.id === "sm_tw" || m.id === "sm_us";
       return /* @__PURE__ */ React.createElement(
         StockMarketRow,
         {
@@ -16330,7 +16389,8 @@ function StockMarketManageSheet({ state, setState, toast, toastRich, onClose, se
           }
         },
         /* @__PURE__ */ React.createElement(TypeIcon, { name: "chart", size: 18, color: "var(--mint-text)" }),
-        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 500, color: "var(--text)" } }, m.label, isCurrentDefault && /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, fontSize: 11, color: "var(--mint-text)", fontWeight: 600 } }, "(\u9810\u8A2D)"), isSystem && !isCurrentDefault && /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, fontSize: 11, color: "var(--text-faint)" } }, "(\u7CFB\u7D71)")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, count > 0 ? `${count} \u500B\u5E33\u6236\u4F7F\u7528\u4E2D` : "\u5C1A\u7121\u5E33\u6236\u4F7F\u7528")),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 500, color: "var(--text)" } }, m.label, isCurrentDefault && // [v555CD] (預設)字體大小同主標(14),改為灰色(原本綠色太搶眼,跟其他綠色UI元件搶焦)
+        /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, fontSize: 14, color: "var(--text-faint)", fontWeight: 500 } }, "(\u9810\u8A2D)")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, count > 0 ? `${count} \u500B\u5E33\u6236\u4F7F\u7528\u4E2D` : "\u5C1A\u7121\u5E33\u6236\u4F7F\u7528")),
         editMode ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement(
           "button",
           {
@@ -17798,6 +17858,54 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
     ),
     showStockMarketPicker && (() => {
       const markets = state.stockMarkets || DEFAULT_STOCK_MARKETS;
+      let touchStartX = null, touchStartY = null, isHorizontal = false;
+      const SWIPE_THRESHOLD = 80;
+      const getModalEl = (e) => e.currentTarget && e.currentTarget.firstElementChild;
+      const onPickerTouchStart = (e) => {
+        const t = e.touches[0];
+        touchStartX = t.clientX;
+        touchStartY = t.clientY;
+        isHorizontal = false;
+      };
+      const onPickerTouchMove = (e) => {
+        if (touchStartX == null) return;
+        const t = e.touches[0];
+        const dx = t.clientX - touchStartX;
+        const dy = Math.abs(t.clientY - touchStartY);
+        if (!isHorizontal && Math.abs(dx) > 10 && Math.abs(dx) > dy * 1.5) {
+          isHorizontal = true;
+        }
+        if (isHorizontal) {
+          const modalEl = getModalEl(e);
+          if (modalEl) {
+            const damped = Math.abs(dx) > 100 ? Math.sign(dx) * (100 + (Math.abs(dx) - 100) * 0.4) : dx;
+            modalEl.style.transform = `translateX(${damped}px)`;
+            modalEl.style.transition = "none";
+          }
+        }
+      };
+      const onPickerTouchEnd = (e) => {
+        if (touchStartX == null) return;
+        let closing = false;
+        if (isHorizontal) {
+          const touch = e.changedTouches && e.changedTouches[0] || null;
+          const dx = touch ? touch.clientX - touchStartX : 0;
+          if (Math.abs(dx) > SWIPE_THRESHOLD) {
+            closing = true;
+            setShowStockMarketPicker(false);
+          }
+        }
+        if (!closing) {
+          const modalEl = getModalEl(e);
+          if (modalEl) {
+            modalEl.style.transition = "transform 0.22s ease-out";
+            modalEl.style.transform = "translateX(0)";
+          }
+        }
+        touchStartX = null;
+        touchStartY = null;
+        isHorizontal = false;
+      };
       return /* @__PURE__ */ React.createElement(
         "div",
         {
@@ -17815,7 +17923,11 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
             padding: 20,
             zIndex: 350
           },
-          onClick: () => setShowStockMarketPicker(false)
+          onClick: () => setShowStockMarketPicker(false),
+          onTouchStart: onPickerTouchStart,
+          onTouchMove: onPickerTouchMove,
+          onTouchEnd: onPickerTouchEnd,
+          onTouchCancel: onPickerTouchEnd
         },
         /* @__PURE__ */ React.createElement(
           "div",
