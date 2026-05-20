@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515BW";
+const APP_VERSION = "1150520BX";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -7868,7 +7868,7 @@ function TxnListPage({ state, setState, setConfirmDialog, toastRich, toast, catI
       /* @__PURE__ */ React.createElement(TypeIcon, { name: "trash", size: 14, color: selectedIds.size > 0 ? "#1a1a1a" : "var(--text-faint)" }),
       /* @__PURE__ */ React.createElement("span", null, "\u522A\u9664 ", selectedIds.size > 0 ? `(${selectedIds.size})` : "")
     )),
-    showFilter && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.actionMenuBackdrop, onClick: () => setShowFilter(false), ...filterSwipe }, /* @__PURE__ */ React.createElement("div", { style: styles.filterCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.actionMenuTitle }, /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "search", size: 18, color: "var(--accent-text)" }), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--accent-text)" } }, "\u641C\u5C0B"), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 2 } }, "\u4EA4\u6613"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 16, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, marginTop: 0, marginBottom: 6 } }, "\u8D77\u59CB\u65E5\u671F"), /* @__PURE__ */ React.createElement(
+    showFilter && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: { ...styles.actionMenuBackdrop, paddingBottom: "calc(80px + env(safe-area-inset-bottom, 0px))" }, onClick: () => setShowFilter(false), ...filterSwipe }, /* @__PURE__ */ React.createElement("div", { style: styles.filterCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.actionMenuTitle }, /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "search", size: 18, color: "var(--accent-text)" }), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--accent-text)" } }, "\u641C\u5C0B"), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 2 } }, "\u4EA4\u6613"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 16, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, marginTop: 0, marginBottom: 6 } }, "\u8D77\u59CB\u65E5\u671F"), /* @__PURE__ */ React.createElement(
       "button",
       {
         style: { ...styles.field, textAlign: "left", cursor: "pointer", width: "100%", boxSizing: "border-box" },
@@ -8198,7 +8198,7 @@ function StatsPage({ state, catIcon, currentMonth, setCurrentMonth, editMode, se
   const renderDonut = (data, total, opts = {}) => {
     const { onSliceClick, highlighted, centerLabel, centerValue } = opts;
     if (total === 0) {
-      return /* @__PURE__ */ React.createElement("svg", { style: { width: 240, height: 240 }, viewBox: "0 0 100 100" }, /* @__PURE__ */ React.createElement("circle", { cx: "50", cy: "50", r: "30.5", fill: "none", stroke: "var(--border)", strokeWidth: "7" }), /* @__PURE__ */ React.createElement("text", { x: "50", y: "54", textAnchor: "middle", fontSize: "5", fill: "var(--text-faint)", style: { letterSpacing: "0.3px" } }, "\u6C92\u6709\u8CC7\u6599"));
+      return /* @__PURE__ */ React.createElement("svg", { style: { width: "min(72vw, 300px)", aspectRatio: "1 / 1" }, viewBox: "0 0 100 100" }, /* @__PURE__ */ React.createElement("circle", { cx: "50", cy: "50", r: "30.5", fill: "none", stroke: "var(--border)", strokeWidth: "7" }), /* @__PURE__ */ React.createElement("text", { x: "50", y: "54", textAnchor: "middle", fontSize: "5", fill: "var(--text-faint)", style: { letterSpacing: "0.3px" } }, "\u6C92\u6709\u8CC7\u6599"));
     }
     const cx = 50, cy = 50;
     const ringR = 30.5;
@@ -8231,7 +8231,7 @@ function StatsPage({ state, catIcon, currentMonth, setCurrentMonth, editMode, se
       const large = ed - sd > 180 ? 1 : 0;
       return `M ${x1} ${y1} A ${ringR} ${ringR} 0 ${large} 1 ${x2} ${y2}`;
     };
-    return /* @__PURE__ */ React.createElement("svg", { style: { width: 240, height: 240, overflow: "visible" }, viewBox: "0 0 100 100" }, /* @__PURE__ */ React.createElement("defs", null, /* @__PURE__ */ React.createElement("filter", { id: "donutGlow", x: "-30%", y: "-30%", width: "160%", height: "160%" }, /* @__PURE__ */ React.createElement("feGaussianBlur", { stdDeviation: "0.8", result: "blur" }), /* @__PURE__ */ React.createElement("feMerge", null, /* @__PURE__ */ React.createElement("feMergeNode", { in: "blur" }), /* @__PURE__ */ React.createElement("feMergeNode", { in: "SourceGraphic" }))), /* @__PURE__ */ React.createElement("filter", { id: "centerTextShadow", x: "-20%", y: "-20%", width: "140%", height: "140%" }, /* @__PURE__ */ React.createElement("feGaussianBlur", { in: "SourceAlpha", stdDeviation: "0.4" }), /* @__PURE__ */ React.createElement("feOffset", { dx: "0", dy: "0.3", result: "offsetblur" }), /* @__PURE__ */ React.createElement("feComponentTransfer", null, /* @__PURE__ */ React.createElement("feFuncA", { type: "linear", slope: "0.18" })), /* @__PURE__ */ React.createElement("feMerge", null, /* @__PURE__ */ React.createElement("feMergeNode", null), /* @__PURE__ */ React.createElement("feMergeNode", { in: "SourceGraphic" })))), slices.map((s) => {
+    return /* @__PURE__ */ React.createElement("svg", { style: { width: "min(72vw, 300px)", aspectRatio: "1 / 1", overflow: "visible" }, viewBox: "0 0 100 100" }, /* @__PURE__ */ React.createElement("defs", null, /* @__PURE__ */ React.createElement("filter", { id: "donutGlow", x: "-30%", y: "-30%", width: "160%", height: "160%" }, /* @__PURE__ */ React.createElement("feGaussianBlur", { stdDeviation: "0.8", result: "blur" }), /* @__PURE__ */ React.createElement("feMerge", null, /* @__PURE__ */ React.createElement("feMergeNode", { in: "blur" }), /* @__PURE__ */ React.createElement("feMergeNode", { in: "SourceGraphic" }))), /* @__PURE__ */ React.createElement("filter", { id: "centerTextShadow", x: "-20%", y: "-20%", width: "140%", height: "140%" }, /* @__PURE__ */ React.createElement("feGaussianBlur", { in: "SourceAlpha", stdDeviation: "0.4" }), /* @__PURE__ */ React.createElement("feOffset", { dx: "0", dy: "0.3", result: "offsetblur" }), /* @__PURE__ */ React.createElement("feComponentTransfer", null, /* @__PURE__ */ React.createElement("feFuncA", { type: "linear", slope: "0.18" })), /* @__PURE__ */ React.createElement("feMerge", null, /* @__PURE__ */ React.createElement("feMergeNode", null), /* @__PURE__ */ React.createElement("feMergeNode", { in: "SourceGraphic" })))), slices.map((s) => {
       const color = CHART_COLORS[s.idx % CHART_COLORS.length];
       const isHi = highlighted != null && highlighted === s.cat;
       const isDim = highlighted != null && highlighted !== s.cat;
@@ -8650,7 +8650,13 @@ function SettingsPage({
   const reminderSetupSwipe = useSwipeToClose(() => setShowReminderSetup(false));
   const snapshotNameSwipe = useSwipeToClose(() => setShowSnapshotNameDialog(false));
   const snapshotsSwipe = useSwipeToClose(() => setShowSnapshots(false));
-  const driveBackupListSwipe = useSwipeToClose(() => setDriveBackupList(null));
+  const driveBackupListSwipe = useSwipeToClose(() => {
+    if (driveSelectMode) {
+      driveExitSelectMode();
+    } else {
+      setDriveBackupList(null);
+    }
+  });
   const persistSnapshots = (list) => {
     setSnapshots(list);
     try {
@@ -9022,6 +9028,28 @@ function SettingsPage({
   }, []);
   const [driveBackupList, setDriveBackupList] = useState(null);
   const [driveNoteEdit, setDriveNoteEdit] = useState(null);
+  const [driveSelectMode, setDriveSelectMode] = useState(false);
+  const [driveSelectedIds, setDriveSelectedIds] = useState(() => /* @__PURE__ */ new Set());
+  const driveExitSelectMode = () => {
+    setDriveSelectMode(false);
+    setDriveSelectedIds(/* @__PURE__ */ new Set());
+  };
+  const driveToggleSelect = (id) => {
+    setDriveSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const driveEnterSelectModeWith = (id) => {
+    setDriveSelectMode(true);
+    setDriveSelectedIds(/* @__PURE__ */ new Set([id]));
+    try {
+      if (navigator.vibrate) navigator.vibrate(15);
+    } catch {
+    }
+  };
   const driveSignIn = async () => {
     setDriveSyncing(true);
     try {
@@ -9156,6 +9184,56 @@ function SettingsPage({
           const files = await GDrive.listBackups(token);
           setDriveBackupList(files);
           toastRich({ title: "\u5DF2\u522A\u9664\u9019\u4EFD\u5099\u4EFD", amount: "\u2713", amountColor: "var(--text-faint)", icon: "minus", lines: ["\u5176\u4ED6\u5099\u4EFD\u4E0D\u53D7\u5F71\u97FF"] }, 1500);
+        } catch (e) {
+          toastRich({ title: "\u522A\u9664\u5931\u6557", amount: "\u2713", amountColor: "var(--pink)", icon: "warn", lines: [cloudErrText(e && e.message)] }, 2200);
+        } finally {
+          setDriveSyncing(false);
+        }
+      }
+    });
+  };
+  const driveBatchDelete = () => {
+    const ids = Array.from(driveSelectedIds);
+    if (ids.length === 0) return;
+    const total = (driveBackupList || []).length;
+    const remaining = total - ids.length;
+    setConfirmDialog({
+      title: `\u522A\u9664 ${ids.length} \u4EFD\u5099\u4EFD`,
+      messageList: {
+        styled: true,
+        before: `\u5C07\u5F9E Google Drive \u4E00\u6B21\u522A\u9664 \u9078\u53D6\u7684 ${ids.length} \u4EFD\u5099\u4EFD\u3002`,
+        items: [
+          remaining > 0 ? `\u5176\u9918 ${remaining} \u4EFD\u5099\u4EFD\u4E0D\u53D7\u5F71\u97FF\u3002` : "\u26A0 \u96F2\u7AEF\u5C07\u6C92\u6709\u4EFB\u4F55\u5099\u4EFD\u3002",
+          "\u26A0 \u522A\u9664\u5F8C \u7121\u6CD5\u5FA9\u539F"
+        ],
+        after: "\u78BA\u5B9A\u522A\u9664\u55CE?"
+      },
+      highlightWords: ["\u7121\u6CD5\u5FA9\u539F"],
+      confirmText: `\u522A\u9664 ${ids.length} \u4EFD`,
+      danger: true,
+      onConfirm: async () => {
+        setDriveSyncing(true);
+        let okCount = 0;
+        let failCount = 0;
+        try {
+          const token = await GDrive.ensureToken();
+          const results = await Promise.allSettled(
+            ids.map((id) => GDrive.deleteBackup(token, id))
+          );
+          results.forEach((r) => {
+            if (r.status === "fulfilled") okCount += 1;
+            else failCount += 1;
+          });
+          const files = await GDrive.listBackups(token);
+          setDriveBackupList(files);
+          driveExitSelectMode();
+          if (failCount === 0) {
+            toastRich({ title: `\u5DF2\u522A\u9664 ${okCount} \u4EFD\u5099\u4EFD`, amount: "\u2713", amountColor: "var(--text-faint)", icon: "minus", lines: remaining > 0 ? ["\u5176\u9918\u5099\u4EFD\u4E0D\u53D7\u5F71\u97FF"] : ["\u96F2\u7AEF\u5DF2\u7121\u5099\u4EFD"] }, 1600);
+          } else if (okCount === 0) {
+            toastRich({ title: "\u522A\u9664\u5931\u6557", amount: "\u2713", amountColor: "var(--pink)", icon: "warn", lines: [`${failCount} \u4EFD\u672A\u6210\u529F\u522A\u9664`] }, 2200);
+          } else {
+            toastRich({ title: "\u90E8\u5206\u522A\u9664\u6210\u529F", amount: "\u2713", amountColor: "var(--pink)", icon: "warn", lines: [`\u6210\u529F ${okCount} \u4EFD\u3001\u5931\u6557 ${failCount} \u4EFD`] }, 2400);
+          }
         } catch (e) {
           toastRich({ title: "\u522A\u9664\u5931\u6557", amount: "\u2713", amountColor: "var(--pink)", icon: "warn", lines: [cloudErrText(e && e.message)] }, 2200);
         } finally {
@@ -10024,7 +10102,13 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
         display: "flex",
         alignItems: "flex-end"
       },
-      onClick: () => setDriveBackupList(null)
+      onClick: () => {
+        if (driveSelectMode) {
+          driveExitSelectMode();
+          return;
+        }
+        setDriveBackupList(null);
+      }
     },
     /* @__PURE__ */ React.createElement(
       "div",
@@ -10044,114 +10128,192 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
         onTouchEnd: driveBackupListSwipe.onTouchEnd,
         onTouchCancel: driveBackupListSwipe.onTouchCancel
       },
-      /* @__PURE__ */ React.createElement("div", { style: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "14px 12px 6px 16px"
-      } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, fontWeight: 700 } }, "\u9078\u64C7\u96F2\u7AEF\u5099\u4EFD\u9084\u539F"), /* @__PURE__ */ React.createElement(
-        "div",
-        {
-          onClick: () => setDriveBackupList(null),
-          style: {
-            padding: "7px 16px",
-            borderRadius: 8,
-            background: "var(--bg-card-alt)",
-            cursor: "pointer",
-            fontSize: 13,
-            color: "var(--text-dim)",
-            fontWeight: 600
-          }
-        },
-        "\u8FD4\u56DE"
-      )),
-      /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 10px", fontSize: 12, color: "var(--text-dim)", lineHeight: 1.6 } }, "\u9EDE\u6574\u5217\u5373\u53EF\u9084\u539F(\u6703\u8986\u84CB\u76EE\u524D\u8CC7\u6599)\u3002", driveBackupList && driveBackupList.length > 0 && /* @__PURE__ */ React.createElement("span", null, `\u76EE\u524D ${driveBackupList.length} / ${GDRIVE_MAX_BACKUPS} \u4EFD,\u6EFF\u4E86\u6703\u81EA\u52D5\u8986\u84CB\u6700\u820A\u7684,\u4E0D\u4F54\u984D\u5916\u7A7A\u9593\u3002`)),
-      /* @__PURE__ */ React.createElement("div", { style: { overflowY: "auto", padding: "4px 16px 16px" } }, driveBackupList.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { padding: "30px 0", textAlign: "center", color: "var(--text-faint)", fontSize: 13 } }, "\u96F2\u7AEF\u5C1A\u7121\u5099\u4EFD\u6A94") : driveBackupList.map((f) => {
-        let displayTime = f.name;
-        const m = f.name.match(/ledger-backup-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/);
-        if (m) {
-          displayTime = `${m[1]}/${m[2]}/${m[3]} ${m[4]}:${m[5]}:${m[6]}`;
-        } else if (f.createdTime) {
-          displayTime = new Date(f.createdTime).toLocaleString("zh-TW");
-        }
-        const sizeKB = f.size ? Math.round(parseInt(f.size, 10) / 1024) : null;
-        const note = (f.description || "").trim();
-        const iconBtn = (name, color, onClick) => /* @__PURE__ */ React.createElement(
+      (() => {
+        const totalCount = (driveBackupList || []).length;
+        return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: {
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "14px 12px 6px 16px"
+        } }, driveSelectMode ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, fontWeight: 700, display: "inline-flex", alignItems: "baseline", gap: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)" } }, "\u5DF2\u9078"), /* @__PURE__ */ React.createElement("span", { style: { fontVariantNumeric: "tabular-nums" } }, driveSelectedIds.size), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: "var(--text-dim)" } }, "/ ", totalCount)), /* @__PURE__ */ React.createElement(
+          "span",
+          {
+            style: {
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--pink-text)",
+              cursor: "pointer",
+              padding: "6px 14px",
+              borderRadius: 16,
+              border: "1.5px solid var(--pink)",
+              background: "rgba(245, 181, 192, 0.08)",
+              userSelect: "none",
+              WebkitTapHighlightColor: "transparent"
+            },
+            onClick: driveExitSelectMode
+          },
+          "\u53D6\u6D88"
+        )) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, fontWeight: 700 } }, "\u9078\u64C7\u96F2\u7AEF\u5099\u4EFD\u9084\u539F"), /* @__PURE__ */ React.createElement(
           "div",
           {
-            onClick: (e) => {
-              e.stopPropagation();
-              onClick();
-            },
+            onClick: () => setDriveBackupList(null),
             style: {
-              flexShrink: 0,
-              width: 34,
-              height: 34,
+              padding: "7px 16px",
+              borderRadius: 8,
+              background: "var(--bg-card-alt)",
+              cursor: "pointer",
+              fontSize: 13,
+              color: "var(--text-dim)",
+              fontWeight: 600
+            }
+          },
+          "\u8FD4\u56DE"
+        ))), /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 10px", fontSize: 12, color: "var(--text-dim)", lineHeight: 1.6 } }, driveSelectMode ? /* @__PURE__ */ React.createElement("span", null, "\u9EDE\u5361\u7247\u53EF\u52FE\u9078\u6216\u53D6\u6D88\u52FE\u9078\u3002\u4E0B\u65B9\u53EF\u5168\u9078\u6216\u522A\u9664\u5DF2\u9078\u5099\u4EFD\u3002") : /* @__PURE__ */ React.createElement(React.Fragment, null, "\u9EDE\u6574\u5217\u5373\u53EF\u9084\u539F(\u6703\u8986\u84CB\u76EE\u524D\u8CC7\u6599)\u3002\u9577\u6309\u53EF\u9032\u5165\u591A\u9078\u522A\u9664\u3002", totalCount > 0 && /* @__PURE__ */ React.createElement("span", null, `\u76EE\u524D ${totalCount} / ${GDRIVE_MAX_BACKUPS} \u4EFD,\u6EFF\u4E86\u6703\u81EA\u52D5\u8986\u84CB\u6700\u820A\u7684,\u4E0D\u4F54\u984D\u5916\u7A7A\u9593\u3002`))), /* @__PURE__ */ React.createElement("div", { style: { overflowY: "auto", padding: "4px 16px 16px", flex: 1, minHeight: 0 } }, totalCount === 0 ? /* @__PURE__ */ React.createElement("div", { style: { padding: "30px 0", textAlign: "center", color: "var(--text-faint)", fontSize: 13 } }, "\u96F2\u7AEF\u5C1A\u7121\u5099\u4EFD\u6A94") : driveBackupList.map((f) => {
+          let displayTime = f.name;
+          const m = f.name.match(/ledger-backup-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/);
+          if (m) {
+            displayTime = `${m[1]}/${m[2]}/${m[3]} ${m[4]}:${m[5]}:${m[6]}`;
+          } else if (f.createdTime) {
+            displayTime = new Date(f.createdTime).toLocaleString("zh-TW");
+          }
+          const sizeKB = f.size ? Math.round(parseInt(f.size, 10) / 1024) : null;
+          const note = (f.description || "").trim();
+          const selected = driveSelectedIds.has(f.id);
+          const iconBtn = (name, color, onClick) => /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              onClick: (e) => {
+                e.stopPropagation();
+                onClick();
+              },
+              style: {
+                flexShrink: 0,
+                width: 34,
+                height: 34,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 8,
+                background: "var(--bg-card-alt)",
+                cursor: "pointer"
+              }
+            },
+            /* @__PURE__ */ React.createElement(TypeIcon, { name, size: 15, color })
+          );
+          return /* @__PURE__ */ React.createElement(
+            DriveBackupRow,
+            {
+              key: f.id,
+              fileId: f.id,
+              displayTime,
+              sizeKB,
+              note,
+              selectMode: driveSelectMode,
+              selected,
+              onClick: () => {
+                if (driveSelectMode) {
+                  driveToggleSelect(f.id);
+                } else {
+                  setDriveBackupList(null);
+                  driveRestoreFrom(f.id, displayTime);
+                }
+              },
+              onLongPress: () => {
+                if (driveSelectMode) return;
+                driveEnterSelectModeWith(f.id);
+              }
+            },
+            !driveSelectMode && /* @__PURE__ */ React.createElement(React.Fragment, null, iconBtn(
+              "pencil",
+              note ? "var(--accent-text)" : "var(--text-dim)",
+              () => setDriveNoteEdit({ fileId: f.id, displayTime, note })
+            ), iconBtn(
+              "download",
+              "var(--text-dim)",
+              () => driveExportBackup(f.id, displayTime)
+            ), iconBtn(
+              "trash",
+              "var(--pink-text)",
+              () => driveDeleteBackup(f.id, displayTime)
+            ))
+          );
+        })), driveSelectMode ? /* @__PURE__ */ React.createElement("div", { style: {
+          padding: "10px 16px calc(14px + env(safe-area-inset-bottom, 0px))",
+          borderTop: "1px solid var(--border-soft)",
+          background: "var(--bg)",
+          display: "flex",
+          gap: 8
+        } }, /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            style: {
+              flex: "0 0 auto",
+              padding: "10px 16px",
+              background: "var(--bg-card)",
+              color: "var(--text)",
+              border: "1px solid var(--border)",
+              borderRadius: 10,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6
+            },
+            onClick: () => {
+              const allSelected = driveSelectedIds.size === totalCount && totalCount > 0;
+              if (allSelected) {
+                setDriveSelectedIds(/* @__PURE__ */ new Set());
+              } else {
+                setDriveSelectedIds(new Set(driveBackupList.map((x) => x.id)));
+              }
+            },
+            disabled: totalCount === 0
+          },
+          /* @__PURE__ */ React.createElement("div", { style: {
+            width: 18,
+            height: 18,
+            borderRadius: 9,
+            border: `1.5px solid ${driveSelectedIds.size === totalCount && totalCount > 0 ? "var(--mint)" : "var(--text-faint)"}`,
+            background: driveSelectedIds.size === totalCount && totalCount > 0 ? "var(--mint)" : "transparent",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          } }, driveSelectedIds.size === totalCount && totalCount > 0 && /* @__PURE__ */ React.createElement("svg", { width: "10", height: "10", viewBox: "0 0 24 24", fill: "none", stroke: "#1a1a1a", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "20 6 9 17 4 12" }))),
+          /* @__PURE__ */ React.createElement("span", null, driveSelectedIds.size === totalCount && totalCount > 0 ? "\u53D6\u6D88\u5168\u9078" : "\u5168\u9078")
+        ), /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            style: {
+              flex: 1,
+              padding: "10px 16px",
+              background: driveSelectedIds.size > 0 ? "var(--pink)" : "rgba(245, 181, 192, 0.25)",
+              color: driveSelectedIds.size > 0 ? "#1a1a1a" : "var(--text-faint)",
+              border: "none",
+              borderRadius: 10,
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: driveSelectedIds.size > 0 ? "pointer" : "default",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              borderRadius: 8,
-              background: "var(--bg-card-alt)",
-              cursor: "pointer"
-            }
-          },
-          /* @__PURE__ */ React.createElement(TypeIcon, { name, size: 15, color })
-        );
-        return /* @__PURE__ */ React.createElement(
-          "div",
-          {
-            key: f.id,
-            onClick: () => {
-              setDriveBackupList(null);
-              driveRestoreFrom(f.id, displayTime);
+              gap: 6,
+              transition: "background 0.15s, color 0.15s"
             },
-            style: {
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "8px 10px 8px 12px",
-              marginBottom: 8,
-              background: "var(--bg-card)",
-              borderRadius: 10,
-              minHeight: 60,
-              boxSizing: "border-box",
-              cursor: "pointer"
-            }
+            onClick: () => driveSelectedIds.size > 0 && driveBatchDelete(),
+            disabled: driveSelectedIds.size === 0
           },
-          /* @__PURE__ */ React.createElement("div", { style: { flexShrink: 0 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-down", size: 18, color: "var(--mint-text)" })),
-          /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600 } }, displayTime), note ? /* @__PURE__ */ React.createElement("div", { style: {
-            fontSize: 12,
-            color: "var(--accent-text)",
-            marginTop: 2,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap"
-          } }, note) : null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "var(--text-faint)" } }, sizeKB !== null ? `${sizeKB} KB \xB7 ` : "", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", fontWeight: 600 } }, "\u9EDE\u6B64\u9084\u539F"))),
-          iconBtn(
-            "pencil",
-            note ? "var(--accent-text)" : "var(--text-dim)",
-            () => setDriveNoteEdit({ fileId: f.id, displayTime, note })
-          ),
-          iconBtn(
-            "download",
-            "var(--text-dim)",
-            () => driveExportBackup(f.id, displayTime)
-          ),
-          iconBtn(
-            "trash",
-            "var(--pink-text)",
-            () => driveDeleteBackup(f.id, displayTime)
-          )
-        );
-      })),
-      /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 16px" } }, /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          style: { ...styles.deleteBtn, width: "100%", marginTop: 0 },
-          onClick: () => setDriveBackupList(null)
-        },
-        "\u95DC\u9589"
-      ))
+          /* @__PURE__ */ React.createElement(TypeIcon, { name: "trash", size: 14, color: driveSelectedIds.size > 0 ? "#1a1a1a" : "var(--text-faint)" }),
+          /* @__PURE__ */ React.createElement("span", null, "\u522A\u9664 ", driveSelectedIds.size > 0 ? `(${driveSelectedIds.size})` : "")
+        )) : /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 16px" } }, /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            style: { ...styles.deleteBtn, width: "100%", marginTop: 0 },
+            onClick: () => setDriveBackupList(null)
+          },
+          "\u95DC\u9589"
+        )));
+      })()
     )
   ), driveNoteEdit !== null && /* @__PURE__ */ React.createElement(
     "div",
@@ -11064,6 +11226,122 @@ function LoadMoreSentinel({ remain, onLoadMore }) {
   );
 }
 const LinkContext = React.createContext({ onLinkClick: null, highlightInfo: null });
+function DriveBackupRow({ fileId, displayTime, sizeKB, note, selectMode, selected, onClick, onLongPress, children }) {
+  const longPressTimer = React.useRef(null);
+  const movedRef = React.useRef(false);
+  const startPosRef = React.useRef(null);
+  const startTimeRef = React.useRef(0);
+  const triggeredRef = React.useRef(false);
+  const handleStart = (e) => {
+    if (!onLongPress) return;
+    if (e.touches && e.touches.length > 1) {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+      startPosRef.current = null;
+      movedRef.current = true;
+      return;
+    }
+    triggeredRef.current = false;
+    movedRef.current = false;
+    const t = e.touches ? e.touches[0] : e;
+    startPosRef.current = { x: t.clientX, y: t.clientY };
+    startTimeRef.current = Date.now();
+    longPressTimer.current = setTimeout(() => {
+      triggeredRef.current = true;
+      onLongPress();
+    }, 600);
+  };
+  const handleMove = (e) => {
+    if (e.touches && e.touches.length > 1) {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+      movedRef.current = true;
+      return;
+    }
+    if (!startPosRef.current || !longPressTimer.current) return;
+    if (Date.now() - startTimeRef.current < 80) return;
+    const t = e.touches ? e.touches[0] : e;
+    const dx = Math.abs(t.clientX - startPosRef.current.x);
+    const dy = Math.abs(t.clientY - startPosRef.current.y);
+    if (dx > 8 || dy > 8) {
+      movedRef.current = true;
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+  const handleEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    startPosRef.current = null;
+  };
+  const handleClick = (e) => {
+    if (triggeredRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      triggeredRef.current = false;
+      return;
+    }
+    if (movedRef.current) return;
+    if (onClick) onClick(e);
+  };
+  const handleContextMenu = (e) => {
+    if (!onLongPress) return;
+    e.preventDefault();
+    if (!selectMode) onLongPress();
+  };
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      onClick: handleClick,
+      onTouchStart: handleStart,
+      onTouchMove: handleMove,
+      onTouchEnd: handleEnd,
+      onTouchCancel: handleEnd,
+      onContextMenu: handleContextMenu,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "8px 10px 8px 12px",
+        marginBottom: 8,
+        background: selected ? "rgba(217, 104, 119, 0.10)" : "var(--bg-card)",
+        border: selected ? "1.5px solid var(--pink)" : "1.5px solid transparent",
+        borderRadius: 10,
+        minHeight: 60,
+        boxSizing: "border-box",
+        cursor: "pointer",
+        WebkitTapHighlightColor: "transparent",
+        transition: "background 0.12s, border-color 0.12s"
+      }
+    },
+    selectMode ? /* @__PURE__ */ React.createElement("div", { style: {
+      flexShrink: 0,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      border: `1.5px solid ${selected ? "var(--pink)" : "var(--text-faint)"}`,
+      background: selected ? "var(--pink)" : "transparent",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    } }, selected && /* @__PURE__ */ React.createElement("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "#fff", strokeWidth: "4", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "20 6 9 17 4 12" }))) : /* @__PURE__ */ React.createElement("div", { style: { flexShrink: 0 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-down", size: 18, color: "var(--mint-text)" })),
+    /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600 } }, displayTime), note ? /* @__PURE__ */ React.createElement("div", { style: {
+      fontSize: 12,
+      color: "var(--accent-text)",
+      marginTop: 2,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    } }, note) : null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "var(--text-faint)" } }, sizeKB !== null ? `${sizeKB} KB` : "", !selectMode && /* @__PURE__ */ React.createElement(React.Fragment, null, sizeKB !== null ? " \xB7 " : "", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", fontWeight: 600 } }, "\u9EDE\u6B64\u9084\u539F")))),
+    children
+  );
+}
 const TxnRow = React.memo(function TxnRow2({ txn, state, catIcon, onClick, onLongPress, onLinkClick, highlighted, selectMode, selected }) {
   const linkCtx = React.useContext(LinkContext);
   const effectiveLinkClick = onLinkClick || linkCtx.onLinkClick;
@@ -16278,7 +16556,7 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
       }
       return null;
     })),
-    showFilter && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.actionMenuBackdrop, onClick: () => setShowFilter(false), ...filterSwipe }, /* @__PURE__ */ React.createElement("div", { style: styles.filterCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.actionMenuTitle }, "\u7BE9\u9078\u689D\u4EF6"), /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u8D77\u59CB\u65E5\u671F"), /* @__PURE__ */ React.createElement(
+    showFilter && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: { ...styles.actionMenuBackdrop, paddingBottom: "calc(80px + env(safe-area-inset-bottom, 0px))" }, onClick: () => setShowFilter(false), ...filterSwipe }, /* @__PURE__ */ React.createElement("div", { style: styles.filterCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.actionMenuTitle }, "\u7BE9\u9078\u689D\u4EF6"), /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u8D77\u59CB\u65E5\u671F"), /* @__PURE__ */ React.createElement(
       "input",
       {
         type: "date",
@@ -16822,7 +17100,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
         }
       });
       const net = totalAssets - totalDebt;
-      return /* @__PURE__ */ React.createElement("div", { style: styles.assetSummary }, /* @__PURE__ */ React.createElement("div", { style: styles.assetSumBox }, /* @__PURE__ */ React.createElement("div", { style: styles.assetSumLabel }, "\u7E3D\u8CC7\u7522"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.assetSumValue, color: "var(--mint-text)", fontSize: autoFitFontSize(totalAssets.toLocaleString()) } }, totalAssets.toLocaleString())), /* @__PURE__ */ React.createElement("div", { style: styles.assetSumDivider }), /* @__PURE__ */ React.createElement("div", { style: styles.assetSumBox }, /* @__PURE__ */ React.createElement("div", { style: styles.assetSumLabel }, "\u7E3D\u8CA0\u50B5"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.assetSumValue, color: "var(--pink-text)", fontSize: autoFitFontSize(totalDebt.toLocaleString()) } }, totalDebt.toLocaleString())), /* @__PURE__ */ React.createElement("div", { style: styles.assetSumDivider }), /* @__PURE__ */ React.createElement("div", { style: styles.assetSumBox }, /* @__PURE__ */ React.createElement("div", { style: styles.assetSumLabel }, "\u6DE8\u8CC7\u7522"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.assetSumValue, color: net < 0 ? "var(--pink)" : "var(--text)", fontSize: autoFitFontSize(net.toLocaleString()) } }, net.toLocaleString())));
+      return /* @__PURE__ */ React.createElement("div", { style: { ...styles.assetSummary, paddingBottom: 10, borderBottom: "1px solid var(--border-soft)", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: styles.assetSumBox }, /* @__PURE__ */ React.createElement("div", { style: styles.assetSumLabel }, "\u7E3D\u8CC7\u7522"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.assetSumValue, color: "var(--mint-text)", fontSize: autoFitFontSize(totalAssets.toLocaleString()) } }, totalAssets.toLocaleString())), /* @__PURE__ */ React.createElement("div", { style: styles.assetSumDivider }), /* @__PURE__ */ React.createElement("div", { style: styles.assetSumBox }, /* @__PURE__ */ React.createElement("div", { style: styles.assetSumLabel }, "\u7E3D\u8CA0\u50B5"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.assetSumValue, color: "var(--pink-text)", fontSize: autoFitFontSize(totalDebt.toLocaleString()) } }, totalDebt.toLocaleString())), /* @__PURE__ */ React.createElement("div", { style: styles.assetSumDivider }), /* @__PURE__ */ React.createElement("div", { style: styles.assetSumBox }, /* @__PURE__ */ React.createElement("div", { style: styles.assetSumLabel }, "\u6DE8\u8CC7\u7522"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.assetSumValue, color: net < 0 ? "var(--pink)" : "var(--text)", fontSize: autoFitFontSize(net.toLocaleString()) } }, net.toLocaleString())));
     })(),
     /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll, "data-scroll-container": true, ref: scrollContainerRef }, editingId ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.block, padding: "10px 12px", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.sectionLabel, marginTop: 0, display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", null, "\u5E33\u6236\u985E\u578B"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("span", { style: styles.gearBtn, onClick: () => setShowTypeManage(true) }, "\u2699\uFE0F"), /* @__PURE__ */ React.createElement("div", { style: styles.lockRow }, /* @__PURE__ */ React.createElement("span", { style: { ...styles.lockLabel, color: typeLocked ? "var(--text-dim)" : "var(--mint)", display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: typeLocked ? "lock" : "unlock", size: 12, color: typeLocked ? "var(--text-dim)" : "var(--mint)" }), typeLocked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
       "div",
