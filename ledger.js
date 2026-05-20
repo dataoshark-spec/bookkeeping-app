@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515BG";
+const APP_VERSION = "1150515BK";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -8749,16 +8749,37 @@ function SettingsPage({
       confirmText: "\u78BA\u8A8D\u9084\u539F",
       danger: true,
       onConfirm: () => {
+        const dbgT = Array.isArray(snap.data.transactions) ? snap.data.transactions.length : "(\u7121)";
+        const dbgA = Array.isArray(snap.data.accounts) ? snap.data.accounts.length : "(\u7121)";
+        const dbgC = (snap.data.categories?.expense?.length || 0) + (snap.data.categories?.income?.length || 0);
+        const dbgAT = Array.isArray(snap.data.accountTypes) ? snap.data.accountTypes.length : "(\u7121)";
+        alert(`\u3010\u9664\u932F\u3011\u5FEB\u7167 data \u5167\u5BB9:
+\u4EA4\u6613: ${dbgT}
+\u5E33\u6236: ${dbgA}
+\u5206\u985E: ${dbgC}
+\u5E33\u6236\u985E\u578B: ${dbgAT}
+
+\u6309\u78BA\u5B9A\u958B\u59CB\u5957\u7528\u5230 state`);
         setState((s) => {
           const next = { ...s };
-          if (scopes.transactions && snap.data.transactions) {
+          if (Array.isArray(snap.data.transactions)) {
             next.transactions = snap.data.transactions;
             next.holdings = Array.isArray(snap.data.holdings) ? snap.data.holdings : [];
             next.trades = Array.isArray(snap.data.trades) ? snap.data.trades : [];
           }
-          if (scopes.accounts && snap.data.accounts) next.accounts = snap.data.accounts;
-          if (scopes.categories && snap.data.categories) next.categories = snap.data.categories;
-          if (scopes.accountTypes && snap.data.accountTypes) next.accountTypes = snap.data.accountTypes;
+          if (Array.isArray(snap.data.accounts)) next.accounts = snap.data.accounts;
+          if (snap.data.categories && (Array.isArray(snap.data.categories.expense) || Array.isArray(snap.data.categories.income))) {
+            next.categories = snap.data.categories;
+          }
+          if (Array.isArray(snap.data.accountTypes)) next.accountTypes = snap.data.accountTypes;
+          setTimeout(() => {
+            alert(`\u3010\u9664\u932F\u3011setState \u5B8C\u6210,next \u8CE6\u503C:
+\u4EA4\u6613: ${next.transactions.length}
+\u5E33\u6236: ${next.accounts.length}
+\u5206\u985E: ${(next.categories?.expense?.length || 0) + (next.categories?.income?.length || 0)}
+
+\u99AC\u4E0A\u53BB\u8A2D\u5B9A\u9801\u770B\u300C\u5E33\u6236\u6578\u300D\u61C9\u8A72\u7B49\u65BC\u6B64\u8655\u7684\u300C\u5E33\u6236\u300D`);
+          }, 100);
           return next;
         });
         const snapDate = new Date(snap.createdAt);
@@ -10554,11 +10575,18 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
     const d = new Date(snap.createdAt);
     const timeStr = `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
     const scopes = snap.scopes || { transactions: true, accounts: true, categories: true, accountTypes: true };
+    const realTxn = Array.isArray(snap.data?.transactions) ? snap.data.transactions.length : 0;
+    const realAcct = Array.isArray(snap.data?.accounts) ? snap.data.accounts.length : 0;
+    const realCat = (snap.data?.categories?.expense?.length || 0) + (snap.data?.categories?.income?.length || 0);
+    const realAcctType = Array.isArray(snap.data?.accountTypes) ? snap.data.accountTypes.length : 0;
+    const sumTxn = snap.summary?.txnCount;
+    const sumAcct = snap.summary?.acctCount;
+    const mismatchLabel = (real, sum) => sum != null && sum !== real ? `${real}/${sum}\u26A0` : String(real);
     const tags = [];
-    if (scopes.transactions) tags.push(`\u4EA4\u6613 ${snap.summary?.txnCount ?? "?"}`);
-    if (scopes.accounts) tags.push(`\u5E33\u6236 ${snap.summary?.acctCount ?? "?"}`);
-    if (scopes.categories) tags.push("\u5206\u985E");
-    if (scopes.accountTypes) tags.push("\u5E33\u6236\u985E\u578B");
+    if (scopes.transactions) tags.push(`\u4EA4\u6613 ${mismatchLabel(realTxn, sumTxn)}`);
+    if (scopes.accounts) tags.push(`\u5E33\u6236 ${mismatchLabel(realAcct, sumAcct)}`);
+    if (scopes.categories) tags.push(`\u5206\u985E ${realCat}`);
+    if (scopes.accountTypes) tags.push(`\u5E33\u6236\u985E\u578B ${realAcctType}`);
     return /* @__PURE__ */ React.createElement("div", { key: snap.id, style: { padding: "12px 20px", borderBottom: "1px solid var(--border)" } }, renamingSnapId === snap.id ? (
       // 編輯模式
       /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 6, alignItems: "center" } }, /* @__PURE__ */ React.createElement(
