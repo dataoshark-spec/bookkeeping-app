@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520CI";
+const APP_VERSION = "1150520CJ";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -17161,6 +17161,24 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
       )
     }));
   };
+  const [groupPickerForAcct, setGroupPickerForAcct] = useState(null);
+  const groupPickerSwipe = useSwipeToClose(() => setGroupPickerForAcct(null));
+  const assignAccountToGroup = (acctId, targetGroupId) => {
+    setState((s) => {
+      const updated = (s.accountGroups || []).map((g) => {
+        const cleaned = (g.accountIds || []).filter((aid) => aid !== acctId);
+        if (g.id === targetGroupId && !cleaned.includes(acctId)) {
+          return { ...g, accountIds: [...cleaned, acctId] };
+        }
+        return { ...g, accountIds: cleaned };
+      });
+      return { ...s, accountGroups: updated };
+    });
+  };
+  const findGroupOfAcct = (acctId) => {
+    const groups = state.accountGroups || [];
+    return groups.find((g) => (g.accountIds || []).includes(acctId)) || null;
+  };
   const renderAcctRow = (a, i, totalLen) => {
     const typeMeta = state.accountTypes.find((t) => t.value === a.type) || { label: "\u5176\u4ED6", icon: "box", color: "#f5c29c" };
     const isStockInvest = a.type === "invest" && (a.investSubType || "stock") === "stock";
@@ -17951,18 +17969,26 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
                 userSelect: "none",
                 borderRadius: 8,
                 // 比帳戶卡稍小:高度約 30px 左右
-                minHeight: 28
+                minHeight: 28,
+                // [v555CJ] 收合時整列淡化,跟展開的視覺重量做出區隔
+                opacity: g.collapsed ? 0.55 : 1
               }
             },
             /* @__PURE__ */ React.createElement("span", { style: {
               fontSize: 11,
+              // 收合時箭頭再淡一階(主視覺已用 opacity 整體淡化,這裡微調保持層次)
               color: "var(--text-faint)",
               transition: "transform 0.2s",
               transform: g.collapsed ? "rotate(-90deg)" : "rotate(0)",
               display: "inline-block",
               width: 12
             } }, "\u25BC"),
-            /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "var(--text-dim)", fontWeight: 500 } }, g.name),
+            /* @__PURE__ */ React.createElement("span", { style: {
+              fontSize: 13,
+              // 收合時 name 從 text-dim → text-faint(再淡一階,跟 opacity 疊加效果更明顯)
+              color: g.collapsed ? "var(--text-faint)" : "var(--text-dim)",
+              fontWeight: g.collapsed ? 400 : 500
+            } }, g.name),
             /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "var(--text-faint)" } }, "\xB7 ", memberCount, " \u500B"),
             /* @__PURE__ */ React.createElement("span", { style: { flex: 1 } }),
             /* @__PURE__ */ React.createElement(
@@ -17997,34 +18023,37 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
       });
       return rendered;
     })()), !editMode && /* @__PURE__ */ React.createElement("div", { style: { height: 12 } }))),
-    !editingId && !editMode && /* @__PURE__ */ React.createElement("div", { style: styles.stickyFooterBar }, /* @__PURE__ */ React.createElement(
-      "div",
+    !editingId && !editMode && /* @__PURE__ */ React.createElement("div", { style: styles.stickyFooterBar }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement(
+      "button",
       {
         onClick: () => setShowManageGroups("list"),
         style: {
-          fontSize: 12,
-          color: "var(--text-faint)",
-          textAlign: "center",
-          padding: "6px 0 8px",
+          flex: "0 0 auto",
+          padding: "14px 14px",
+          borderRadius: 12,
+          border: "1px solid var(--border)",
+          background: "transparent",
+          color: "var(--text-dim)",
+          fontSize: 13,
           cursor: "pointer",
-          userSelect: "none"
+          whiteSpace: "nowrap"
         }
       },
-      "\u7BA1\u7406\u5B50\u6A19\u7C64 ",
-      state.accountGroups && state.accountGroups.length > 0 ? `(${state.accountGroups.length})` : ""
+      "\u7BA1\u7406\u5B50\u6A19\u7C64",
+      state.accountGroups && state.accountGroups.length > 0 ? ` (${state.accountGroups.length})` : ""
     ), /* @__PURE__ */ React.createElement(
       "button",
       {
         style: {
           ...styles.addIncBtn,
-          width: "100%",
+          flex: 1,
           padding: "14px 0",
           borderRadius: 12
         },
         onClick: startAdd
       },
       "\uFF0B \u65B0\u589E\u5E33\u6236"
-    )),
+    ))),
     deleteModeChoice && (() => {
       const info = deleteModeChoice;
       const balanceText = info.balance !== 0 ? fmtSigned(info.balance) : "0";
@@ -18240,6 +18269,22 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
       ), /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogDivider }), /* @__PURE__ */ React.createElement(
         "div",
         {
+          style: styles.centerDialogItem,
+          onClick: () => {
+            const acct = actionMenu;
+            setActionMenu(null);
+            setGroupPickerForAcct(acct);
+          }
+        },
+        /* @__PURE__ */ React.createElement("span", { style: styles.actionMenuIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "folder", size: 20, color: "var(--text-dim)" })),
+        /* @__PURE__ */ React.createElement("span", { style: { flex: 1 } }, "\u5B50\u6A19\u7C64"),
+        (() => {
+          const g = findGroupOfAcct(actionMenu.id);
+          return /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--text-faint)", marginRight: 4 } }, g ? g.name : "\u7121");
+        })()
+      ), /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogDivider }), /* @__PURE__ */ React.createElement(
+        "div",
+        {
           style: { ...styles.centerDialogItem, color: "var(--pink-text)" },
           onClick: () => {
             const acct = actionMenu;
@@ -18249,6 +18294,56 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
         },
         /* @__PURE__ */ React.createElement("span", { style: styles.actionMenuIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "trash", size: 20, color: "var(--pink-text)" })),
         /* @__PURE__ */ React.createElement("span", null, "\u522A\u9664\u9019\u500B\u5E33\u6236")
+      )));
+    })(),
+    groupPickerForAcct && (() => {
+      const acct = groupPickerForAcct;
+      const groups = state.accountGroups || [];
+      const currentGroup = findGroupOfAcct(acct.id);
+      return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: () => setGroupPickerForAcct(null), ...groupPickerSwipe }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogHeader }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogHeaderName }, "\u8A2D\u5B9A\u5B50\u6A19\u7C64"), /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogHeaderMeta }, "\u5E33\u6236: ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text)", fontWeight: 500 } }, acct.name))), /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogDivider }), /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: styles.centerDialogItem,
+          onClick: () => {
+            assignAccountToGroup(acct.id, null);
+            setGroupPickerForAcct(null);
+            toastRich && toastRich({ title: "\u5DF2\u79FB\u51FA\u5B50\u6A19\u7C64", amount: "\u2713", amountColor: "var(--text-faint)" }, 1200);
+          }
+        },
+        /* @__PURE__ */ React.createElement("span", { style: { ...styles.actionMenuIcon, fontSize: 18, color: "var(--text-dim)", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, "\u2014"),
+        /* @__PURE__ */ React.createElement("span", { style: { flex: 1 } }, "\u4E0D\u6B78\u5165\u4EFB\u4F55\u5B50\u6A19\u7C64"),
+        !currentGroup && /* @__PURE__ */ React.createElement(TypeIcon, { name: "check", size: 16, color: "var(--mint-text)" })
+      ), groups.map((g) => /* @__PURE__ */ React.createElement(React.Fragment, { key: g.id }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogDivider }), /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: styles.centerDialogItem,
+          onClick: () => {
+            assignAccountToGroup(acct.id, g.id);
+            setGroupPickerForAcct(null);
+            toastRich && toastRich({
+              titleSegments: [
+                { text: "\u5DF2\u52A0\u5165" },
+                { text: ` ${g.name}`, color: "var(--mint-text)", weight: 700 }
+              ],
+              amount: "\u2713",
+              amountColor: "var(--mint-text)"
+            }, 1200);
+          }
+        },
+        /* @__PURE__ */ React.createElement("span", { style: styles.actionMenuIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "folder", size: 20, color: "var(--text-dim)" })),
+        /* @__PURE__ */ React.createElement("span", { style: { flex: 1 } }, g.name),
+        currentGroup && currentGroup.id === g.id && /* @__PURE__ */ React.createElement(TypeIcon, { name: "check", size: 16, color: "var(--mint-text)" })
+      ))), /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogDivider }), /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: { ...styles.centerDialogItem, color: "var(--accent-text)" },
+          onClick: () => {
+            setGroupPickerForAcct(null);
+            openManageGroups(null);
+          }
+        },
+        /* @__PURE__ */ React.createElement("span", { style: { ...styles.actionMenuIcon, fontSize: 20, color: "var(--accent-text)", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, "\uFF0B"),
+        /* @__PURE__ */ React.createElement("span", null, "\u65B0\u589E\u5B50\u6A19\u7C64\u2026")
       )));
     })(),
     showInitCalc && /* @__PURE__ */ React.createElement(
