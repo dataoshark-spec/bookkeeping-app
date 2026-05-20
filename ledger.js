@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515BK";
+const APP_VERSION = "1150515BL";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -1600,6 +1600,13 @@ function App() {
       _hasMountedRef.current = true;
       return;
     }
+    alert(`\u3010\u9664\u932F useEffect[state] \u89F8\u767C\u3011
+\u4EA4\u6613: ${state.transactions.length}
+\u5E33\u6236: ${state.accounts.length}
+\u5206\u985E: ${(state.categories?.expense?.length || 0) + (state.categories?.income?.length || 0)}
+\u6301\u80A1: ${state.holdings.length}
+
+\u6309\u78BA\u5B9A\u7E7C\u7E8C(\u53EF\u80FD\u6703\u518D\u8DF3\u5E7E\u6B21)`);
     try {
       const isEmptyState = (!state.transactions || state.transactions.length === 0) && (!state.accounts || state.accounts.length === 0) && (!state.holdings || state.holdings.length === 0) && (!state.trades || state.trades.length === 0);
       if (isEmptyState) {
