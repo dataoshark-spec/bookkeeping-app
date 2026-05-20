@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515BV";
+const APP_VERSION = "1150515BW";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -6907,14 +6907,20 @@ function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, sel
     const sel = state.transactions.filter((t) => ids.includes(t.id));
     const transferIds = /* @__PURE__ */ new Set();
     const settleIds = /* @__PURE__ */ new Set();
+    const txnGroupIds = /* @__PURE__ */ new Set();
+    const tradeIds = /* @__PURE__ */ new Set();
     sel.forEach((t) => {
       if (t.transferId) transferIds.add(t.transferId);
       if (t.settleId) settleIds.add(t.settleId);
+      if (t.txnGroupId) txnGroupIds.add(t.txnGroupId);
+      if (t.tradeId) tradeIds.add(t.tradeId);
     });
     const actuallyDeleteIds = new Set(ids);
     state.transactions.forEach((t) => {
       if (t.transferId && transferIds.has(t.transferId)) actuallyDeleteIds.add(t.id);
       if (t.settleId && settleIds.has(t.settleId)) actuallyDeleteIds.add(t.id);
+      if (t.txnGroupId && txnGroupIds.has(t.txnGroupId)) actuallyDeleteIds.add(t.id);
+      if (t.tradeId && tradeIds.has(t.tradeId)) actuallyDeleteIds.add(t.id);
     });
     const cascadeIds = expandStockBuyCascade(state, actuallyDeleteIds);
     if (cascadeIds.size > 0) {
@@ -6923,6 +6929,8 @@ function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, sel
     const delCount = actuallyDeleteIds.size;
     const includesTransfer = transferIds.size > 0;
     const includesSettle = settleIds.size > 0;
+    const includesGroup = txnGroupIds.size > 0;
+    const includesTrade = tradeIds.size > 0;
     const expandedCount = delCount - ids.length;
     const listText = buildBatchDeletePreview(state.transactions, selectedIds, actuallyDeleteIds);
     if (!setConfirmDialog) return;
@@ -6932,8 +6940,12 @@ function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, sel
         linkMsg = "\u540C\u7D44\u8F49\u5E33\u8207\u80A1\u7968\u7D50\u7B97\u5C07\u4E00\u4F75\u522A\u9664\u3002";
       } else if (includesSettle) {
         linkMsg = "\u672C\u91D1\u6B78\u9084\u8207\u640D\u76CA\u5C6C\u540C\u4E00\u7D44,\u5C07\u4E00\u4F75\u522A\u9664\u3002";
+      } else if (includesTrade) {
+        linkMsg = "\u540C\u7B46\u8CB7\u8CE3\u7684\u76F8\u95DC\u7D00\u9304\u5C07\u4E00\u4F75\u522A\u9664\u3002";
       } else if (includesTransfer) {
         linkMsg = "\u8F49\u5E33\u5169\u7AEF\u7D00\u9304\u5C6C\u540C\u4E00\u7D44,\u5C07\u4E00\u4F75\u522A\u9664\u3002";
+      } else if (includesGroup) {
+        linkMsg = "\u540C\u7D44\u7D00\u9304(\u542B\u624B\u7E8C\u8CBB)\u5C07\u4E00\u4F75\u522A\u9664\u3002";
       }
     }
     const stockImpact = detectStockBuyImpact(state, actuallyDeleteIds);
@@ -7414,14 +7426,20 @@ function TxnListPage({ state, setState, setConfirmDialog, toastRich, toast, catI
     const txns = state.transactions.filter((t) => ids.includes(t.id));
     const transferIds = /* @__PURE__ */ new Set();
     const settleIds = /* @__PURE__ */ new Set();
+    const txnGroupIds = /* @__PURE__ */ new Set();
+    const tradeIds = /* @__PURE__ */ new Set();
     txns.forEach((t) => {
       if (t.transferId) transferIds.add(t.transferId);
       if (t.settleId) settleIds.add(t.settleId);
+      if (t.txnGroupId) txnGroupIds.add(t.txnGroupId);
+      if (t.tradeId) tradeIds.add(t.tradeId);
     });
     const actuallyDeleteIds = new Set(ids);
     state.transactions.forEach((t) => {
       if (t.transferId && transferIds.has(t.transferId)) actuallyDeleteIds.add(t.id);
       if (t.settleId && settleIds.has(t.settleId)) actuallyDeleteIds.add(t.id);
+      if (t.txnGroupId && txnGroupIds.has(t.txnGroupId)) actuallyDeleteIds.add(t.id);
+      if (t.tradeId && tradeIds.has(t.tradeId)) actuallyDeleteIds.add(t.id);
     });
     const cascadeIds = expandStockBuyCascade(state, actuallyDeleteIds);
     if (cascadeIds.size > 0) {
@@ -7430,6 +7448,8 @@ function TxnListPage({ state, setState, setConfirmDialog, toastRich, toast, catI
     const delCount = actuallyDeleteIds.size;
     const includesTransfer = transferIds.size > 0;
     const includesSettle = settleIds.size > 0;
+    const includesGroup = txnGroupIds.size > 0;
+    const includesTrade = tradeIds.size > 0;
     const expandedCount = delCount - ids.length;
     const listText = buildBatchDeletePreview(state.transactions, selectedIds, actuallyDeleteIds);
     let linkMsg;
@@ -7438,8 +7458,12 @@ function TxnListPage({ state, setState, setConfirmDialog, toastRich, toast, catI
         linkMsg = "\u540C\u7D44\u8F49\u5E33\u8207\u80A1\u7968\u7D50\u7B97\u5C07\u4E00\u4F75\u522A\u9664\u3002";
       } else if (includesSettle) {
         linkMsg = "\u672C\u91D1\u6B78\u9084\u8207\u640D\u76CA\u5C6C\u540C\u4E00\u7D44,\u5C07\u4E00\u4F75\u522A\u9664\u3002";
+      } else if (includesTrade) {
+        linkMsg = "\u540C\u7B46\u8CB7\u8CE3\u7684\u76F8\u95DC\u7D00\u9304\u5C07\u4E00\u4F75\u522A\u9664\u3002";
       } else if (includesTransfer) {
         linkMsg = "\u8F49\u5E33\u5169\u7AEF\u7D00\u9304\u5C6C\u540C\u4E00\u7D44,\u5C07\u4E00\u4F75\u522A\u9664\u3002";
+      } else if (includesGroup) {
+        linkMsg = "\u540C\u7D44\u7D00\u9304(\u542B\u624B\u7E8C\u8CBB)\u5C07\u4E00\u4F75\u522A\u9664\u3002";
       }
     }
     const stockImpact = detectStockBuyImpact(state, actuallyDeleteIds);
@@ -14387,14 +14411,20 @@ function PeriodDetailSheet({ state, setState, catIcon, periodKey, onClose, onCli
     const sel = state.transactions.filter((t) => ids.includes(t.id));
     const transferIds = /* @__PURE__ */ new Set();
     const settleIds = /* @__PURE__ */ new Set();
+    const txnGroupIds = /* @__PURE__ */ new Set();
+    const tradeIds = /* @__PURE__ */ new Set();
     sel.forEach((t) => {
       if (t.transferId) transferIds.add(t.transferId);
       if (t.settleId) settleIds.add(t.settleId);
+      if (t.txnGroupId) txnGroupIds.add(t.txnGroupId);
+      if (t.tradeId) tradeIds.add(t.tradeId);
     });
     const actuallyDeleteIds = new Set(ids);
     state.transactions.forEach((t) => {
       if (t.transferId && transferIds.has(t.transferId)) actuallyDeleteIds.add(t.id);
       if (t.settleId && settleIds.has(t.settleId)) actuallyDeleteIds.add(t.id);
+      if (t.txnGroupId && txnGroupIds.has(t.txnGroupId)) actuallyDeleteIds.add(t.id);
+      if (t.tradeId && tradeIds.has(t.tradeId)) actuallyDeleteIds.add(t.id);
     });
     const cascadeIds = expandStockBuyCascade(state, actuallyDeleteIds);
     if (cascadeIds.size > 0) {
@@ -14403,6 +14433,8 @@ function PeriodDetailSheet({ state, setState, catIcon, periodKey, onClose, onCli
     const delCount = actuallyDeleteIds.size;
     const includesTransfer = transferIds.size > 0;
     const includesSettle = settleIds.size > 0;
+    const includesGroup = txnGroupIds.size > 0;
+    const includesTrade = tradeIds.size > 0;
     const expandedCount = delCount - ids.length;
     const listText = buildBatchDeletePreview(state.transactions, selectedIds, actuallyDeleteIds);
     if (!setConfirmDialog) return;
@@ -14412,8 +14444,12 @@ function PeriodDetailSheet({ state, setState, catIcon, periodKey, onClose, onCli
         linkMsg = "\u540C\u7D44\u8F49\u5E33\u8207\u80A1\u7968\u7D50\u7B97\u5C07\u4E00\u4F75\u522A\u9664\u3002";
       } else if (includesSettle) {
         linkMsg = "\u672C\u91D1\u6B78\u9084\u8207\u640D\u76CA\u5C6C\u540C\u4E00\u7D44,\u5C07\u4E00\u4F75\u522A\u9664\u3002";
+      } else if (includesTrade) {
+        linkMsg = "\u540C\u7B46\u8CB7\u8CE3\u7684\u76F8\u95DC\u7D00\u9304\u5C07\u4E00\u4F75\u522A\u9664\u3002";
       } else if (includesTransfer) {
         linkMsg = "\u8F49\u5E33\u5169\u7AEF\u7D00\u9304\u5C6C\u540C\u4E00\u7D44,\u5C07\u4E00\u4F75\u522A\u9664\u3002";
+      } else if (includesGroup) {
+        linkMsg = "\u540C\u7D44\u7D00\u9304(\u542B\u624B\u7E8C\u8CBB)\u5C07\u4E00\u4F75\u522A\u9664\u3002";
       }
     }
     const stockImpact = detectStockBuyImpact(state, actuallyDeleteIds);
@@ -19014,12 +19050,13 @@ const styles = {
   filterCard: {
     background: "var(--bg)",
     borderRadius: 18,
-    padding: "20px",
+    padding: "20px 20px calc(28px + env(safe-area-inset-bottom, 0px))",
     width: "100%",
     maxWidth: 380,
-    maxHeight: "85vh",
+    maxHeight: "82vh",
     overflowY: "auto",
-    boxShadow: "0 10px 40px rgba(0,0,0,0.5)"
+    boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
+    marginBottom: 8
   },
   filterBadge: {
     display: "flex",
