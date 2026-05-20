@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515BL";
+const APP_VERSION = "1150515BM";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -1600,13 +1600,6 @@ function App() {
       _hasMountedRef.current = true;
       return;
     }
-    alert(`\u3010\u9664\u932F useEffect[state] \u89F8\u767C\u3011
-\u4EA4\u6613: ${state.transactions.length}
-\u5E33\u6236: ${state.accounts.length}
-\u5206\u985E: ${(state.categories?.expense?.length || 0) + (state.categories?.income?.length || 0)}
-\u6301\u80A1: ${state.holdings.length}
-
-\u6309\u78BA\u5B9A\u7E7C\u7E8C(\u53EF\u80FD\u6703\u518D\u8DF3\u5E7E\u6B21)`);
     try {
       const isEmptyState = (!state.transactions || state.transactions.length === 0) && (!state.accounts || state.accounts.length === 0) && (!state.holdings || state.holdings.length === 0) && (!state.trades || state.trades.length === 0);
       if (isEmptyState) {
@@ -8599,7 +8592,7 @@ function SettingsPage({
       if (onSubSheetChange) onSubSheetChange(false);
     };
   }, [onSubSheetChange]);
-  const SNAPSHOT_KEY = "ledger_snapshots_v1";
+  const SNAPSHOT_KEY = "ledger_snapshots_v2";
   const SNAPSHOT_MAX = 10;
   const [snapshots, setSnapshots] = useState(() => {
     try {
@@ -8609,18 +8602,18 @@ function SettingsPage({
       return [];
     }
   });
+  React.useEffect(() => {
+    try {
+      localStorage.removeItem("ledger_snapshots_v1");
+    } catch {
+    }
+  }, []);
   const [showSnapshots, setShowSnapshots] = useState(false);
   const [snapshotsLocked, setSnapshotsLocked] = useState(true);
   const [renamingSnapId, setRenamingSnapId] = useState(null);
   const [renameInput, setRenameInput] = useState("");
   const [snapshotNameInput, setSnapshotNameInput] = useState("");
   const [showSnapshotNameDialog, setShowSnapshotNameDialog] = useState(false);
-  const [snapshotScopes, setSnapshotScopes] = useState({
-    transactions: true,
-    accounts: true,
-    categories: true,
-    accountTypes: true
-  });
   const driveSetupSwipe = useSwipeToClose(() => setShowDriveSetup(false));
   const reminderSetupSwipe = useSwipeToClose(() => setShowReminderSetup(false));
   const snapshotNameSwipe = useSwipeToClose(() => setShowSnapshotNameDialog(false));
@@ -8635,12 +8628,6 @@ function SettingsPage({
     }
   };
   const createSnapshot = (customName) => {
-    const scopes = snapshotScopes;
-    const anyChecked = scopes.transactions || scopes.accounts || scopes.categories || scopes.accountTypes;
-    if (!anyChecked) {
-      toast("\u81F3\u5C11\u8981\u9078\u4E00\u500B\u985E\u5225");
-      return;
-    }
     if (snapshots.length >= SNAPSHOT_MAX) {
       setConfirmDialog({
         title: "\u5FEB\u7167\u5DF2\u9054\u4E0A\u9650",
@@ -8655,28 +8642,30 @@ function SettingsPage({
     }
     const now = /* @__PURE__ */ new Date();
     const defaultName = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")} \u624B\u52D5\u5FEB\u7167`;
-    const data = {};
-    if (scopes.transactions) {
-      data.transactions = state.transactions;
-      data.holdings = state.holdings;
-      data.trades = state.trades;
-    }
-    if (scopes.accounts) data.accounts = state.accounts;
-    if (scopes.categories) data.categories = state.categories;
-    if (scopes.accountTypes) data.accountTypes = state.accountTypes;
+    const stateJSON = JSON.stringify({
+      transactions: state.transactions,
+      accounts: state.accounts,
+      categories: state.categories,
+      accountTypes: state.accountTypes,
+      holdings: state.holdings,
+      trades: state.trades
+    });
     const snap = {
       id: "snap_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       name: customName && customName.trim() || defaultName,
       createdAt: now.getTime(),
-      data,
-      scopes: { ...scopes },
-      summary: {
-        txnCount: scopes.transactions ? state.transactions.length : null,
-        holdingCount: scopes.transactions ? state.holdings.length : null,
-        tradeCount: scopes.transactions ? state.trades.length : null,
-        acctCount: scopes.accounts ? state.accounts.length : null,
-        catCount: scopes.categories ? (state.categories.expense?.length || 0) + (state.categories.income?.length || 0) : null,
-        acctTypeCount: scopes.accountTypes ? state.accountTypes.length : null
+      v: 2,
+      // schema 版本標記,給未來相容性判斷用
+      stateJSON,
+      // 完整 state 序列化字串(這是唯一的真實資料來源)
+      // 顯示用統計(只是 UI chip 用,不參與還原)
+      counts: {
+        txn: state.transactions.length,
+        acct: state.accounts.length,
+        cat: (state.categories?.expense?.length || 0) + (state.categories?.income?.length || 0),
+        acctType: state.accountTypes.length,
+        holding: state.holdings.length,
+        trade: state.trades.length
       }
     };
     const next = [snap, ...snapshots].slice(0, SNAPSHOT_MAX);
@@ -8696,58 +8685,56 @@ function SettingsPage({
     }
   };
   const restoreSnapshot = (snap) => {
-    const scopes = snap.scopes || { transactions: true, accounts: true, categories: true, accountTypes: true };
-    const changes = [];
-    if (scopes.transactions && snap.data.transactions) {
-      const cur = state.transactions.length;
-      const next = snap.data.transactions.length;
-      const curH = state.holdings.length;
-      const nextH = Array.isArray(snap.data.holdings) ? snap.data.holdings.length : 0;
-      const curT = state.trades.length;
-      const nextT = Array.isArray(snap.data.trades) ? snap.data.trades.length : 0;
-      const txnChanged = cur !== next;
-      const stockChanged = curH !== nextH || curT !== nextT;
-      changes.push({
+    let snapData;
+    try {
+      if (snap.stateJSON) {
+        snapData = JSON.parse(snap.stateJSON);
+      } else if (snap.data) {
+        snapData = snap.data;
+      } else {
+        toast("\u5FEB\u7167\u8CC7\u6599\u7F3A\u5931,\u7121\u6CD5\u9084\u539F");
+        return;
+      }
+    } catch (e) {
+      toast("\u5FEB\u7167\u8CC7\u6599\u640D\u6BC0,\u7121\u6CD5\u9084\u539F");
+      return;
+    }
+    const snapTxn = Array.isArray(snapData.transactions) ? snapData.transactions : [];
+    const snapAcct = Array.isArray(snapData.accounts) ? snapData.accounts : [];
+    const snapCat = snapData.categories || { expense: [], income: [] };
+    const snapAcctType = Array.isArray(snapData.accountTypes) ? snapData.accountTypes : [];
+    const snapHoldings = Array.isArray(snapData.holdings) ? snapData.holdings : [];
+    const snapTrades = Array.isArray(snapData.trades) ? snapData.trades : [];
+    const changes = [
+      {
         icon: "list",
         label: "\u4EA4\u6613\u7D00\u9304",
-        from: `\u73FE\u6709 ${cur} \u7B46${curH > 0 || curT > 0 ? ` (\u6301\u80A1 ${curH})` : ""}`,
-        to: `\u5FEB\u7167 ${next} \u7B46${nextH > 0 || nextT > 0 ? ` (\u6301\u80A1 ${nextH})` : curH > 0 || curT > 0 ? " (\u6301\u80A1 0)" : ""}`,
-        changed: txnChanged || stockChanged
-      });
-    }
-    if (scopes.accounts && snap.data.accounts) {
-      const cur = state.accounts.length;
-      const next = snap.data.accounts.length;
-      changes.push({
+        from: `\u73FE\u6709 ${state.transactions.length} \u7B46${state.holdings.length > 0 || state.trades.length > 0 ? ` (\u6301\u80A1 ${state.holdings.length})` : ""}`,
+        to: `\u5FEB\u7167 ${snapTxn.length} \u7B46${snapHoldings.length > 0 || snapTrades.length > 0 ? ` (\u6301\u80A1 ${snapHoldings.length})` : state.holdings.length > 0 || state.trades.length > 0 ? " (\u6301\u80A1 0)" : ""}`,
+        changed: state.transactions.length !== snapTxn.length || state.holdings.length !== snapHoldings.length || state.trades.length !== snapTrades.length
+      },
+      {
         icon: "bank",
         label: "\u5E33\u6236",
-        from: `\u73FE\u6709 ${cur} \u500B`,
-        to: `\u5FEB\u7167 ${next} \u500B`,
-        changed: cur !== next
-      });
-    }
-    if (scopes.categories && snap.data.categories) {
-      const curCount = (state.categories.expense?.length || 0) + (state.categories.income?.length || 0);
-      const nextCount = (snap.data.categories.expense?.length || 0) + (snap.data.categories.income?.length || 0);
-      changes.push({
+        from: `\u73FE\u6709 ${state.accounts.length} \u500B`,
+        to: `\u5FEB\u7167 ${snapAcct.length} \u500B`,
+        changed: state.accounts.length !== snapAcct.length
+      },
+      {
         icon: "note",
         label: "\u5206\u985E\u8A2D\u5B9A",
-        from: `\u73FE\u6709 ${curCount} \u9805`,
-        to: `\u5FEB\u7167 ${nextCount} \u9805`,
-        changed: curCount !== nextCount
-      });
-    }
-    if (scopes.accountTypes && snap.data.accountTypes) {
-      const cur = state.accountTypes.length;
-      const next = snap.data.accountTypes.length;
-      changes.push({
+        from: `\u73FE\u6709 ${(state.categories.expense?.length || 0) + (state.categories.income?.length || 0)} \u9805`,
+        to: `\u5FEB\u7167 ${(snapCat.expense?.length || 0) + (snapCat.income?.length || 0)} \u9805`,
+        changed: (state.categories.expense?.length || 0) + (state.categories.income?.length || 0) !== (snapCat.expense?.length || 0) + (snapCat.income?.length || 0)
+      },
+      {
         icon: "briefcase",
         label: "\u5E33\u6236\u985E\u578B",
-        from: `\u73FE\u6709 ${cur} \u7A2E`,
-        to: `\u5FEB\u7167 ${next} \u7A2E`,
-        changed: cur !== next
-      });
-    }
+        from: `\u73FE\u6709 ${state.accountTypes.length} \u7A2E`,
+        to: `\u5FEB\u7167 ${snapAcctType.length} \u7A2E`,
+        changed: state.accountTypes.length !== snapAcctType.length
+      }
+    ];
     setConfirmDialog({
       title: "\u9084\u539F\u5FEB\u7167",
       target: { label: "\u5FEB\u7167", name: snap.name },
@@ -8756,38 +8743,13 @@ function SettingsPage({
       confirmText: "\u78BA\u8A8D\u9084\u539F",
       danger: true,
       onConfirm: () => {
-        const dbgT = Array.isArray(snap.data.transactions) ? snap.data.transactions.length : "(\u7121)";
-        const dbgA = Array.isArray(snap.data.accounts) ? snap.data.accounts.length : "(\u7121)";
-        const dbgC = (snap.data.categories?.expense?.length || 0) + (snap.data.categories?.income?.length || 0);
-        const dbgAT = Array.isArray(snap.data.accountTypes) ? snap.data.accountTypes.length : "(\u7121)";
-        alert(`\u3010\u9664\u932F\u3011\u5FEB\u7167 data \u5167\u5BB9:
-\u4EA4\u6613: ${dbgT}
-\u5E33\u6236: ${dbgA}
-\u5206\u985E: ${dbgC}
-\u5E33\u6236\u985E\u578B: ${dbgAT}
-
-\u6309\u78BA\u5B9A\u958B\u59CB\u5957\u7528\u5230 state`);
-        setState((s) => {
-          const next = { ...s };
-          if (Array.isArray(snap.data.transactions)) {
-            next.transactions = snap.data.transactions;
-            next.holdings = Array.isArray(snap.data.holdings) ? snap.data.holdings : [];
-            next.trades = Array.isArray(snap.data.trades) ? snap.data.trades : [];
-          }
-          if (Array.isArray(snap.data.accounts)) next.accounts = snap.data.accounts;
-          if (snap.data.categories && (Array.isArray(snap.data.categories.expense) || Array.isArray(snap.data.categories.income))) {
-            next.categories = snap.data.categories;
-          }
-          if (Array.isArray(snap.data.accountTypes)) next.accountTypes = snap.data.accountTypes;
-          setTimeout(() => {
-            alert(`\u3010\u9664\u932F\u3011setState \u5B8C\u6210,next \u8CE6\u503C:
-\u4EA4\u6613: ${next.transactions.length}
-\u5E33\u6236: ${next.accounts.length}
-\u5206\u985E: ${(next.categories?.expense?.length || 0) + (next.categories?.income?.length || 0)}
-
-\u99AC\u4E0A\u53BB\u8A2D\u5B9A\u9801\u770B\u300C\u5E33\u6236\u6578\u300D\u61C9\u8A72\u7B49\u65BC\u6B64\u8655\u7684\u300C\u5E33\u6236\u300D`);
-          }, 100);
-          return next;
+        setState({
+          transactions: snapTxn,
+          accounts: snapAcct,
+          categories: snapCat,
+          accountTypes: snapAcctType,
+          holdings: snapHoldings,
+          trades: snapTrades
         });
         const snapDate = new Date(snap.createdAt);
         const dateStr = `${snapDate.getFullYear()}/${String(snapDate.getMonth() + 1).padStart(2, "0")}/${String(snapDate.getDate()).padStart(2, "0")} ${String(snapDate.getHours()).padStart(2, "0")}:${String(snapDate.getMinutes()).padStart(2, "0")}`;
@@ -9526,7 +9488,6 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
           return;
         }
         setSnapshotNameInput("");
-        setSnapshotScopes({ transactions: true, accounts: true, categories: true, accountTypes: true });
         setShowSnapshotNameDialog(true);
       } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "box", size: 20, color: "var(--mint-text)" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u5132\u5B58\u5FEB\u7167"), /* @__PURE__ */ React.createElement("div", { style: {
         fontSize: 11,
@@ -10559,7 +10520,6 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
       onClick: () => {
         setShowSnapshots(false);
         setSnapshotNameInput("");
-        setSnapshotScopes({ transactions: true, accounts: true, categories: true, accountTypes: true });
         setShowSnapshotNameDialog(true);
       },
       style: {
@@ -10581,19 +10541,26 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
   )) : snapshots.map((snap) => {
     const d = new Date(snap.createdAt);
     const timeStr = `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-    const scopes = snap.scopes || { transactions: true, accounts: true, categories: true, accountTypes: true };
-    const realTxn = Array.isArray(snap.data?.transactions) ? snap.data.transactions.length : 0;
-    const realAcct = Array.isArray(snap.data?.accounts) ? snap.data.accounts.length : 0;
-    const realCat = (snap.data?.categories?.expense?.length || 0) + (snap.data?.categories?.income?.length || 0);
-    const realAcctType = Array.isArray(snap.data?.accountTypes) ? snap.data.accountTypes.length : 0;
-    const sumTxn = snap.summary?.txnCount;
-    const sumAcct = snap.summary?.acctCount;
-    const mismatchLabel = (real, sum) => sum != null && sum !== real ? `${real}/${sum}\u26A0` : String(real);
     const tags = [];
-    if (scopes.transactions) tags.push(`\u4EA4\u6613 ${mismatchLabel(realTxn, sumTxn)}`);
-    if (scopes.accounts) tags.push(`\u5E33\u6236 ${mismatchLabel(realAcct, sumAcct)}`);
-    if (scopes.categories) tags.push(`\u5206\u985E ${realCat}`);
-    if (scopes.accountTypes) tags.push(`\u5E33\u6236\u985E\u578B ${realAcctType}`);
+    if (snap.v === 2 && snap.counts) {
+      tags.push(`\u4EA4\u6613 ${snap.counts.txn}`);
+      tags.push(`\u5E33\u6236 ${snap.counts.acct}`);
+      tags.push(`\u5206\u985E ${snap.counts.cat}`);
+      tags.push(`\u5E33\u6236\u985E\u578B ${snap.counts.acctType}`);
+    } else {
+      const scopes = snap.scopes || { transactions: true, accounts: true, categories: true, accountTypes: true };
+      const realTxn = Array.isArray(snap.data?.transactions) ? snap.data.transactions.length : 0;
+      const realAcct = Array.isArray(snap.data?.accounts) ? snap.data.accounts.length : 0;
+      const realCat = (snap.data?.categories?.expense?.length || 0) + (snap.data?.categories?.income?.length || 0);
+      const realAcctType = Array.isArray(snap.data?.accountTypes) ? snap.data.accountTypes.length : 0;
+      const sumTxn = snap.summary?.txnCount;
+      const sumAcct = snap.summary?.acctCount;
+      const mismatchLabel = (real, sum) => sum != null && sum !== real ? `${real}/${sum}\u26A0` : String(real);
+      if (scopes.transactions) tags.push(`\u4EA4\u6613 ${mismatchLabel(realTxn, sumTxn)}`);
+      if (scopes.accounts) tags.push(`\u5E33\u6236 ${mismatchLabel(realAcct, sumAcct)}`);
+      if (scopes.categories) tags.push(`\u5206\u985E ${realCat}`);
+      if (scopes.accountTypes) tags.push(`\u5E33\u6236\u985E\u578B ${realAcctType}`);
+    }
     return /* @__PURE__ */ React.createElement("div", { key: snap.id, style: { padding: "12px 20px", borderBottom: "1px solid var(--border)" } }, renamingSnapId === snap.id ? (
       // 編輯模式
       /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 6, alignItems: "center" } }, /* @__PURE__ */ React.createElement(
