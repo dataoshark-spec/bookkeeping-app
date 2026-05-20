@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520CF";
+const APP_VERSION = "1150520CG";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -7939,89 +7939,103 @@ function TxnListPage({ state, setState, setConfirmDialog, toastRich, toast, catI
       /* @__PURE__ */ React.createElement(TypeIcon, { name: "trash", size: 14, color: selectedIds.size > 0 ? "#1a1a1a" : "var(--text-faint)" }),
       /* @__PURE__ */ React.createElement("span", null, "\u522A\u9664 ", selectedIds.size > 0 ? `(${selectedIds.size})` : "")
     )),
-    showFilter && /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: { ...styles.actionMenuBackdrop, paddingBottom: "calc(80px + env(safe-area-inset-bottom, 0px))" }, onClick: () => setShowFilter(false), ...filterSwipe }, /* @__PURE__ */ React.createElement("div", { style: styles.filterCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.actionMenuTitle }, /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "search", size: 18, color: "var(--accent-text)" }), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--accent-text)" } }, "\u641C\u5C0B"), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 2 } }, "\u4EA4\u6613"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 16, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, marginTop: 0, marginBottom: 6 } }, "\u8D77\u59CB\u65E5\u671F"), /* @__PURE__ */ React.createElement(
-      "button",
+    showFilter && /* @__PURE__ */ React.createElement(
+      "div",
       {
-        style: { ...styles.field, textAlign: "left", cursor: "pointer", width: "100%", boxSizing: "border-box" },
-        onClick: () => setFEditField("start")
+        "data-picker-backdrop": "true",
+        style: {
+          ...styles.actionMenuBackdrop,
+          alignItems: "flex-start",
+          paddingTop: "calc(100px + env(safe-area-inset-top, 0px))",
+          paddingBottom: "calc(80px + env(safe-area-inset-bottom, 0px))"
+        },
+        onClick: () => setShowFilter(false),
+        ...filterSwipe
       },
-      fStart.replace(/-/g, "/")
-    )), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, marginTop: 0, marginBottom: 6 } }, "\u7D50\u675F\u65E5\u671F"), /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        style: { ...styles.field, textAlign: "left", cursor: "pointer", width: "100%", boxSizing: "border-box" },
-        onClick: () => setFEditField("end")
-      },
-      fEnd.replace(/-/g, "/")
-    ))), /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u985E\u578B"), /* @__PURE__ */ React.createElement("div", { style: styles.typeToggle }, [
-      { v: "expense", l: "\u652F\u51FA" },
-      { v: "income", l: "\u6536\u5165" },
-      { v: "stock", l: "\u80A1\u7968" },
-      { v: "all", l: "\u5168\u90E8" }
-    ].map((opt) => /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        key: opt.v,
-        onClick: () => {
-          setFType(opt.v);
-          if (opt.v === "stock") {
-            setFCategory2("all");
-            setFSubCategory2("all");
+      /* @__PURE__ */ React.createElement("div", { style: { ...styles.filterCard, touchAction: "pan-y" }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.actionMenuTitle }, /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "search", size: 18, color: "var(--accent-text)" }), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--accent-text)" } }, "\u641C\u5C0B"), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 2 } }, "\u4EA4\u6613"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 16, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, marginTop: 0, marginBottom: 6 } }, "\u8D77\u59CB\u65E5\u671F"), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          style: { ...styles.field, textAlign: "left", cursor: "pointer", width: "100%", boxSizing: "border-box" },
+          onClick: () => setFEditField("start")
+        },
+        fStart.replace(/-/g, "/")
+      )), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, marginTop: 0, marginBottom: 6 } }, "\u7D50\u675F\u65E5\u671F"), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          style: { ...styles.field, textAlign: "left", cursor: "pointer", width: "100%", boxSizing: "border-box" },
+          onClick: () => setFEditField("end")
+        },
+        fEnd.replace(/-/g, "/")
+      ))), /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u985E\u578B"), /* @__PURE__ */ React.createElement("div", { style: styles.typeToggle }, [
+        { v: "expense", l: "\u652F\u51FA" },
+        { v: "income", l: "\u6536\u5165" },
+        { v: "stock", l: "\u80A1\u7968" },
+        { v: "all", l: "\u5168\u90E8" }
+      ].map((opt) => /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: opt.v,
+          onClick: () => {
+            setFType(opt.v);
+            if (opt.v === "stock") {
+              setFCategory2("all");
+              setFSubCategory2("all");
+            }
+          },
+          style: {
+            ...styles.typeBtn,
+            ...fType === opt.v ? opt.v === "income" ? { background: "var(--mint)", color: "var(--on-mint)" } : opt.v === "expense" ? { background: "var(--pink)", color: "var(--on-pink)" } : opt.v === "stock" ? { background: "var(--accent)", color: "#fff" } : { background: "var(--text-dim)", color: "#fff" } : {}
           }
         },
-        style: {
-          ...styles.typeBtn,
-          ...fType === opt.v ? opt.v === "income" ? { background: "var(--mint)", color: "var(--on-mint)" } : opt.v === "expense" ? { background: "var(--pink)", color: "var(--on-pink)" } : opt.v === "stock" ? { background: "var(--accent)", color: "#fff" } : { background: "var(--text-dim)", color: "#fff" } : {}
+        opt.l
+      ))), state.accounts.filter((a) => !a.isSystem).length > 0 && (() => {
+        const acct = state.accounts.find((a) => a.id === fAccount);
+        return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u5E33\u6236"), /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            style: { ...styles.field, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center" },
+            onClick: () => setFPickerOpen("account")
+          },
+          /* @__PURE__ */ React.createElement("span", { style: { flex: 1, color: fAccount === "all" ? "var(--text-dim)" : "var(--text)" } }, fAccount === "all" ? "\u5168\u90E8\u5E33\u6236" : acct ? acct.name : "\u5168\u90E8\u5E33\u6236"),
+          /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 16 } }, "\u203A")
+        ));
+      })(), fType !== "stock" && (() => {
+        const cats = fType === "all" ? [...state.categories?.expense || [], ...state.categories?.income || []] : state.categories?.[fType] || [];
+        if (cats.length === 0) return null;
+        return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u5927\u5206\u985E"), /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            style: { ...styles.field, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center" },
+            onClick: () => setFPickerOpen("category")
+          },
+          /* @__PURE__ */ React.createElement("span", { style: { flex: 1, color: fCategory === "all" ? "var(--text-dim)" : "var(--text)" } }, fCategory === "all" ? "\u5168\u90E8\u5927\u5206\u985E" : fCategory),
+          /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 16 } }, "\u203A")
+        ));
+      })(), fType !== "stock" && fCategory !== "all" && (() => {
+        const cats = fType === "all" ? [...state.categories?.expense || [], ...state.categories?.income || []] : state.categories?.[fType] || [];
+        const matched = cats.find((c) => c.label === fCategory);
+        const subs = matched?.subs || [];
+        if (subs.length === 0) return null;
+        return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u5B50\u5206\u985E"), /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            style: { ...styles.field, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center" },
+            onClick: () => setFPickerOpen("subCategory")
+          },
+          /* @__PURE__ */ React.createElement("span", { style: { flex: 1, color: fSubCategory === "all" ? "var(--text-dim)" : "var(--text)" } }, fSubCategory === "all" ? "\u5168\u90E8\u5B50\u5206\u985E" : fSubCategory),
+          /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 16 } }, "\u203A")
+        ));
+      })(), /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u95DC\u9375\u5B57\uFF08\u975E\u5FC5\u586B\uFF09"), /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          type: "text",
+          style: styles.field,
+          value: fKeyword,
+          onChange: (e) => setFKeyword(e.target.value),
+          placeholder: "\u641C\u5C0B\u5206\u985E\u6216\u5099\u8A3B"
         }
-      },
-      opt.l
-    ))), state.accounts.filter((a) => !a.isSystem).length > 0 && (() => {
-      const acct = state.accounts.find((a) => a.id === fAccount);
-      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u5E33\u6236"), /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          style: { ...styles.field, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center" },
-          onClick: () => setFPickerOpen("account")
-        },
-        /* @__PURE__ */ React.createElement("span", { style: { flex: 1, color: fAccount === "all" ? "var(--text-dim)" : "var(--text)" } }, fAccount === "all" ? "\u5168\u90E8\u5E33\u6236" : acct ? acct.name : "\u5168\u90E8\u5E33\u6236"),
-        /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 16 } }, "\u203A")
-      ));
-    })(), fType !== "stock" && (() => {
-      const cats = fType === "all" ? [...state.categories?.expense || [], ...state.categories?.income || []] : state.categories?.[fType] || [];
-      if (cats.length === 0) return null;
-      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u5927\u5206\u985E"), /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          style: { ...styles.field, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center" },
-          onClick: () => setFPickerOpen("category")
-        },
-        /* @__PURE__ */ React.createElement("span", { style: { flex: 1, color: fCategory === "all" ? "var(--text-dim)" : "var(--text)" } }, fCategory === "all" ? "\u5168\u90E8\u5927\u5206\u985E" : fCategory),
-        /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 16 } }, "\u203A")
-      ));
-    })(), fType !== "stock" && fCategory !== "all" && (() => {
-      const cats = fType === "all" ? [...state.categories?.expense || [], ...state.categories?.income || []] : state.categories?.[fType] || [];
-      const matched = cats.find((c) => c.label === fCategory);
-      const subs = matched?.subs || [];
-      if (subs.length === 0) return null;
-      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u5B50\u5206\u985E"), /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          style: { ...styles.field, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center" },
-          onClick: () => setFPickerOpen("subCategory")
-        },
-        /* @__PURE__ */ React.createElement("span", { style: { flex: 1, color: fSubCategory === "all" ? "var(--text-dim)" : "var(--text)" } }, fSubCategory === "all" ? "\u5168\u90E8\u5B50\u5206\u985E" : fSubCategory),
-        /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 16 } }, "\u203A")
-      ));
-    })(), /* @__PURE__ */ React.createElement("div", { style: styles.fieldLabel }, "\u95DC\u9375\u5B57\uFF08\u975E\u5FC5\u586B\uFF09"), /* @__PURE__ */ React.createElement(
-      "input",
-      {
-        type: "text",
-        style: styles.field,
-        value: fKeyword,
-        onChange: (e) => setFKeyword(e.target.value),
-        placeholder: "\u641C\u5C0B\u5206\u985E\u6216\u5099\u8A3B"
-      }
-    ), /* @__PURE__ */ React.createElement("button", { style: { ...styles.saveBtn, background: "var(--mint)", color: "var(--on-mint)", marginTop: 20 }, onClick: applyFilter }, "\u5957\u7528"), filterMode && /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, marginTop: 6 }, onClick: clearFilter }, "\u6E05\u9664\u7BE9\u9078"), /* @__PURE__ */ React.createElement("button", { style: { ...styles.cancelBtn || styles.deleteBtn, marginTop: 6, background: "transparent", border: "1px solid var(--border)", color: "var(--text-dim)" }, onClick: () => setShowFilter(false) }, "\u53D6\u6D88"))),
+      ), /* @__PURE__ */ React.createElement("button", { style: { ...styles.saveBtn, background: "var(--mint)", color: "var(--on-mint)", marginTop: 20 }, onClick: applyFilter }, "\u5957\u7528"), filterMode && /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, marginTop: 6 }, onClick: clearFilter }, "\u6E05\u9664\u7BE9\u9078"), /* @__PURE__ */ React.createElement("button", { style: { ...styles.cancelBtn || styles.deleteBtn, marginTop: 6, background: "transparent", border: "1px solid var(--border)", color: "var(--text-dim)" }, onClick: () => setShowFilter(false) }, "\u53D6\u6D88"))
+    ),
     fEditField && /* @__PURE__ */ React.createElement(
       DatePicker,
       {
