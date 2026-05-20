@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520BY";
+const APP_VERSION = "1150520BZ";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -353,6 +353,7 @@ const DEFAULT_STOCK_MARKETS = [
   { id: "sm_tw", label: "\u53F0\u80A1" },
   { id: "sm_us", label: "\u7F8E\u80A1" }
 ];
+const DEFAULT_STOCK_MARKET_ID = "sm_tw";
 const TYPE_ICONS = [
   "cash",
   "bank",
@@ -1234,7 +1235,8 @@ function App() {
           accountTypes: d.accountTypes?.length ? d.accountTypes : [...DEFAULT_ACCOUNT_TYPES],
           holdings: d.holdings || [],
           trades: d.trades || [],
-          stockMarkets: d.stockMarkets?.length ? d.stockMarkets : [...DEFAULT_STOCK_MARKETS]
+          stockMarkets: d.stockMarkets?.length ? d.stockMarkets : [...DEFAULT_STOCK_MARKETS],
+          defaultStockMarketId: d.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID
         };
       }
     } catch {
@@ -1246,7 +1248,8 @@ function App() {
       accountTypes: [...DEFAULT_ACCOUNT_TYPES],
       holdings: [],
       trades: [],
-      stockMarkets: [...DEFAULT_STOCK_MARKETS]
+      stockMarkets: [...DEFAULT_STOCK_MARKETS],
+      defaultStockMarketId: DEFAULT_STOCK_MARKET_ID
     };
   });
   const [page, setPage] = useState("home");
@@ -2687,7 +2690,8 @@ function App() {
           accountTypes: [...DEFAULT_ACCOUNT_TYPES],
           holdings: [],
           trades: [],
-          stockMarkets: [...DEFAULT_STOCK_MARKETS]
+          stockMarkets: [...DEFAULT_STOCK_MARKETS],
+          defaultStockMarketId: DEFAULT_STOCK_MARKET_ID
         });
         toastRich({
           title: "\u5DF2\u6E05\u9664\u6240\u6709\u8CC7\u6599",
@@ -8198,11 +8202,11 @@ function StatsPage({ state, catIcon, currentMonth, setCurrentMonth, editMode, se
   const renderDonut = (data, total, opts = {}) => {
     const { onSliceClick, highlighted, centerLabel, centerValue } = opts;
     if (total === 0) {
-      return /* @__PURE__ */ React.createElement("svg", { style: { width: "min(80vw, 320px)", aspectRatio: "1 / 1" }, viewBox: "0 0 100 100" }, /* @__PURE__ */ React.createElement("circle", { cx: "50", cy: "50", r: "30.5", fill: "none", stroke: "var(--border)", strokeWidth: "7" }), /* @__PURE__ */ React.createElement("text", { x: "50", y: "54", textAnchor: "middle", fontSize: "5", fill: "var(--text-faint)", style: { letterSpacing: "0.3px" } }, "\u6C92\u6709\u8CC7\u6599"));
+      return /* @__PURE__ */ React.createElement("svg", { style: { width: "min(80vw, 320px)", aspectRatio: "1 / 1" }, viewBox: "0 0 100 100" }, /* @__PURE__ */ React.createElement("circle", { cx: "50", cy: "50", r: "41", fill: "none", stroke: "var(--border)", strokeWidth: "9" }), /* @__PURE__ */ React.createElement("text", { x: "50", y: "54", textAnchor: "middle", fontSize: "5", fill: "var(--text-faint)", style: { letterSpacing: "0.3px" } }, "\u6C92\u6709\u8CC7\u6599"));
     }
     const cx = 50, cy = 50;
-    const ringR = 30.5;
-    const ringW = 7;
+    const ringR = 41;
+    const ringW = 9;
     const r = ringR + ringW / 2;
     const innerR = ringR - ringW / 2;
     let maxIdx = 0;
@@ -8697,7 +8701,8 @@ function SettingsPage({
       accountTypes: state.accountTypes,
       holdings: state.holdings,
       trades: state.trades,
-      stockMarkets: state.stockMarkets
+      stockMarkets: state.stockMarkets,
+      defaultStockMarketId: state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID
     });
     const snap = {
       id: "snap_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
@@ -8775,6 +8780,7 @@ function SettingsPage({
     const snapHoldings = Array.isArray(snapData.holdings) ? snapData.holdings : [];
     const snapTrades = Array.isArray(snapData.trades) ? snapData.trades : [];
     const snapStockMarkets = Array.isArray(snapData.stockMarkets) ? snapData.stockMarkets : [...DEFAULT_STOCK_MARKETS];
+    const snapDefaultStockMarketId = snapData.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID;
     const changes = [
       {
         icon: "list",
@@ -8820,7 +8826,8 @@ function SettingsPage({
           accountTypes: snapAcctType,
           holdings: snapHoldings,
           trades: snapTrades,
-          stockMarkets: snapStockMarkets
+          stockMarkets: snapStockMarkets,
+          defaultStockMarketId: snapDefaultStockMarketId
         };
         try {
           localStorage.setItem("ledger_v16", JSON.stringify(newState));
@@ -8987,6 +8994,7 @@ function SettingsPage({
     holdings: state.holdings,
     trades: state.trades,
     stockMarkets: state.stockMarkets,
+    defaultStockMarketId: state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID,
     preferences: collectPreferences(),
     exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
     exportVersion: 3
@@ -9138,7 +9146,16 @@ function SettingsPage({
       localStorage.setItem(GDRIVE_AUTO_KEY, next ? "1" : "0");
     } catch {
     }
-    toast(next ? "\u5DF2\u958B\u555F\u81EA\u52D5\u5099\u4EFD" : "\u5DF2\u95DC\u9589\u81EA\u52D5\u5099\u4EFD");
+    if (next) {
+      if (GDrive.isLinked()) {
+        toastRich({ title: "\u5DF2\u958B\u555F\u81EA\u52D5\u5099\u4EFD", amount: "\u2713", amountColor: "var(--mint)", lines: ["\u6B63\u5728\u5099\u4EFD\u76EE\u524D\u8CC7\u6599\u22EF"] }, 1600);
+        driveSyncNow(true);
+      } else {
+        toast("\u5DF2\u958B\u555F\u81EA\u52D5\u5099\u4EFD");
+      }
+    } else {
+      toast("\u5DF2\u95DC\u9589\u81EA\u52D5\u5099\u4EFD");
+    }
   };
   const setDriveRemind = (mode) => {
     setDriveRemindMode(String(mode));
@@ -9498,7 +9515,8 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
             accountTypes: Array.isArray(data.accountTypes) && data.accountTypes.length ? data.accountTypes : [...DEFAULT_ACCOUNT_TYPES],
             holdings: Array.isArray(data.holdings) ? data.holdings : [],
             trades: Array.isArray(data.trades) ? data.trades : [],
-            stockMarkets: Array.isArray(data.stockMarkets) && data.stockMarkets.length ? data.stockMarkets : [...DEFAULT_STOCK_MARKETS]
+            stockMarkets: Array.isArray(data.stockMarkets) && data.stockMarkets.length ? data.stockMarkets : [...DEFAULT_STOCK_MARKETS],
+            defaultStockMarketId: data.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID
           };
           try {
             localStorage.setItem("ledger_v16", JSON.stringify(newState));
@@ -10118,7 +10136,8 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
           width: "100%",
           background: "var(--bg)",
           borderRadius: "18px 18px 0 0",
-          maxHeight: "75vh",
+          // maxHeight 用 100vh 減 tab bar (~80px) + safe-area,保證底部 footer 不會被 tab bar 遮住
+          maxHeight: "calc(100vh - 80px - env(safe-area-inset-bottom, 0px))",
           display: "flex",
           flexDirection: "column",
           paddingBottom: "env(safe-area-inset-bottom, 0px)"
@@ -15934,6 +15953,103 @@ function AccountTypeManageSheet({ state, setState, toast, toastRich, onClose, se
     ))
   );
 }
+function StockMarketRow({ editMode, onClick, onLongPress, children }) {
+  const longPressTimer = React.useRef(null);
+  const movedRef = React.useRef(false);
+  const startPosRef = React.useRef(null);
+  const startTimeRef = React.useRef(0);
+  const triggeredRef = React.useRef(false);
+  const handleStart = (e) => {
+    if (!onLongPress || editMode) return;
+    if (e.touches && e.touches.length > 1) {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+      startPosRef.current = null;
+      movedRef.current = true;
+      return;
+    }
+    triggeredRef.current = false;
+    movedRef.current = false;
+    const t = e.touches ? e.touches[0] : e;
+    startPosRef.current = { x: t.clientX, y: t.clientY };
+    startTimeRef.current = Date.now();
+    longPressTimer.current = setTimeout(() => {
+      triggeredRef.current = true;
+      onLongPress();
+    }, 600);
+  };
+  const handleMove = (e) => {
+    if (e.touches && e.touches.length > 1) {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+      movedRef.current = true;
+      return;
+    }
+    if (!startPosRef.current || !longPressTimer.current) return;
+    if (Date.now() - startTimeRef.current < 80) return;
+    const t = e.touches ? e.touches[0] : e;
+    const dx = Math.abs(t.clientX - startPosRef.current.x);
+    const dy = Math.abs(t.clientY - startPosRef.current.y);
+    if (dx > 8 || dy > 8) {
+      movedRef.current = true;
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+  const handleEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    startPosRef.current = null;
+  };
+  const handleClick = (e) => {
+    if (triggeredRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      triggeredRef.current = false;
+      return;
+    }
+    if (movedRef.current) return;
+    if (onClick) onClick(e);
+  };
+  const handleContextMenu = (e) => {
+    if (!onLongPress || editMode) return;
+    e.preventDefault();
+    onLongPress();
+  };
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      onClick: handleClick,
+      onTouchStart: handleStart,
+      onTouchMove: handleMove,
+      onTouchEnd: handleEnd,
+      onTouchCancel: handleEnd,
+      onContextMenu: handleContextMenu,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "12px 14px",
+        borderRadius: 10,
+        background: "var(--bg-card)",
+        border: "1px solid var(--border)",
+        marginBottom: 8,
+        cursor: editMode ? "default" : "pointer",
+        minHeight: 60,
+        boxSizing: "border-box",
+        WebkitTapHighlightColor: "transparent",
+        userSelect: "none"
+      }
+    },
+    children
+  );
+}
 function StockMarketManageSheet({ state, setState, toast, toastRich, onClose, setConfirmDialog }) {
   const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
   const list = state.stockMarkets || DEFAULT_STOCK_MARKETS;
@@ -16028,25 +16144,33 @@ function StockMarketManageSheet({ state, setState, toast, toastRich, onClose, se
         before: `\u78BA\u5B9A\u8981\u522A\u9664\u300C${target.label}\u300D\u55CE\uFF1F`,
         items: usingCount2 > 0 ? [
           { text: `\u6709 ${usingCount2} \u500B\u5E33\u6236 \u6B63\u5728\u4F7F\u7528\u6B64\u985E\u578B`, card: true },
-          `\u522A\u9664\u5F8C,\u9019\u4E9B\u5E33\u6236\u6703 \u6539\u70BA\u53F0\u80A1 \u5206\u985E`
+          `\u522A\u9664\u5F8C,\u9019\u4E9B\u5E33\u6236\u6703 \u6539\u70BA\u5176\u4ED6\u985E\u578B \u5206\u985E`
         ] : [
           "\u6B64\u985E\u578B \u6C92\u6709\u5E33\u6236 \u5728\u4F7F\u7528"
         ]
       },
-      highlightWords: usingCount2 > 0 ? [`${usingCount2} \u500B\u5E33\u6236`, "\u6539\u70BA\u53F0\u80A1"] : ["\u6C92\u6709\u5E33\u6236"],
+      highlightWords: usingCount2 > 0 ? [`${usingCount2} \u500B\u5E33\u6236`, "\u6539\u70BA\u5176\u4ED6\u985E\u578B"] : ["\u6C92\u6709\u5E33\u6236"],
       confirmText: "\u78BA\u5B9A\u522A\u9664",
       confirmStyle: "danger",
       onConfirm: () => {
         const next = list.filter((_, i) => i !== idx);
+        const curDefault = state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID;
+        const nextDefault = curDefault === target.id ? next[0]?.id || DEFAULT_STOCK_MARKET_ID : curDefault;
         const nextAccounts = state.accounts.map(
-          (a) => a.stockMarketId === target.id ? { ...a, stockMarketId: "sm_tw" } : a
+          (a) => a.stockMarketId === target.id ? { ...a, stockMarketId: nextDefault } : a
         );
-        setState((s) => ({ ...s, stockMarkets: next, accounts: nextAccounts }));
+        const nextDefaultLabel = next.find((x) => x.id === nextDefault)?.label || "\u9810\u8A2D";
+        setState((s) => ({
+          ...s,
+          stockMarkets: next,
+          accounts: nextAccounts,
+          defaultStockMarketId: nextDefault
+        }));
         toastRich({
           title: "\u5DF2\u522A\u9664\u985E\u578B",
           amount: "\u2713",
           amountColor: "var(--mint)",
-          lines: [target.label, usingCount2 > 0 ? `${usingCount2} \u500B\u5E33\u6236 \u5DF2\u6539\u70BA \u53F0\u80A1` : ""].filter(Boolean)
+          lines: [target.label, usingCount2 > 0 ? `${usingCount2} \u500B\u5E33\u6236 \u5DF2\u6539\u70BA ${nextDefaultLabel}` : ""].filter(Boolean)
         }, 1800);
         cancelEdit();
       }
@@ -16064,7 +16188,12 @@ function StockMarketManageSheet({ state, setState, toast, toastRich, onClose, se
     [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
     setState((s) => ({ ...s, stockMarkets: next }));
   };
-  const usingCount = (id) => state.accounts.filter((a) => (a.stockMarketId || "sm_tw") === id).length;
+  const usingCount = (id) => state.accounts.filter((a) => {
+    if (a.type !== "invest") return false;
+    if ((a.investSubType || "stock") !== "stock") return false;
+    const acctMarket = a.stockMarketId || state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID;
+    return acctMarket === id;
+  }).length;
   return /* @__PURE__ */ React.createElement(
     "div",
     {
@@ -16150,28 +16279,42 @@ function StockMarketManageSheet({ state, setState, toast, toastRich, onClose, se
       "\u522A\u9664\u6B64\u985E\u578B"
     )) : /* @__PURE__ */ React.createElement(React.Fragment, null, list.map((m, i) => {
       const count = usingCount(m.id);
-      const isDefault = m.id === "sm_tw" || m.id === "sm_us";
+      const curDefaultId = state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID;
+      const isCurrentDefault = m.id === curDefaultId;
+      const isSystem = m.id === "sm_tw" || m.id === "sm_us";
       return /* @__PURE__ */ React.createElement(
-        "div",
+        StockMarketRow,
         {
           key: m.id,
+          editMode,
           onClick: () => !editMode && startEdit(i),
-          style: {
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "12px 14px",
-            borderRadius: 10,
-            background: "var(--bg-card)",
-            border: "1px solid var(--border)",
-            marginBottom: 8,
-            cursor: editMode ? "default" : "pointer",
-            minHeight: 60,
-            boxSizing: "border-box"
+          onLongPress: () => {
+            if (editMode) return;
+            if (isCurrentDefault) {
+              toastRich({
+                title: `\u300C${m.label}\u300D\u5DF2\u662F\u9810\u8A2D`,
+                amount: "\u2713",
+                icon: "info",
+                amountColor: "var(--text-faint)",
+                lines: ["\u65B0\u589E\u6295\u8CC7\u5E33\u6236\u6642\u7684\u521D\u59CB\u985E\u578B"]
+              }, 1400);
+              return;
+            }
+            setState((s) => ({ ...s, defaultStockMarketId: m.id }));
+            toastRich({
+              title: `\u5DF2\u8A2D\u70BA\u9810\u8A2D`,
+              amount: "\u2713",
+              amountColor: "var(--mint)",
+              lines: [`\u65B0\u589E\u6295\u8CC7\u5E33\u6236\u6642\u5C07\u521D\u59CB\u70BA\u300C${m.label}\u300D`]
+            }, 1600);
+            try {
+              if (navigator.vibrate) navigator.vibrate(15);
+            } catch {
+            }
           }
         },
         /* @__PURE__ */ React.createElement(TypeIcon, { name: "chart", size: 18, color: "var(--mint-text)" }),
-        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 500, color: "var(--text)" } }, m.label, isDefault && /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, fontSize: 11, color: "var(--text-faint)" } }, "(\u9810\u8A2D)")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, count > 0 ? `${count} \u500B\u5E33\u6236\u4F7F\u7528\u4E2D` : "\u5C1A\u7121\u5E33\u6236\u4F7F\u7528")),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 500, color: "var(--text)" } }, m.label, isCurrentDefault && /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, fontSize: 11, color: "var(--mint-text)", fontWeight: 600 } }, "(\u9810\u8A2D)"), isSystem && !isCurrentDefault && /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, fontSize: 11, color: "var(--text-faint)" } }, "(\u7CFB\u7D71)")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, count > 0 ? `${count} \u500B\u5E33\u6236\u4F7F\u7528\u4E2D` : "\u5C1A\u7121\u5E33\u6236\u4F7F\u7528")),
         editMode ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement(
           "button",
           {
@@ -16214,7 +16357,13 @@ function StockMarketManageSheet({ state, setState, toast, toastRich, onClose, se
           "\u25BC"
         )) : /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 14 } }, "\u203A")
       );
-    }), !editMode && /* @__PURE__ */ React.createElement(
+    }), !editMode && list.length > 0 && /* @__PURE__ */ React.createElement("div", { style: {
+      fontSize: 11,
+      color: "var(--text-faint)",
+      textAlign: "center",
+      padding: "10px 16px 4px",
+      lineHeight: 1.6
+    } }, "\u9577\u6309\u53EF\u8B8A\u66F4 \u9810\u8A2D ;\u65B0\u589E\u6295\u8CC7\u5E33\u6236\u6642\u6703\u4EE5\u9810\u8A2D\u70BA\u521D\u59CB\u985E\u578B\u3002"), !editMode && /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: startNew,
@@ -16622,7 +16771,9 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
   const [showInitCalc, setShowInitCalc] = useState(false);
   const [virtual, setVirtual] = useState(initial ? !!initial.virtual : false);
   const [investSubType, setInvestSubType] = useState(initial ? initial.investSubType || "stock" : "stock");
-  const [stockMarketId, setStockMarketId] = useState(initial ? initial.stockMarketId || "sm_tw" : "sm_tw");
+  const [stockMarketId, setStockMarketId] = useState(
+    initial ? initial.stockMarketId || state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID : state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID
+  );
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showTypeManage, setShowTypeManage] = useState(false);
   const [actionMenu, setActionMenu] = useState(null);
@@ -16680,7 +16831,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
     setInitAmount("");
     setVirtual(false);
     setInvestSubType("stock");
-    setStockMarketId("sm_tw");
+    setStockMarketId(state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID);
     setNameLocked(false);
     setAmountLocked(false);
     setTypeLocked(false);
@@ -16697,7 +16848,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
     setInitAmount(a.initAmount != null ? String(a.initAmount) : "");
     setVirtual(!!a.virtual);
     setInvestSubType(a.investSubType || "stock");
-    setStockMarketId(a.stockMarketId || "sm_tw");
+    setStockMarketId(a.stockMarketId || state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID);
     setNameLocked(true);
     setAmountLocked(true);
     setTypeLocked(true);
@@ -16767,7 +16918,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
     const typeChanged = type !== original.type;
     const initAmtChanged = initAmt !== (original.initAmount || 0);
     const subTypeChanged = type === "invest" && investSubType !== (original.investSubType || "stock");
-    const stockMarketChanged = type === "invest" && investSubType === "stock" && stockMarketId !== (original.stockMarketId || "sm_tw");
+    const stockMarketChanged = type === "invest" && investSubType === "stock" && stockMarketId !== (original.stockMarketId || state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID);
     const virtualChanged = !!virtual !== !!original.virtual;
     if (!nameChanged && !typeChanged && !initAmtChanged && !subTypeChanged && !stockMarketChanged && !virtualChanged) {
       if (toastRich) {
@@ -17631,93 +17782,108 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
     ),
     showStockMarketPicker && (() => {
       const markets = state.stockMarkets || DEFAULT_STOCK_MARKETS;
-      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+      return /* @__PURE__ */ React.createElement(
         "div",
         {
-          style: { ...styles.sheetBackdrop, zIndex: 350 },
-          onClick: () => setShowStockMarketPicker(false)
-        }
-      ), /* @__PURE__ */ React.createElement("div", { style: {
-        position: "fixed",
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: "var(--bg-card)",
-        borderRadius: "20px 20px 0 0",
-        padding: "14px 16px 28px",
-        zIndex: 351,
-        maxHeight: "60vh",
-        overflowY: "auto",
-        animation: "sheetSlideUp 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)"
-      } }, /* @__PURE__ */ React.createElement("div", { style: {
-        width: 36,
-        height: 4,
-        background: "var(--border)",
-        borderRadius: 2,
-        margin: "0 auto 12px"
-      } }), /* @__PURE__ */ React.createElement("div", { style: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        marginBottom: 14
-      } }, /* @__PURE__ */ React.createElement("div", { style: { width: 32 } }), /* @__PURE__ */ React.createElement("div", { style: {
-        fontSize: 16,
-        fontWeight: 600,
-        color: "var(--text)"
-      } }, "\u9078\u64C7\u80A1\u7968\u985E\u578B"), /* @__PURE__ */ React.createElement(
-        "div",
-        {
-          onClick: () => {
-            setShowStockMarketPicker(false);
-            setShowStockMarketManage(true);
-          },
+          "data-picker-backdrop": "true",
           style: {
-            width: 32,
-            height: 32,
-            borderRadius: 8,
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.55)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            cursor: "pointer",
-            fontSize: 18
+            padding: 20,
+            zIndex: 350
           },
-          title: "\u7BA1\u7406\u985E\u578B"
+          onClick: () => setShowStockMarketPicker(false)
         },
-        "\u2699\uFE0F"
-      )), markets.map((m) => {
-        const isActive = m.id === stockMarketId;
-        return /* @__PURE__ */ React.createElement(
+        /* @__PURE__ */ React.createElement(
           "div",
           {
-            key: m.id,
-            onClick: () => {
-              setStockMarketId(m.id);
-              setShowStockMarketPicker(false);
-            },
+            onClick: (e) => e.stopPropagation(),
             style: {
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "12px 14px",
-              borderRadius: 10,
-              background: isActive ? "rgba(126,224,192,0.15)" : "transparent",
-              border: `1px solid ${isActive ? "var(--mint)" : "var(--border)"}`,
-              marginBottom: 8,
-              cursor: "pointer"
+              width: "100%",
+              maxWidth: 360,
+              background: "var(--bg-card)",
+              borderRadius: 18,
+              padding: "16px 16px 18px",
+              maxHeight: "80vh",
+              overflowY: "auto",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+              animation: "fadeInScale 0.18s ease-out"
             }
           },
-          /* @__PURE__ */ React.createElement(TypeIcon, { name: "chart", size: 16, color: isActive ? "var(--mint-text)" : "var(--text-dim)" }),
-          /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontSize: 14, fontWeight: isActive ? 600 : 500, color: isActive ? "var(--mint-text)" : "var(--text)" } }, m.label),
-          isActive && /* @__PURE__ */ React.createElement(TypeIcon, { name: "check", size: 16, color: "var(--mint-text)" })
-        );
-      }), /* @__PURE__ */ React.createElement("div", { style: {
-        marginTop: 10,
-        padding: "10px 12px",
-        fontSize: 12,
-        color: "var(--text-faint)",
-        textAlign: "center",
-        lineHeight: 1.6
-      } }, "\u9EDE \u2699\uFE0F \u53EF\u65B0\u589E / \u7DE8\u8F2F / \u522A\u9664\u985E\u578B")));
+          /* @__PURE__ */ React.createElement("div", { style: {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 14
+          } }, /* @__PURE__ */ React.createElement("div", { style: { width: 32 } }), /* @__PURE__ */ React.createElement("div", { style: {
+            fontSize: 16,
+            fontWeight: 600,
+            color: "var(--text)"
+          } }, "\u9078\u64C7\u80A1\u7968\u985E\u578B"), /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              onClick: () => {
+                setShowStockMarketPicker(false);
+                setShowStockMarketManage(true);
+              },
+              style: {
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                fontSize: 18
+              },
+              title: "\u7BA1\u7406\u985E\u578B"
+            },
+            "\u2699\uFE0F"
+          )),
+          markets.map((m) => {
+            const isActive = m.id === stockMarketId;
+            return /* @__PURE__ */ React.createElement(
+              "div",
+              {
+                key: m.id,
+                onClick: () => {
+                  setStockMarketId(m.id);
+                  setShowStockMarketPicker(false);
+                },
+                style: {
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "12px 14px",
+                  borderRadius: 10,
+                  background: isActive ? "rgba(126,224,192,0.15)" : "transparent",
+                  border: `1px solid ${isActive ? "var(--mint)" : "var(--border)"}`,
+                  marginBottom: 8,
+                  cursor: "pointer"
+                }
+              },
+              /* @__PURE__ */ React.createElement(TypeIcon, { name: "chart", size: 16, color: isActive ? "var(--mint-text)" : "var(--text-dim)" }),
+              /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontSize: 14, fontWeight: isActive ? 600 : 500, color: isActive ? "var(--mint-text)" : "var(--text)" } }, m.label),
+              isActive && /* @__PURE__ */ React.createElement(TypeIcon, { name: "check", size: 16, color: "var(--mint-text)" })
+            );
+          }),
+          /* @__PURE__ */ React.createElement("div", { style: {
+            marginTop: 6,
+            padding: "8px 12px 0",
+            fontSize: 12,
+            color: "var(--text-faint)",
+            textAlign: "center",
+            lineHeight: 1.6
+          } }, "\u9EDE \u2699\uFE0F \u53EF\u65B0\u589E / \u7DE8\u8F2F / \u522A\u9664\u985E\u578B")
+        )
+      );
     })(),
     showStockMarketManage && /* @__PURE__ */ React.createElement(
       StockMarketManageSheet,
@@ -17892,6 +18058,11 @@ function Style({ theme = "dark", numFont = DEFAULT_NUM_FONT }) {
       @keyframes amountPulse {
         0%, 100% { opacity: 0.35; }
         50% { opacity: 1; }
+      }
+      /* \u6F02\u6D6E\u5361\u7247\u6DE1\u5165\u7E2E\u653E(picker / dialog \u7528) */
+      @keyframes fadeInScale {
+        from { opacity: 0; transform: scale(0.94); }
+        to { opacity: 1; transform: scale(1); }
       }
       .dp-nav-btn { border: none; padding: 0; transition: transform 0.1s, background 0.15s; -webkit-tap-highlight-color: transparent; }
       .dp-nav-btn:active { transform: scale(0.85); background: var(--mint-bg) !important; color: var(--mint-text) !important; }
