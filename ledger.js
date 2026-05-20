@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520BZ";
+const APP_VERSION = "1150520CA";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -3499,7 +3499,11 @@ function App() {
         } }, customIcon === "info" ? /* @__PURE__ */ React.createElement("svg", { width: "32", height: "32", viewBox: "0 0 24 24", fill: "none", stroke: "#1a1a1a", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "9" }), /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "11", x2: "12", y2: "17" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "7.5", r: "0.6", fill: "#1a1a1a", stroke: "none" })) : customIcon === "warn" ? (
           // 警告:三角形 + 中間驚嘆號(直線+點)
           /* @__PURE__ */ React.createElement("svg", { width: "34", height: "34", viewBox: "0 0 24 24", fill: "none", stroke: "#1a1a1a", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M12 3 L22 20 L2 20 Z" }), /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "10", x2: "12", y2: "14.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "17.2", r: "0.7", fill: "#1a1a1a", stroke: "none" }))
-        ) : customIcon === "minus" ? /* @__PURE__ */ React.createElement("svg", { width: "32", height: "32", viewBox: "0 0 24 24", fill: "none", stroke: "#1a1a1a", strokeWidth: "3.2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("line", { x1: "6", y1: "12", x2: "18", y2: "12" })) : /* @__PURE__ */ React.createElement("svg", { width: "32", height: "32", viewBox: "0 0 24 24", fill: "none", stroke: "#1a1a1a", strokeWidth: "3.2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "5 12 10 17 19 8" }))), /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, color: "var(--text)", letterSpacing: "0.5px", marginBottom: toastMsg.lines?.length > 0 ? 12 : 0, whiteSpace: "pre-line", textAlign: "center", lineHeight: 1.35 } }, Array.isArray(toastMsg.titleSegments) ? (() => {
+        ) : customIcon === "minus" ? (
+          // [v555CA] 刪除完成圖示 — 改用垃圾桶,比減號更直覺
+          // (原本減號視覺類似「禁止」符號,容易誤解)
+          /* @__PURE__ */ React.createElement("svg", { width: "32", height: "32", viewBox: "0 0 24 24", fill: "none", stroke: "#1a1a1a", strokeWidth: "2.2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "3 6 5 6 21 6" }), /* @__PURE__ */ React.createElement("path", { d: "M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" }), /* @__PURE__ */ React.createElement("path", { d: "M10 11v6" }), /* @__PURE__ */ React.createElement("path", { d: "M14 11v6" }), /* @__PURE__ */ React.createElement("path", { d: "M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" }))
+        ) : /* @__PURE__ */ React.createElement("svg", { width: "32", height: "32", viewBox: "0 0 24 24", fill: "none", stroke: "#1a1a1a", strokeWidth: "3.2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "5 12 10 17 19 8" }))), /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, color: "var(--text)", letterSpacing: "0.5px", marginBottom: toastMsg.lines?.length > 0 ? 12 : 0, whiteSpace: "pre-line", textAlign: "center", lineHeight: 1.35 } }, Array.isArray(toastMsg.titleSegments) ? (() => {
           let line = 0;
           return toastMsg.titleSegments.map((seg, i) => {
             if (seg === "\n") {
@@ -8127,11 +8131,19 @@ function StatsPage({ state, catIcon, currentMonth, setCurrentMonth, editMode, se
     }
   })();
   let prevInc = 0, prevExp = 0;
+  const prevIncByCat = {};
+  const prevExpByCat = {};
   for (const t of state.transactions) {
     if (!t.date.startsWith(prevPrefix)) continue;
     if (!isRealFlow(t)) continue;
-    if (t.type === "income") prevInc += t.amount;
-    else if (t.type === "expense") prevExp += t.amount;
+    const cat = t.category || "\u672A\u5206\u985E";
+    if (t.type === "income") {
+      prevInc += t.amount;
+      prevIncByCat[cat] = (prevIncByCat[cat] || 0) + t.amount;
+    } else if (t.type === "expense") {
+      prevExp += t.amount;
+      prevExpByCat[cat] = (prevExpByCat[cat] || 0) + t.amount;
+    }
   }
   const expDiffPct = prevExp > 0 ? (exp - prevExp) / prevExp * 100 : null;
   const incDiffPct = prevInc > 0 ? (inc - prevInc) / prevInc * 100 : null;
@@ -8555,14 +8567,16 @@ function StatsPage({ state, catIcon, currentMonth, setCurrentMonth, editMode, se
       return /* @__PURE__ */ React.createElement(Block, { key: "trend", ...blockProps, title: scope === "month" ? "\u6BCF\u65E5\u652F\u51FA\u8DA8\u52E2" : "\u6BCF\u6708\u652F\u51FA\u8DA8\u52E2" }, /* @__PURE__ */ React.createElement("div", { style: { padding: "8px 4px 4px" } }, renderTrendChart(trendData, trendMax, chartType)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text-faint)", padding: "0 6px" } }, /* @__PURE__ */ React.createElement("span", null, scope === "month" ? "\u65E5" : "\u6708"), /* @__PURE__ */ React.createElement("span", null, "\u6700\u9AD8 ", fmt(trendMax))));
     }
     if (blockKey === "compare") {
-      const curVal = chartType === "expense" ? exp : inc;
-      const prevVal = chartType === "expense" ? prevExp : prevInc;
+      const isExp = chartType === "expense";
+      const curVal = drillCat ? subcatTotal : isExp ? exp : inc;
+      const prevVal = drillCat ? (isExp ? prevExpByCat : prevIncByCat)[drillCat] || 0 : isExp ? prevExp : prevInc;
       const diff = curVal - prevVal;
-      const diffPct = chartType === "expense" ? expDiffPct : incDiffPct;
+      const diffPct = prevVal > 0 ? (curVal - prevVal) / prevVal * 100 : null;
       const prevLabel = scope === "day" ? "\u6628\u65E5" : scope === "month" ? "\u4E0A\u6708" : "\u53BB\u5E74";
-      const isGood = chartType === "expense" ? diff < 0 : diff > 0;
+      const isGood = isExp ? diff < 0 : diff > 0;
       const diffColor = diff === 0 ? "var(--text-faint)" : isGood ? "var(--mint)" : "var(--pink)";
-      return /* @__PURE__ */ React.createElement(Block, { key: "compare", ...blockProps, title: `${prevLabel}\u540C\u671F\u5C0D\u6BD4` }, /* @__PURE__ */ React.createElement("div", { style: styles.compareRow }, /* @__PURE__ */ React.createElement("div", { style: styles.compareBox }, /* @__PURE__ */ React.createElement("div", { style: styles.compareLabel }, "\u672C\u671F", chartType === "expense" ? "\u652F\u51FA" : "\u6536\u5165"), /* @__PURE__ */ React.createElement("div", { style: styles.compareVal }, fmt(curVal))), /* @__PURE__ */ React.createElement("div", { style: styles.compareBox }, /* @__PURE__ */ React.createElement("div", { style: styles.compareLabel }, prevLabel), /* @__PURE__ */ React.createElement("div", { style: { ...styles.compareVal, color: "var(--text-dim)" } }, fmt(prevVal))), /* @__PURE__ */ React.createElement("div", { style: styles.compareBox }, /* @__PURE__ */ React.createElement("div", { style: styles.compareLabel }, "\u8B8A\u5316"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.compareVal, color: diffColor } }, diff > 0 ? "+" : "", fmt(diff), diffPct != null && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, marginLeft: 4 } }, "(", diff >= 0 ? "+" : "", diffPct.toFixed(1), "%)")))), prevVal === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", textAlign: "center", marginTop: 8 } }, prevLabel, "\u6C92\u6709\u8CC7\u6599"));
+      const titleNode = drillCat ? /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", fontWeight: 700 } }, drillCat), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", margin: "0 6px" } }, "\xB7"), /* @__PURE__ */ React.createElement("span", null, `${prevLabel}\u540C\u671F\u5C0D\u6BD4`)) : `${prevLabel}\u540C\u671F\u5C0D\u6BD4`;
+      return /* @__PURE__ */ React.createElement(Block, { key: "compare", ...blockProps, title: titleNode }, /* @__PURE__ */ React.createElement("div", { style: styles.compareRow }, /* @__PURE__ */ React.createElement("div", { style: styles.compareBox }, /* @__PURE__ */ React.createElement("div", { style: styles.compareLabel }, "\u672C\u671F", isExp ? "\u652F\u51FA" : "\u6536\u5165"), /* @__PURE__ */ React.createElement("div", { style: styles.compareVal }, fmt(curVal))), /* @__PURE__ */ React.createElement("div", { style: styles.compareBox }, /* @__PURE__ */ React.createElement("div", { style: styles.compareLabel }, prevLabel), /* @__PURE__ */ React.createElement("div", { style: { ...styles.compareVal, color: "var(--text-dim)" } }, fmt(prevVal))), /* @__PURE__ */ React.createElement("div", { style: styles.compareBox }, /* @__PURE__ */ React.createElement("div", { style: styles.compareLabel }, "\u8B8A\u5316"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.compareVal, color: diffColor } }, diff > 0 ? "+" : "", fmt(diff), diffPct != null && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, marginLeft: 4 } }, "(", diff >= 0 ? "+" : "", diffPct.toFixed(1), "%)")))), prevVal === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", textAlign: "center", marginTop: 8 } }, drillCat ? `${prevLabel}\u6C92\u6709\u300C${drillCat}\u300D\u7684\u8CC7\u6599` : `${prevLabel}\u6C92\u6709\u8CC7\u6599`));
     }
     if (blockKey === "top5") {
       if (top5Txns.length === 0) return null;
@@ -10136,8 +10150,10 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
           width: "100%",
           background: "var(--bg)",
           borderRadius: "18px 18px 0 0",
-          // maxHeight 用 100vh 減 tab bar (~80px) + safe-area,保證底部 footer 不會被 tab bar 遮住
-          maxHeight: "calc(100vh - 80px - env(safe-area-inset-bottom, 0px))",
+          // [v555CA] 雲端 sheet 高度 — 用 dvh(動態視窗高度,瀏覽器會自動扣 url bar / nav bar)
+          // 100vh 在 Android Chrome 包含 URL bar 區域,實際可見區可能小於 100vh,
+          // 用 100dvh 才能精準取得真實可見高度,再扣 80px tab bar 與 safe-area
+          maxHeight: "calc(100dvh - 80px - env(safe-area-inset-bottom, 0px))",
           display: "flex",
           flexDirection: "column",
           paddingBottom: "env(safe-area-inset-bottom, 0px)"
