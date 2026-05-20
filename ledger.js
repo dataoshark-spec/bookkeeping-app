@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150515BM";
+const APP_VERSION = "1150515BN";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -1655,6 +1655,29 @@ function App() {
   };
   React.useEffect(() => {
     setGlobalToastRich(toastRich);
+  }, []);
+  React.useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("ledger_snap_restored");
+      if (!raw) return;
+      sessionStorage.removeItem("ledger_snap_restored");
+      const info = JSON.parse(raw);
+      const snapDate = new Date(info.createdAt);
+      const dateStr = `${snapDate.getFullYear()}/${String(snapDate.getMonth() + 1).padStart(2, "0")}/${String(snapDate.getDate()).padStart(2, "0")} ${String(snapDate.getHours()).padStart(2, "0")}:${String(snapDate.getMinutes()).padStart(2, "0")}`;
+      setTimeout(() => {
+        toastRich({
+          title: "\u5DF2\u9084\u539F\u5FEB\u7167",
+          amount: "\u2713",
+          amountColor: "var(--mint-text)",
+          lines: [
+            `\u300C${info.name}\u300D`,
+            `\u5FEB\u7167\u6642\u9593 \xB7 ${dateStr}`,
+            info.changedLabels?.length > 0 ? `\u5DF2\u66F4\u65B0:${info.changedLabels.join("\u3001")}` : "\u8CC7\u6599\u5DF2\u540C\u6B65"
+          ]
+        }, 2600);
+      }, 300);
+    } catch {
+    }
   }, []);
   const catIconMap = React.useMemo(() => {
     const map = /* @__PURE__ */ new Map();
@@ -8743,32 +8766,29 @@ function SettingsPage({
       confirmText: "\u78BA\u8A8D\u9084\u539F",
       danger: true,
       onConfirm: () => {
-        setState({
+        const newState = {
           transactions: snapTxn,
           accounts: snapAcct,
           categories: snapCat,
           accountTypes: snapAcctType,
           holdings: snapHoldings,
           trades: snapTrades
-        });
-        const snapDate = new Date(snap.createdAt);
-        const dateStr = `${snapDate.getFullYear()}/${String(snapDate.getMonth() + 1).padStart(2, "0")}/${String(snapDate.getDate()).padStart(2, "0")} ${String(snapDate.getHours()).padStart(2, "0")}:${String(snapDate.getMinutes()).padStart(2, "0")}`;
-        const changedLabels = changes.filter((c) => c.changed).map((c) => c.label);
-        if (toastRich) {
-          toastRich({
-            title: "\u5DF2\u9084\u539F\u5FEB\u7167",
-            amount: "\u2713",
-            amountColor: "var(--mint-text)",
-            lines: [
-              `\u300C${snap.name}\u300D`,
-              `\u5FEB\u7167\u6642\u9593 \xB7 ${dateStr}`,
-              changedLabels.length > 0 ? `\u5DF2\u66F4\u65B0:${changedLabels.join("\u3001")}` : "\u8CC7\u6599\u5DF2\u540C\u6B65"
-            ]
-          }, 2600);
-        } else {
-          toast(`\u5DF2\u9084\u539F\u5FEB\u7167\uFF1A${snap.name}`);
+        };
+        try {
+          localStorage.setItem("ledger_v16", JSON.stringify(newState));
+        } catch (e) {
+          toast("\u5BEB\u5165\u5931\u6557,\u5132\u5B58\u7A7A\u9593\u53EF\u80FD\u5DF2\u6EFF");
+          return;
         }
-        setShowSnapshots(false);
+        try {
+          sessionStorage.setItem("ledger_snap_restored", JSON.stringify({
+            name: snap.name,
+            createdAt: snap.createdAt,
+            changedLabels: changes.filter((c) => c.changed).map((c) => c.label)
+          }));
+        } catch {
+        }
+        window.location.reload();
       }
     });
   };
