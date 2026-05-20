@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520CE";
+const APP_VERSION = "1150520CF";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -2926,25 +2926,48 @@ function App() {
         setPageOrder: setPageOrder("settings")
       }
     )
-  ), !txnSelectMode && !homeSelectMode && !settingsSubSheet && /* @__PURE__ */ React.createElement("div", { style: styles.bottomnav }, [
-    { k: "home", icon: "home", label: "\u9996\u9801" },
-    { k: "txn", icon: "list", label: "\u660E\u7D30" },
-    { k: "stats", icon: "pie", label: "\u7D71\u8A08" },
-    { k: "settings", icon: "gear", label: "\u8A2D\u5B9A" }
-  ].map((p) => {
-    const isActive = page === p.k;
-    const color = isActive ? "var(--mint)" : "var(--text-faint)";
-    return /* @__PURE__ */ React.createElement(
-      "div",
-      {
-        key: p.k,
-        style: { ...styles.navItem, color },
-        onClick: () => setPage(p.k)
-      },
-      /* @__PURE__ */ React.createElement("div", { style: styles.navIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: p.icon, size: 22, color })),
-      /* @__PURE__ */ React.createElement("div", null, p.label)
-    );
-  })), sheet && /* @__PURE__ */ React.createElement(
+  ), !txnSelectMode && !homeSelectMode && !settingsSubSheet && /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: { ...styles.bottomnav, touchAction: "none" },
+      onTouchMove: (e) => {
+        const t = e.touches[0];
+        if (!t) return;
+        const el = document.elementFromPoint(t.clientX, t.clientY);
+        if (!el) return;
+        const tabEl = el.closest("[data-tab-key]");
+        if (!tabEl) return;
+        const k = tabEl.getAttribute("data-tab-key");
+        if (k && k !== page) {
+          setPage(k);
+          try {
+            navigator.vibrate?.(8);
+          } catch {
+          }
+        }
+      }
+    },
+    [
+      { k: "home", icon: "home", label: "\u9996\u9801" },
+      { k: "txn", icon: "list", label: "\u660E\u7D30" },
+      { k: "stats", icon: "pie", label: "\u7D71\u8A08" },
+      { k: "settings", icon: "gear", label: "\u8A2D\u5B9A" }
+    ].map((p) => {
+      const isActive = page === p.k;
+      const color = isActive ? "var(--mint)" : "var(--text-faint)";
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: p.k,
+          "data-tab-key": p.k,
+          style: { ...styles.navItem, color },
+          onClick: () => setPage(p.k)
+        },
+        /* @__PURE__ */ React.createElement("div", { style: styles.navIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: p.icon, size: 22, color })),
+        /* @__PURE__ */ React.createElement("div", null, p.label)
+      );
+    })
+  ), sheet && /* @__PURE__ */ React.createElement(
     "div",
     {
       style: styles.backdrop,
