@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520CD";
+const APP_VERSION = "1150520CE";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -33,6 +33,7 @@ const GDRIVE_EMAIL_KEY = "ledger_gdrive_email_v1";
 const GDRIVE_AUTO_KEY = "ledger_gdrive_auto_v1";
 const GDRIVE_LASTSYNC_KEY = "ledger_gdrive_lastsync_v1";
 const GDRIVE_REMIND_DAYS_KEY = "ledger_gdrive_remind_days_v1";
+const GDRIVE_PENDING_KEY = "ledger_gdrive_pending_v1";
 const GDRIVE_MAX_BACKUPS = 100;
 const driveLastSyncListeners = /* @__PURE__ */ new Set();
 const broadcastDriveLastSync = (ts) => {
@@ -1284,6 +1285,49 @@ function App() {
   const _autoBkTimerRef = React.useRef(null);
   const _autoBkMountRef = React.useRef(false);
   const _autoBkRunningRef = React.useRef(false);
+  const _autoBkRunRef = React.useRef(null);
+  _autoBkRunRef.current = async () => {
+    if (_autoBkRunningRef.current) return;
+    let autoOn = false;
+    try {
+      autoOn = localStorage.getItem(GDRIVE_AUTO_KEY) === "1";
+    } catch {
+    }
+    if (!autoOn || !GDrive.isLinked()) return;
+    _autoBkRunningRef.current = true;
+    try {
+      const token = await GDrive.ensureToken();
+      const payload = JSON.stringify({
+        transactions: state.transactions,
+        accounts: state.accounts,
+        categories: state.categories,
+        accountTypes: state.accountTypes,
+        holdings: state.holdings,
+        trades: state.trades,
+        exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        exportVersion: 3
+      }, null, 2);
+      await GDrive.uploadBackup(token, payload);
+      await GDrive.pruneOldBackups(token);
+      const ts = Date.now();
+      try {
+        localStorage.setItem(GDRIVE_LASTSYNC_KEY, String(ts));
+      } catch {
+      }
+      try {
+        localStorage.removeItem(GDRIVE_PENDING_KEY);
+      } catch {
+      }
+      broadcastDriveLastSync(ts);
+    } catch (e) {
+      try {
+        localStorage.setItem(GDRIVE_PENDING_KEY, "1");
+      } catch {
+      }
+    } finally {
+      _autoBkRunningRef.current = false;
+    }
+  };
   useEffect(() => {
     if (!_autoBkMountRef.current) {
       _autoBkMountRef.current = true;
@@ -1296,42 +1340,36 @@ function App() {
     }
     if (!autoOn || !GDrive.isLinked()) return;
     if (_autoBkTimerRef.current) return;
-    _autoBkTimerRef.current = setTimeout(async () => {
+    _autoBkTimerRef.current = setTimeout(() => {
       _autoBkTimerRef.current = null;
-      if (_autoBkRunningRef.current) return;
-      let stillOn = false;
-      try {
-        stillOn = localStorage.getItem(GDRIVE_AUTO_KEY) === "1";
-      } catch {
-      }
-      if (!stillOn || !GDrive.isLinked()) return;
-      _autoBkRunningRef.current = true;
-      try {
-        const token = await GDrive.ensureToken();
-        const payload = JSON.stringify({
-          transactions: state.transactions,
-          accounts: state.accounts,
-          categories: state.categories,
-          accountTypes: state.accountTypes,
-          holdings: state.holdings,
-          trades: state.trades,
-          exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
-          exportVersion: 3
-        }, null, 2);
-        await GDrive.uploadBackup(token, payload);
-        await GDrive.pruneOldBackups(token);
-        const ts = Date.now();
-        try {
-          localStorage.setItem(GDRIVE_LASTSYNC_KEY, String(ts));
-        } catch {
-        }
-        broadcastDriveLastSync(ts);
-      } catch (e) {
-      } finally {
-        _autoBkRunningRef.current = false;
-      }
+      _autoBkRunRef.current && _autoBkRunRef.current();
     }, 8e3);
   }, [state]);
+  useEffect(() => {
+    const onOnline = () => {
+      let pending = false;
+      try {
+        pending = localStorage.getItem(GDRIVE_PENDING_KEY) === "1";
+      } catch {
+      }
+      if (!pending) return;
+      _autoBkRunRef.current && _autoBkRunRef.current();
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, []);
+  useEffect(() => {
+    let pending = false;
+    try {
+      pending = localStorage.getItem(GDRIVE_PENDING_KEY) === "1";
+    } catch {
+    }
+    if (!pending) return;
+    const t = setTimeout(() => {
+      _autoBkRunRef.current && _autoBkRunRef.current();
+    }, 3e3);
+    return () => clearTimeout(t);
+  }, []);
   useEffect(() => {
     let migrated = false;
     setState((s) => {
@@ -9120,6 +9158,10 @@ function SettingsPage({
         setDriveLinked(false);
         setDriveEmail("");
         setDriveLastSync(0);
+        try {
+          localStorage.removeItem(GDRIVE_PENDING_KEY);
+        } catch {
+        }
         toastRich({
           titleSegments: [
             // [v555CD] 「已解除」強化(同刪除備份家族)
@@ -9147,6 +9189,10 @@ function SettingsPage({
       const now = Date.now();
       try {
         localStorage.setItem(GDRIVE_LASTSYNC_KEY, String(now));
+      } catch {
+      }
+      try {
+        localStorage.removeItem(GDRIVE_PENDING_KEY);
       } catch {
       }
       setDriveLastSync(now);
