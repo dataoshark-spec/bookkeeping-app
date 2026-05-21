@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520DI";
+const APP_VERSION = "1150520DJ";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -1247,7 +1247,11 @@ function App() {
           // [v555CI] 帳戶子標籤 — 把不常用帳戶半隱藏到收合的子標籤下
           // 結構: [{ id, name, accountIds: [string], collapsed: boolean }]
           // accountIds 決定 group 內帳戶的順序;collapsed 持久化跟著 group 走
-          accountGroups: Array.isArray(d.accountGroups) ? d.accountGroups : []
+          accountGroups: Array.isArray(d.accountGroups) ? d.accountGroups : [],
+          // [v555DJ] 持股子標籤 — 給股票分類「主題」用,如 太空類 / AI / 機器人 / 美債
+          // 結構: [{ id, name }]
+          // 一檔 holding 掛 1 個(holding.subTagId);沒掛的在統計頁歸「未分類」
+          stockSubTags: Array.isArray(d.stockSubTags) ? d.stockSubTags : []
         };
       }
     } catch {
@@ -1261,7 +1265,8 @@ function App() {
       trades: [],
       stockMarkets: [...DEFAULT_STOCK_MARKETS],
       defaultStockMarketId: DEFAULT_STOCK_MARKET_ID,
-      accountGroups: []
+      accountGroups: [],
+      stockSubTags: []
     };
   });
   const [page, setPage] = useState("home");
@@ -1498,6 +1503,7 @@ function App() {
   const [highlightedTxnInfo, setHighlightedTxnInfo] = useState(null);
   const highlightTokenRef = React.useRef(0);
   const [editHoldingDialog, setEditHoldingDialog] = useState(null);
+  const [holdingSubTagPickerSheet, setHoldingSubTagPickerSheet] = useState(null);
   const [editBuyTradeDialog, setEditBuyTradeDialog] = useState(null);
   const [holdingDetailSheet, setHoldingDetailSheet] = useState(null);
   const [showStockEntryPicker, setShowStockEntryPicker] = useState(false);
@@ -2475,6 +2481,49 @@ function App() {
     });
     return affectedCount;
   };
+  const updateHoldingSubTag = (holdingId, subTagId) => {
+    setState((s) => ({
+      ...s,
+      holdings: s.holdings.map(
+        (x) => x.id === holdingId ? { ...x, subTagId: subTagId || void 0 } : x
+      )
+    }));
+  };
+  const addStockSubTag = (name) => {
+    const trimmed = String(name || "").trim();
+    if (!trimmed) return null;
+    let resultId = null;
+    setState((s) => {
+      const exists = (s.stockSubTags || []).find((t) => t.name === trimmed);
+      if (exists) {
+        resultId = exists.id;
+        return s;
+      }
+      const newTag = { id: "sst_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: trimmed };
+      resultId = newTag.id;
+      return { ...s, stockSubTags: [...s.stockSubTags || [], newTag] };
+    });
+    return resultId;
+  };
+  const renameStockSubTag = (tagId, newName) => {
+    const trimmed = String(newName || "").trim();
+    if (!trimmed) return;
+    setState((s) => ({
+      ...s,
+      stockSubTags: (s.stockSubTags || []).map(
+        (t) => t.id === tagId ? { ...t, name: trimmed } : t
+      )
+    }));
+  };
+  const deleteStockSubTag = (tagId) => {
+    setState((s) => ({
+      ...s,
+      stockSubTags: (s.stockSubTags || []).filter((t) => t.id !== tagId),
+      holdings: s.holdings.map(
+        (h) => h.subTagId === tagId ? { ...h, subTagId: void 0 } : h
+      )
+    }));
+  };
   const updateBuyTrade = (tradeId, newData) => {
     setState((s) => {
       const trade = s.trades.find((t) => t.id === tradeId);
@@ -2760,7 +2809,8 @@ function App() {
           trades: [],
           stockMarkets: [...DEFAULT_STOCK_MARKETS],
           defaultStockMarketId: DEFAULT_STOCK_MARKET_ID,
-          accountGroups: []
+          accountGroups: [],
+          stockSubTags: []
         });
         toastRich({
           title: "\u5DF2\u6E05\u9664\u6240\u6709\u8CC7\u6599",
@@ -3276,7 +3326,8 @@ function App() {
       },
       setConfirmDialog,
       onEditHolding: (holding, field) => setEditHoldingDialog({ holding, field }),
-      onEditTrade: (trade, holding) => setEditBuyTradeDialog({ trade, holding })
+      onEditTrade: (trade, holding) => setEditBuyTradeDialog({ trade, holding }),
+      onEditSubTag: (holding) => setHoldingSubTagPickerSheet({ holding })
     }
   ), investNoteSheet && /* @__PURE__ */ React.createElement(
     InvestNoteSheet,
@@ -3311,7 +3362,29 @@ function App() {
         }
       }
     );
-  })(), editHoldingDialog && (() => {
+  })(), holdingSubTagPickerSheet && /* @__PURE__ */ React.createElement(
+    HoldingSubTagPickerSheet,
+    {
+      state,
+      holding: state.holdings.find((h) => h.id === holdingSubTagPickerSheet.holding.id),
+      onClose: () => setHoldingSubTagPickerSheet(null),
+      onPick: (subTagId) => {
+        updateHoldingSubTag(holdingSubTagPickerSheet.holding.id, subTagId);
+        setHoldingSubTagPickerSheet(null);
+        toastRich && toastRich({
+          title: subTagId ? "\u5DF2\u8A2D\u5B9A\u5206\u985E" : "\u5DF2\u53D6\u6D88\u5206\u985E",
+          amount: "\u2713",
+          amountColor: "var(--mint-text)"
+        }, 1e3);
+      },
+      onAdd: addStockSubTag,
+      onRename: renameStockSubTag,
+      onDelete: deleteStockSubTag,
+      toast,
+      toastRich,
+      setConfirmDialog
+    }
+  ), editHoldingDialog && (() => {
     const h = editHoldingDialog.holding;
     const field = editHoldingDialog.field || "symbol";
     const relTradeIds = new Set(state.trades.filter((t) => t.holdingId === h.id).map((t) => t.id));
@@ -6592,7 +6665,7 @@ function SettleDetailSheet({ state, settleGroup, onClose, onDeleteGroup }) {
     )))
   );
 }
-function HoldingDetailSheet({ state, holding, onClose, onUpdateMarketValue, onBuyMore, onSell, onDeleteTrade, onEditHolding, onEditTrade, setConfirmDialog }) {
+function HoldingDetailSheet({ state, holding, onClose, onUpdateMarketValue, onBuyMore, onSell, onDeleteTrade, onEditHolding, onEditTrade, onEditSubTag, setConfirmDialog }) {
   const swipe = useSwipeBack(onClose);
   const longPressTimerRef = React.useRef(null);
   const longPressTriggeredRef = React.useRef(false);
@@ -6739,6 +6812,7 @@ function HoldingDetailSheet({ state, holding, onClose, onUpdateMarketValue, onBu
         flex: 1,
         fontSize: 15,
         fontWeight: 600,
+        color: "var(--text)",
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
@@ -6799,6 +6873,47 @@ function HoldingDetailSheet({ state, holding, onClose, onUpdateMarketValue, onBu
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
       } }, market > 0 ? fmt(market) : "\u9EDE\u6B64\u8A2D\u5B9A"),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, color: "var(--text-faint)", marginLeft: 8 } }, "\u203A")
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => onEditSubTag && onEditSubTag(holding),
+        style: {
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          padding: "14px 16px",
+          background: "transparent",
+          border: "none",
+          borderTop: "1px solid var(--border)",
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent",
+          textAlign: "left"
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-dim)", width: 56, flexShrink: 0 } }, "\u5206\u985E"),
+      /* @__PURE__ */ React.createElement("div", { style: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: 500,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      } }, (() => {
+        const tag = holding.subTagId ? (state.stockSubTags || []).find((t) => t.id === holding.subTagId) : null;
+        if (tag) {
+          return /* @__PURE__ */ React.createElement("span", { style: {
+            display: "inline-block",
+            padding: "3px 10px",
+            borderRadius: 10,
+            background: "rgba(126, 224, 192, 0.15)",
+            color: "var(--mint-text)",
+            fontSize: 13,
+            fontWeight: 600
+          } }, tag.name);
+        }
+        return /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "(\u672A\u5206\u985E)");
+      })()),
       /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, color: "var(--text-faint)", marginLeft: 8 } }, "\u203A")
     )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, margin: "0 16px 16px" } }, /* @__PURE__ */ React.createElement(
       "button",
@@ -6946,6 +7061,416 @@ function AccountPickerSheet({ state, currentId, excludeIds, onPick, onClose, tit
         /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-dim)" } }, bal.toLocaleString())
       );
     })))
+  );
+}
+function HoldingSubTagPickerSheet({ state, holding, onClose, onPick, onAdd, onRename, onDelete, toast, toastRich, setConfirmDialog }) {
+  const swipe = useSwipeBack(onClose);
+  const tags = state.stockSubTags || [];
+  const currentId = holding ? holding.subTagId : null;
+  const [showInput, setShowInput] = React.useState(false);
+  const [newName, setNewName] = React.useState("");
+  const [editingTagId, setEditingTagId] = React.useState(null);
+  const [editingName, setEditingName] = React.useState("");
+  const longPressTimerRef = React.useRef(null);
+  const longPressTriggeredRef = React.useRef(false);
+  const inputRef = React.useRef(null);
+  const editInputRef = React.useRef(null);
+  React.useEffect(() => {
+    if (showInput && inputRef.current) {
+      setTimeout(() => inputRef.current && inputRef.current.focus(), 50);
+    }
+  }, [showInput]);
+  React.useEffect(() => {
+    if (editingTagId && editInputRef.current) {
+      setTimeout(() => editInputRef.current && editInputRef.current.focus(), 50);
+    }
+  }, [editingTagId]);
+  if (!holding) return null;
+  const handleAddSubmit = () => {
+    const t = newName.trim();
+    if (!t) {
+      toast && toast("\u8ACB\u8F38\u5165\u5206\u985E\u540D\u7A31");
+      return;
+    }
+    const existed = tags.find((x) => x.name === t);
+    if (existed) {
+      toast && toast("\u5DF2\u6709\u540C\u540D\u5206\u985E");
+      return;
+    }
+    const newId = onAdd && onAdd(t);
+    if (newId) {
+      onPick && onPick(newId);
+      toastRich && toastRich({
+        title: "\u5DF2\u65B0\u589E\u5206\u985E",
+        amount: "\u2713",
+        amountColor: "var(--mint-text)",
+        lines: [t]
+      }, 1400);
+    }
+    setShowInput(false);
+    setNewName("");
+  };
+  const handleEditSubmit = () => {
+    const t = editingName.trim();
+    if (!t) {
+      toast && toast("\u8ACB\u8F38\u5165\u5206\u985E\u540D\u7A31");
+      return;
+    }
+    const dup = tags.find((x) => x.id !== editingTagId && x.name === t);
+    if (dup) {
+      toast && toast("\u5DF2\u6709\u540C\u540D\u5206\u985E");
+      return;
+    }
+    onRename && onRename(editingTagId, t);
+    toastRich && toastRich({
+      title: "\u5DF2\u66F4\u65B0\u5206\u985E",
+      amount: "\u2713",
+      amountColor: "var(--mint-text)"
+    }, 1200);
+    setEditingTagId(null);
+    setEditingName("");
+  };
+  const startLongPress = (tag) => {
+    longPressTriggeredRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      setConfirmDialog && setConfirmDialog({
+        title: tag.name,
+        messageList: {
+          before: "\u5C0D\u9019\u500B\u5206\u985E\u505A\u4EC0\u9EBC?",
+          items: [
+            "\u6539\u540D \u2014 \u4FEE\u6539\u5206\u985E\u540D\u7A31",
+            "\u522A\u9664 \u2014 \u6B64\u5206\u985E\u4E0B\u6301\u80A1\u5C07\u8B8A\u56DE \u672A\u5206\u985E "
+          ]
+        },
+        confirmText: "\u6539\u540D",
+        cancelText: "\u522A\u9664",
+        onConfirm: () => {
+          setEditingTagId(tag.id);
+          setEditingName(tag.name);
+        },
+        onCancel: () => {
+          const usedCount = state.holdings.filter((h) => h.subTagId === tag.id).length;
+          setConfirmDialog && setConfirmDialog({
+            title: "\u522A\u9664\u5206\u985E",
+            target: { label: "\u5206\u985E", name: tag.name },
+            messageList: usedCount > 0 ? {
+              before: "\u5C07\u522A\u9664\u9019\u500B\u5206\u985E:",
+              items: [
+                `\u76EE\u524D\u6709 ${usedCount} \u6A94\u6301\u80A1\u4F7F\u7528 \u6B64\u5206\u985E`,
+                "\u522A\u9664\u5F8C\u6301\u80A1\u6703\u8B8A\u56DE \u672A\u5206\u985E (\u6301\u80A1\u672C\u8EAB\u4E0D\u6703\u88AB\u522A\u9664)"
+              ]
+            } : {
+              before: "\u5C07\u522A\u9664\u9019\u500B\u5206\u985E:",
+              items: ["\u6C92\u6709\u6301\u80A1\u4F7F\u7528\u6B64\u5206\u985E,\u53EF\u653E\u5FC3\u522A\u9664"]
+            },
+            warning: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F",
+            confirmText: "\u522A\u9664",
+            danger: true,
+            onConfirm: () => {
+              onDelete && onDelete(tag.id);
+              toastRich && toastRich({
+                title: "\u5DF2\u522A\u9664\u5206\u985E",
+                amount: "\u2713",
+                amountColor: "var(--pink-text)"
+              }, 1200);
+            }
+          });
+        }
+      });
+    }, 500);
+  };
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-sheet": "true",
+      style: {
+        ...styles.sheet,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          background: "transparent",
+          border: "none",
+          color: "var(--text-dim)",
+          fontSize: 22,
+          cursor: "pointer",
+          padding: "6px 12px"
+        },
+        onClick: onClose
+      },
+      "\xD7"
+    ), /* @__PURE__ */ React.createElement("div", { style: { ...styles.sheetTitle, color: "var(--text)" } }, "\u9078\u64C7\u5206\u985E"), /* @__PURE__ */ React.createElement("div", { style: { width: 50 } })),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: { padding: "4px 16px 0", fontSize: 12, color: "var(--text-faint)" } }, "\u7D66 ", holding.symbol, " \u5206\u5230\u81EA\u8A02\u7684\u4E3B\u984C\u985E\u5225,\u5982 \u592A\u7A7A / AI / \u6A5F\u5668\u4EBA / \u7F8E\u50B5 \u7B49\u3002"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, padding: 12 } }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick: () => onPick && onPick(null),
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "12px 14px",
+          borderRadius: 12,
+          background: "var(--bg-card)",
+          border: !currentId ? "2px solid var(--mint)" : "1.5px solid var(--border)",
+          cursor: "pointer"
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: {
+        width: 30,
+        height: 30,
+        borderRadius: 8,
+        background: "var(--border)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "var(--text-faint)",
+        fontSize: 16,
+        fontWeight: 700
+      } }, "\u2014"),
+      /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 14, color: "var(--text-dim)" } }, "\u672A\u5206\u985E"),
+      !currentId && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--mint-text)", fontWeight: 700 } }, "\u2713")
+    ), tags.map((tag) => {
+      const isSelected = tag.id === currentId;
+      const isEditing = editingTagId === tag.id;
+      const usedCount = state.holdings.filter((h) => h.subTagId === tag.id).length;
+      if (isEditing) {
+        return /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            key: tag.id,
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "10px 14px",
+              borderRadius: 12,
+              background: "var(--bg-card)",
+              border: "2px solid var(--mint)"
+            }
+          },
+          /* @__PURE__ */ React.createElement(
+            "input",
+            {
+              ref: editInputRef,
+              value: editingName,
+              onChange: (e) => setEditingName(e.target.value),
+              onKeyDown: (e) => {
+                if (e.key === "Enter") handleEditSubmit();
+                if (e.key === "Escape") {
+                  setEditingTagId(null);
+                  setEditingName("");
+                }
+              },
+              placeholder: "\u5206\u985E\u540D\u7A31",
+              style: {
+                flex: 1,
+                fontSize: 14,
+                padding: "8px 10px",
+                borderRadius: 8,
+                border: "1px solid var(--border)",
+                background: "var(--bg)",
+                color: "var(--text)",
+                outline: "none"
+              }
+            }
+          ),
+          /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              onClick: handleEditSubmit,
+              style: {
+                padding: "8px 14px",
+                borderRadius: 8,
+                background: "var(--mint)",
+                color: "#fff",
+                border: "none",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer"
+              }
+            },
+            "\u5132\u5B58"
+          ),
+          /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              onClick: () => {
+                setEditingTagId(null);
+                setEditingName("");
+              },
+              style: {
+                padding: "8px 10px",
+                borderRadius: 8,
+                background: "transparent",
+                color: "var(--text-dim)",
+                border: "1px solid var(--border)",
+                fontSize: 13,
+                cursor: "pointer"
+              }
+            },
+            "\u53D6\u6D88"
+          )
+        );
+      }
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: tag.id,
+          onClick: () => {
+            if (longPressTriggeredRef.current) {
+              longPressTriggeredRef.current = false;
+              return;
+            }
+            onPick && onPick(tag.id);
+          },
+          onTouchStart: () => startLongPress(tag),
+          onTouchEnd: cancelLongPress,
+          onTouchMove: cancelLongPress,
+          onTouchCancel: cancelLongPress,
+          onContextMenu: (e) => {
+            e.preventDefault();
+            longPressTriggeredRef.current = true;
+            startLongPress(tag);
+            cancelLongPress();
+          },
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "12px 14px",
+            borderRadius: 12,
+            background: "var(--bg-card)",
+            border: isSelected ? "2px solid var(--mint)" : "1.5px solid var(--border)",
+            cursor: "pointer",
+            WebkitTapHighlightColor: "transparent",
+            WebkitUserSelect: "none",
+            userSelect: "none"
+          }
+        },
+        /* @__PURE__ */ React.createElement("div", { style: {
+          width: 30,
+          height: 30,
+          borderRadius: 8,
+          background: "rgba(126, 224, 192, 0.2)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "var(--mint-text)",
+          fontSize: 13,
+          fontWeight: 700
+        } }, tag.name.slice(0, 1)),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 500 } }, tag.name), usedCount > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2 } }, usedCount, " \u6A94\u6301\u80A1")),
+        isSelected && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--mint-text)", fontWeight: 700 } }, "\u2713")
+      );
+    }), showInput ? /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "10px 14px",
+          borderRadius: 12,
+          background: "var(--bg-card)",
+          border: "2px dashed var(--mint)"
+        }
+      },
+      /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          ref: inputRef,
+          value: newName,
+          onChange: (e) => setNewName(e.target.value),
+          onKeyDown: (e) => {
+            if (e.key === "Enter") handleAddSubmit();
+            if (e.key === "Escape") {
+              setShowInput(false);
+              setNewName("");
+            }
+          },
+          placeholder: "\u4F8B:\u592A\u7A7A\u985E / AI / \u6A5F\u5668\u4EBA",
+          style: {
+            flex: 1,
+            fontSize: 14,
+            padding: "8px 10px",
+            borderRadius: 8,
+            border: "1px solid var(--border)",
+            background: "var(--bg)",
+            color: "var(--text)",
+            outline: "none"
+          }
+        }
+      ),
+      /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: handleAddSubmit,
+          style: {
+            padding: "8px 14px",
+            borderRadius: 8,
+            background: "var(--mint)",
+            color: "#fff",
+            border: "none",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer"
+          }
+        },
+        "\u65B0\u589E"
+      ),
+      /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => {
+            setShowInput(false);
+            setNewName("");
+          },
+          style: {
+            padding: "8px 10px",
+            borderRadius: 8,
+            background: "transparent",
+            color: "var(--text-dim)",
+            border: "1px solid var(--border)",
+            fontSize: 13,
+            cursor: "pointer"
+          }
+        },
+        "\u53D6\u6D88"
+      )
+    ) : /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setShowInput(true),
+        style: {
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          padding: "12px 14px",
+          borderRadius: 12,
+          background: "transparent",
+          border: "1.5px dashed var(--border)",
+          color: "var(--mint-text)",
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      /* @__PURE__ */ React.createElement("span", null, "+ \u65B0\u589E\u5206\u985E")
+    ), tags.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", textAlign: "center", marginTop: 6 } }, "\u9577\u6309\u5206\u985E\u53EF \u6539\u540D \u6216 \u522A\u9664")))
   );
 }
 function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, selectedDate, setSelectedDate, onAdd, onClickTxn, onViewAll, onOpenPeriod, onOpenAccount, onOpenDate, onOpenLend, onOpenInvestPicker, editMode, setEditMode, blockOrder, moveBlock, setPageOrder, setConfirmDialog, toastRich, toast, onSelectModeChange, isBlockHidden, toggleBlockHidden }) {
@@ -8440,6 +8965,53 @@ function StatsPage({ state, catIcon, currentMonth, setCurrentMonth, editMode, se
     return Object.entries(bySub).sort((a, b) => b[1] - a[1]);
   })() : null;
   const subcatTotal = subcatData ? subcatData.reduce((s, [, v]) => s + v, 0) : 0;
+  const stockChartData = React.useMemo(() => {
+    const holdings = state.holdings || [];
+    const trades = state.trades || [];
+    const markets = state.stockMarkets || DEFAULT_STOCK_MARKETS;
+    const subTags = state.stockSubTags || [];
+    const active = holdings.filter((h) => holdingShares(h, trades) > 0);
+    const byMarket = {};
+    active.forEach((h) => {
+      const mid = h.stockMarketId || markets[0]?.id || "sm_tw";
+      if (!byMarket[mid]) byMarket[mid] = { cost: 0, marketValue: 0, holdings: [] };
+      const c = holdingCost(h, trades);
+      const mv = h.marketValue || 0;
+      byMarket[mid].cost += c;
+      byMarket[mid].marketValue += mv > 0 ? mv : c;
+      byMarket[mid].holdings.push(h);
+    });
+    const marketCostData = markets.filter((m) => byMarket[m.id]).map((m) => [m.label, byMarket[m.id].cost, m.id]).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    const marketValueData = markets.filter((m) => byMarket[m.id]).map((m) => [m.label, byMarket[m.id].marketValue, m.id]).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    const totalCost = marketCostData.reduce((s, [, v]) => s + v, 0);
+    const totalMarket = marketValueData.reduce((s, [, v]) => s + v, 0);
+    return { byMarket, marketCostData, marketValueData, totalCost, totalMarket, markets, subTags };
+  }, [state.holdings, state.trades, state.stockMarkets, state.stockSubTags]);
+  const stockDrillData = React.useMemo(() => {
+    if (chartType !== "stock" || !drillCat) return null;
+    const marketEntry = stockChartData.byMarket[drillCat];
+    if (!marketEntry) return null;
+    const subTagMap = {};
+    const UNCATEGORIZED = "__uncategorized__";
+    marketEntry.holdings.forEach((h) => {
+      const tagId = h.subTagId || UNCATEGORIZED;
+      const tagName = h.subTagId ? (stockChartData.subTags.find((t) => t.id === h.subTagId) || {}).name || "\u672A\u5206\u985E" : "\u672A\u5206\u985E";
+      if (!subTagMap[tagId]) subTagMap[tagId] = { name: tagName, cost: 0, marketValue: 0 };
+      const c = holdingCost(h, state.trades || []);
+      const mv = h.marketValue || 0;
+      subTagMap[tagId].cost += c;
+      subTagMap[tagId].marketValue += mv > 0 ? mv : c;
+    });
+    const costData = Object.values(subTagMap).map((x) => [x.name, x.cost]).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    const valueData = Object.values(subTagMap).map((x) => [x.name, x.marketValue]).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    return {
+      costData,
+      valueData,
+      totalCost: costData.reduce((s, [, v]) => s + v, 0),
+      totalMarket: valueData.reduce((s, [, v]) => s + v, 0),
+      marketLabel: (stockChartData.markets.find((m) => m.id === drillCat) || {}).label || drillCat
+    };
+  }, [chartType, drillCat, stockChartData, state.trades]);
   let transferTotal = 0, feeTotal = 0, transferCount = 0;
   for (const t of txns) {
     if (t.transferRole === "out") {
@@ -8669,6 +9241,7 @@ function StatsPage({ state, catIcon, currentMonth, setCurrentMonth, editMode, se
       onMoveDown: () => moveBlock && moveBlock(blockKey, 1)
     };
     if (blockKey === "period") {
+      if (chartType === "stock") return null;
       const navTitle = scope === "day" ? (() => {
         const [y, m, d] = currentDate.split("-");
         const wd = ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][(/* @__PURE__ */ new Date(currentDate + "T00:00:00")).getDay()];
@@ -8710,9 +9283,182 @@ function StatsPage({ state, catIcon, currentMonth, setCurrentMonth, editMode, se
       )), /* @__PURE__ */ React.createElement("div", { style: styles.monthHeader }, /* @__PURE__ */ React.createElement("div", { style: styles.monthNav, onClick: onNavPrev }, "\u2039"), /* @__PURE__ */ React.createElement("div", { style: styles.monthTitle }, navTitle), /* @__PURE__ */ React.createElement("div", { style: styles.monthNav, onClick: onNavNext }, "\u203A")));
     }
     if (blockKey === "summary") {
+      if (chartType === "stock") return null;
       return /* @__PURE__ */ React.createElement(Block, { key: "summary", ...blockProps, title: "\u6536\u652F\u7E3D\u89BD" }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryRow }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u6536\u5165"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: "var(--mint-text)", fontSize: autoFitFontSize(fmt(inc)) } }, fmt(inc))), /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u652F\u51FA"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: "var(--pink-text)", fontSize: autoFitFontSize(fmt(exp)) } }, fmt(exp))), /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u7D50\u9918"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: inc - exp < 0 ? "var(--pink)" : inc - exp > 0 ? "var(--mint)" : "var(--text)", fontSize: autoFitFontSize(fmtSigned(inc - exp)) } }, fmtSigned(inc - exp)))));
     }
     if (blockKey === "chart") {
+      if (chartType === "stock") {
+        const isDrilled = !!drillCat;
+        const drillMarket = isDrilled ? stockChartData.markets.find((m) => m.id === drillCat) || null : null;
+        const valueData = isDrilled ? stockDrillData ? stockDrillData.valueData : [] : stockChartData.marketValueData.map(([n, v]) => [n, v]);
+        const costData = isDrilled ? stockDrillData ? stockDrillData.costData : [] : stockChartData.marketCostData.map(([n, v]) => [n, v]);
+        const valueTotal = isDrilled ? stockDrillData ? stockDrillData.totalMarket : 0 : stockChartData.totalMarket;
+        const costTotal = isDrilled ? stockDrillData ? stockDrillData.totalCost : 0 : stockChartData.totalCost;
+        const hasData = valueData.length + costData.length > 0;
+        const renderMiniDonut = (data, total, title) => {
+          if (!total || data.length === 0) {
+            return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", fontWeight: 600 } }, title), /* @__PURE__ */ React.createElement("svg", { style: { width: "100%", maxWidth: 130, aspectRatio: "1/1" }, viewBox: "0 0 100 100" }, /* @__PURE__ */ React.createElement("circle", { cx: "50", cy: "50", r: "38", fill: "none", stroke: "var(--border)", strokeWidth: "8" }), /* @__PURE__ */ React.createElement("text", { x: "50", y: "54", textAnchor: "middle", fontSize: "6", fill: "var(--text-faint)" }, "\u6C92\u6709\u8CC7\u6599")));
+          }
+          const cx = 50, cy = 50, ringR = 38, ringW = 8;
+          const gapDeg = data.length > 1 ? 4 : 0;
+          const totalGap = gapDeg * data.length;
+          const availableDeg = 360 - totalGap;
+          let startDeg = -90;
+          const slices = [];
+          data.forEach(([cat, val], i) => {
+            const sweepDeg = val / total * availableDeg;
+            const endDeg = startDeg + sweepDeg;
+            slices.push({ cat, val, startDeg, endDeg, idx: i });
+            startDeg = endDeg + gapDeg;
+          });
+          const polar = (cxv, cyv, rv, deg) => {
+            const rad = deg * Math.PI / 180;
+            return [cxv + rv * Math.cos(rad), cyv + rv * Math.sin(rad)];
+          };
+          const arcStroke = (sd, ed) => {
+            const [x1, y1] = polar(cx, cy, ringR, sd);
+            const [x2, y2] = polar(cx, cy, ringR, ed);
+            const large = ed - sd > 180 ? 1 : 0;
+            return `M ${x1} ${y1} A ${ringR} ${ringR} 0 ${large} 1 ${x2} ${y2}`;
+          };
+          return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", fontWeight: 600 } }, title), /* @__PURE__ */ React.createElement("svg", { style: { width: "100%", maxWidth: 130, aspectRatio: "1/1", overflow: "visible" }, viewBox: "0 0 100 100" }, slices.map((s) => {
+            const color = CHART_COLORS[s.idx % CHART_COLORS.length];
+            const isFullCircle = s.endDeg - s.startDeg >= 360 - 0.01;
+            return /* @__PURE__ */ React.createElement("g", { key: s.cat }, isFullCircle ? /* @__PURE__ */ React.createElement("circle", { cx, cy, r: ringR, fill: "none", stroke: color, strokeWidth: ringW }) : /* @__PURE__ */ React.createElement(
+              "path",
+              {
+                d: arcStroke(s.startDeg, s.endDeg),
+                fill: "none",
+                stroke: color,
+                strokeWidth: ringW,
+                strokeLinecap: "round"
+              }
+            ));
+          }), /* @__PURE__ */ React.createElement("text", { x: "50", y: "51", textAnchor: "middle", fontSize: "9", fontWeight: "700", fill: "var(--text)", style: { fontFamily: "var(--num-font)" } }, fmt(total))));
+        };
+        const legendData = valueData.length > 0 ? valueData : costData;
+        const costMap = {};
+        costData.forEach(([n, v]) => {
+          costMap[n] = v;
+        });
+        return /* @__PURE__ */ React.createElement(
+          Block,
+          {
+            key: "chart",
+            ...blockProps,
+            title: isDrilled ? `${drillMarket ? drillMarket.label : ""} \xB7 \u4E3B\u984C\u4F54\u6BD4` : "\u80A1\u7968\u4F54\u6BD4 (\u4F9D\u5E02\u5834)",
+            headerRight: isDrilled ? /* @__PURE__ */ React.createElement(
+              "button",
+              {
+                onClick: () => {
+                  setDrillCat(null);
+                  setSelectedCat(null);
+                  setDrillSub(null);
+                },
+                style: {
+                  background: "var(--bg-card)",
+                  color: "var(--mint-text)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 16,
+                  padding: "6px 12px 6px 10px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  WebkitTapHighlightColor: "transparent",
+                  outline: "none"
+                }
+              },
+              /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, lineHeight: 1 } }, "\u2039"),
+              /* @__PURE__ */ React.createElement("span", null, "\u8FD4\u56DE")
+            ) : null
+          },
+          !isDrilled && /* @__PURE__ */ React.createElement("div", { style: styles.recentFilterBar }, /* @__PURE__ */ React.createElement(
+            "span",
+            {
+              style: { ...styles.recentFilterChip, ...chartType === "expense" ? styles.recentFilterChipActive : {} },
+              onClick: () => {
+                setChartType("expense");
+                setSelectedCat(null);
+                setDrillCat(null);
+              }
+            },
+            "\u652F\u51FA"
+          ), /* @__PURE__ */ React.createElement(
+            "span",
+            {
+              style: { ...styles.recentFilterChip, ...chartType === "income" ? styles.recentFilterChipActive : {} },
+              onClick: () => {
+                setChartType("income");
+                setSelectedCat(null);
+                setDrillCat(null);
+              }
+            },
+            "\u6536\u5165"
+          ), /* @__PURE__ */ React.createElement(
+            "span",
+            {
+              style: { ...styles.recentFilterChip, ...chartType === "stock" ? styles.recentFilterChipActive : {} },
+              onClick: () => {
+                setChartType("stock");
+                setSelectedCat(null);
+                setDrillCat(null);
+              }
+            },
+            "\u80A1\u7968"
+          )),
+          hasData ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: {
+            display: "flex",
+            gap: 8,
+            justifyContent: "space-around",
+            alignItems: "flex-start",
+            padding: "8px 4px 12px"
+          } }, renderMiniDonut(valueData, valueTotal, "\u5E02\u503C"), renderMiniDonut(costData, costTotal, "\u6210\u672C")), /* @__PURE__ */ React.createElement("div", { style: {
+            display: "flex",
+            justifyContent: "center",
+            gap: 6,
+            alignItems: "baseline",
+            paddingBottom: 8,
+            fontFamily: "var(--num-font)"
+          } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--text-faint)" } }, "\u640D\u76CA"), /* @__PURE__ */ React.createElement("span", { style: {
+            fontSize: 16,
+            fontWeight: 700,
+            color: valueTotal - costTotal >= 0 ? "var(--mint-text)" : "var(--pink-text)"
+          } }, valueTotal - costTotal >= 0 ? "+" : "", fmt(valueTotal - costTotal)), /* @__PURE__ */ React.createElement("span", { style: {
+            fontSize: 12,
+            color: valueTotal - costTotal >= 0 ? "var(--mint-text)" : "var(--pink-text)"
+          } }, "(", costTotal > 0 ? ((valueTotal - costTotal) / costTotal * 100).toFixed(2) : "0.00", "%)")), /* @__PURE__ */ React.createElement("div", { style: styles.legendList }, legendData.map(([name, val], i) => {
+            const color = CHART_COLORS[i % CHART_COLORS.length];
+            const pct = valueTotal > 0 ? (val / valueTotal * 100).toFixed(1) : "0.0";
+            const cost = costMap[name] || 0;
+            const marketId = !isDrilled ? (stockChartData.marketValueData.find(([n]) => n === name) || stockChartData.marketCostData.find(([n]) => n === name) || [])[2] : null;
+            return /* @__PURE__ */ React.createElement(
+              "div",
+              {
+                key: name,
+                style: {
+                  ...styles.legendRow,
+                  cursor: !isDrilled ? "pointer" : "default",
+                  borderRadius: 8,
+                  padding: "6px 8px"
+                },
+                onClick: () => {
+                  if (!isDrilled && marketId) {
+                    setDrillCat(marketId);
+                    setSelectedCat(null);
+                  }
+                }
+              },
+              /* @__PURE__ */ React.createElement("div", { style: { ...styles.legendDot, background: color } }),
+              /* @__PURE__ */ React.createElement("span", { style: styles.legendName }, name),
+              /* @__PURE__ */ React.createElement("span", { style: styles.legendPct }, pct, "%"),
+              /* @__PURE__ */ React.createElement("span", { style: { ...styles.legendAmt, fontFamily: "var(--num-font)" } }, fmt(val))
+            );
+          }), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", textAlign: "center", marginTop: 8 } }, isDrilled ? "\u4F9D\u6301\u80A1\u5206\u985E\u805A\u5408" : "\u9EDE\u5E02\u5834 \u2192 \u770B\u4E3B\u984C\u5206\u4F48"))) : /* @__PURE__ */ React.createElement("div", { style: styles.empty }, (state.holdings || []).length === 0 ? "\u5C1A\u672A\u6709\u6301\u80A1\u8CC7\u6599" : "\u76EE\u524D\u6C92\u6709\u5728\u6301\u80A1\u4E2D\u7684\u80A1\u7968")
+        );
+      }
       const displayData = drillCat ? subcatData : mainData;
       const displayTotal = drillCat ? subcatTotal : mainTotal;
       const selectedData = selectedCat ? displayData.find(([c]) => c === selectedCat) : null;
@@ -8772,6 +9518,17 @@ function StatsPage({ state, catIcon, currentMonth, setCurrentMonth, editMode, se
             }
           },
           "\u6536\u5165"
+        ), /* @__PURE__ */ React.createElement(
+          "span",
+          {
+            style: { ...styles.recentFilterChip, ...chartType === "stock" ? styles.recentFilterChipActive : {} },
+            onClick: () => {
+              setChartType("stock");
+              setSelectedCat(null);
+              setDrillCat(null);
+            }
+          },
+          "\u80A1\u7968"
         )),
         /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "center", padding: "4px 0 8px" } }, renderDonut(displayData, displayTotal, {
           highlighted: selectedCat,
@@ -8818,9 +9575,11 @@ function StatsPage({ state, catIcon, currentMonth, setCurrentMonth, editMode, se
     }
     if (blockKey === "trend") {
       if (scope === "day") return null;
+      if (chartType === "stock") return null;
       return /* @__PURE__ */ React.createElement(Block, { key: "trend", ...blockProps, title: scope === "month" ? "\u6BCF\u65E5\u652F\u51FA\u8DA8\u52E2" : "\u6BCF\u6708\u652F\u51FA\u8DA8\u52E2" }, /* @__PURE__ */ React.createElement("div", { style: { padding: "8px 4px 4px" } }, renderTrendChart(trendData, trendMax, chartType)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text-faint)", padding: "0 6px" } }, /* @__PURE__ */ React.createElement("span", null, scope === "month" ? "\u65E5" : "\u6708"), /* @__PURE__ */ React.createElement("span", null, "\u6700\u9AD8 ", fmt(trendMax))));
     }
     if (blockKey === "compare") {
+      if (chartType === "stock") return null;
       const isExp = chartType === "expense";
       const curVal = drillCat ? subcatTotal : isExp ? exp : inc;
       const prevVal = drillCat ? (isExp ? prevExpByCat : prevIncByCat)[drillCat] || 0 : isExp ? prevExp : prevInc;
@@ -8833,6 +9592,7 @@ function StatsPage({ state, catIcon, currentMonth, setCurrentMonth, editMode, se
       return /* @__PURE__ */ React.createElement(Block, { key: "compare", ...blockProps, title: titleNode }, /* @__PURE__ */ React.createElement("div", { style: styles.compareRow }, /* @__PURE__ */ React.createElement("div", { style: styles.compareBox }, /* @__PURE__ */ React.createElement("div", { style: styles.compareLabel }, "\u672C\u671F", isExp ? "\u652F\u51FA" : "\u6536\u5165"), /* @__PURE__ */ React.createElement("div", { style: styles.compareVal }, fmt(curVal))), /* @__PURE__ */ React.createElement("div", { style: styles.compareBox }, /* @__PURE__ */ React.createElement("div", { style: styles.compareLabel }, prevLabel), /* @__PURE__ */ React.createElement("div", { style: { ...styles.compareVal, color: "var(--text-dim)" } }, fmt(prevVal))), /* @__PURE__ */ React.createElement("div", { style: styles.compareBox }, /* @__PURE__ */ React.createElement("div", { style: styles.compareLabel }, "\u8B8A\u5316"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.compareVal, color: diffColor } }, diff > 0 ? "+" : "", fmt(diff), diffPct != null && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, marginLeft: 4 } }, "(", diff >= 0 ? "+" : "", diffPct.toFixed(1), "%)")))), prevVal === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", textAlign: "center", marginTop: 8 } }, drillCat ? `${prevLabel}\u6C92\u6709\u300C${drillCat}\u300D\u7684\u8CC7\u6599` : `${prevLabel}\u6C92\u6709\u8CC7\u6599`));
     }
     if (blockKey === "top5") {
+      if (chartType === "stock") return null;
       if (top5Txns.length === 0) return null;
       const isExp = chartType === "expense";
       const baseTitle = isExp ? "\u55AE\u7B46\u6700\u5927\u652F\u51FA Top 5" : "\u55AE\u7B46\u6700\u5927\u6536\u5165 Top 5";
@@ -8845,6 +9605,7 @@ function StatsPage({ state, catIcon, currentMonth, setCurrentMonth, editMode, se
       })));
     }
     if (blockKey === "transfer") {
+      if (chartType === "stock") return null;
       if (transferCount === 0) return null;
       return /* @__PURE__ */ React.createElement(Block, { key: "transfer", ...blockProps, title: "\u8F49\u5E33\u52D5\u614B" }, /* @__PURE__ */ React.createElement("div", { style: styles.compareRow }, /* @__PURE__ */ React.createElement("div", { style: styles.compareBox }, /* @__PURE__ */ React.createElement("div", { style: styles.compareLabel }, "\u8F49\u5E33\u7B46\u6578"), /* @__PURE__ */ React.createElement("div", { style: styles.compareVal }, transferCount)), /* @__PURE__ */ React.createElement("div", { style: styles.compareBox }, /* @__PURE__ */ React.createElement("div", { style: styles.compareLabel }, "\u642C\u79FB\u91D1\u984D"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.compareVal, color: "var(--accent-text)" } }, fmt(transferTotal))), /* @__PURE__ */ React.createElement("div", { style: styles.compareBox }, /* @__PURE__ */ React.createElement("div", { style: styles.compareLabel }, "\u624B\u7E8C\u8CBB\u5408\u8A08"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.compareVal, color: "var(--pink-text)" } }, fmt(feeTotal)))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", textAlign: "center", marginTop: 8 } }, "\u8F49\u5E33\u4E0D\u8A08\u5165\u652F\u51FA/\u6536\u5165\u7D71\u8A08"));
     }
@@ -8971,7 +9732,8 @@ function SettingsPage({
       trades: state.trades,
       stockMarkets: state.stockMarkets,
       defaultStockMarketId: state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID,
-      accountGroups: state.accountGroups || []
+      accountGroups: state.accountGroups || [],
+      stockSubTags: state.stockSubTags || []
     });
     const snap = {
       id: "snap_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
@@ -9051,6 +9813,7 @@ function SettingsPage({
     const snapStockMarkets = Array.isArray(snapData.stockMarkets) ? snapData.stockMarkets : [...DEFAULT_STOCK_MARKETS];
     const snapDefaultStockMarketId = snapData.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID;
     const snapAccountGroups = Array.isArray(snapData.accountGroups) ? snapData.accountGroups : [];
+    const snapStockSubTags = Array.isArray(snapData.stockSubTags) ? snapData.stockSubTags : [];
     const changes = [
       {
         icon: "list",
@@ -9098,7 +9861,8 @@ function SettingsPage({
           trades: snapTrades,
           stockMarkets: snapStockMarkets,
           defaultStockMarketId: snapDefaultStockMarketId,
-          accountGroups: snapAccountGroups
+          accountGroups: snapAccountGroups,
+          stockSubTags: snapStockSubTags
         };
         try {
           localStorage.setItem("ledger_v16", JSON.stringify(newState));
@@ -9273,6 +10037,7 @@ function SettingsPage({
     stockMarkets: state.stockMarkets,
     defaultStockMarketId: state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID,
     accountGroups: state.accountGroups || [],
+    stockSubTags: state.stockSubTags || [],
     preferences: collectPreferences(),
     exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
     exportVersion: 3
@@ -9866,7 +10631,8 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
             trades: Array.isArray(data.trades) ? data.trades : [],
             stockMarkets: Array.isArray(data.stockMarkets) && data.stockMarkets.length ? data.stockMarkets : [...DEFAULT_STOCK_MARKETS],
             defaultStockMarketId: data.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID,
-            accountGroups: Array.isArray(data.accountGroups) ? data.accountGroups : []
+            accountGroups: Array.isArray(data.accountGroups) ? data.accountGroups : [],
+            stockSubTags: Array.isArray(data.stockSubTags) ? data.stockSubTags : []
           };
           try {
             localStorage.setItem("ledger_v16", JSON.stringify(newState));
@@ -17501,7 +18267,20 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap"
-            } }, h.name), /* @__PURE__ */ React.createElement("div", { style: {
+            } }, h.name), (() => {
+              const tag = h.subTagId ? (state.stockSubTags || []).find((t) => t.id === h.subTagId) : null;
+              if (!tag) return null;
+              return /* @__PURE__ */ React.createElement("div", { style: { marginTop: 4 } }, /* @__PURE__ */ React.createElement("span", { style: {
+                display: "inline-block",
+                padding: "2px 8px",
+                borderRadius: 8,
+                background: "rgba(126, 224, 192, 0.15)",
+                color: "var(--mint-text)",
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: 0.2
+              } }, tag.name));
+            })(), /* @__PURE__ */ React.createElement("div", { style: {
               fontSize: 11,
               color: "var(--text-faint)",
               marginTop: 6,
