@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520DA";
+const APP_VERSION = "1150520DB";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -4038,6 +4038,7 @@ function ConfirmDialogRenderer({ dialog, onClose }) {
     } }, renderHL(ml.before)), Array.isArray(ml.items) && ml.items.length > 0 && (styled ? /* @__PURE__ */ React.createElement("div", { style: { margin: "0 0 12px", display: "flex", flexDirection: "column", gap: 6 } }, ml.items.map((it, i) => {
       const itemText = it && typeof it === "object" ? it.text : it;
       const itemCard = !!(it && typeof it === "object" && it.card);
+      const itemLines = it && typeof it === "object" && Array.isArray(it.lines) ? it.lines : null;
       const renderItemContent = (text) => {
         if (!itemCard) return renderHL(text);
         const m = text && text.match(/^(.+?)\s+(\d[\d,]*)\s+(.+)$/);
@@ -4054,9 +4055,9 @@ function ConfirmDialogRenderer({ dialog, onClose }) {
           background: "var(--bg-card-alt)",
           border: "1px solid var(--border)",
           borderRadius: 10,
-          padding: "8px 14px"
+          padding: itemLines ? "10px 14px" : "8px 14px"
         } : { padding: "4px 2px" }
-      } }, renderItemContent(itemText));
+      } }, itemLines ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, itemLines.map((ln, j) => /* @__PURE__ */ React.createElement("div", { key: j }, renderItemContent(ln)))) : renderItemContent(itemText));
     })) : /* @__PURE__ */ React.createElement("div", { style: {
       margin: "0 0 10px",
       display: "flex",
@@ -4194,28 +4195,32 @@ function ConfirmDialogRenderer({ dialog, onClose }) {
       } }, renderHighlighted(trailing.join("\n"))));
     })(), !dialog.warning && autoWarning && /* @__PURE__ */ React.createElement("div", { style: {
       margin: effectiveMessage ? "0 16px 4px" : "4px 16px 4px",
-      padding: "8px 12px",
-      background: "rgba(245, 181, 192, 0.08)",
-      borderRadius: 6,
-      fontSize: 12.5,
+      padding: "10px 14px",
+      background: "rgba(217, 104, 119, 0.12)",
+      border: "1px solid rgba(217, 104, 119, 0.25)",
+      borderRadius: 8,
+      fontSize: 13,
       color: "var(--pink-text)",
-      fontWeight: 500,
+      fontWeight: 600,
       display: "flex",
       alignItems: "center",
+      justifyContent: "center",
       gap: 8
-    } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "warning", size: 13, color: "var(--pink-text)" }), /* @__PURE__ */ React.createElement("span", null, autoWarning)));
+    } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "warning", size: 13, color: "var(--pink-text)" }), /* @__PURE__ */ React.createElement("span", null, autoWarning), /* @__PURE__ */ React.createElement(TypeIcon, { name: "warning", size: 13, color: "var(--pink-text)" })));
   })(), dialog.warning && /* @__PURE__ */ React.createElement("div", { style: {
     margin: "0 16px 14px",
-    padding: "8px 12px",
-    background: "rgba(245, 181, 192, 0.08)",
-    borderRadius: 6,
+    padding: "10px 14px",
+    background: "rgba(217, 104, 119, 0.12)",
+    border: "1px solid rgba(217, 104, 119, 0.25)",
+    borderRadius: 8,
     fontSize: 13,
     color: "var(--pink-text)",
-    fontWeight: 500,
+    fontWeight: 600,
     display: "flex",
     alignItems: "center",
+    justifyContent: "center",
     gap: 8
-  } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "warning", size: 14, color: "var(--pink-text)" }), /* @__PURE__ */ React.createElement("span", null, dialog.warning))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "8px 16px 16px" } }, !dialog.singleAction && /* @__PURE__ */ React.createElement(
+  } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "warning", size: 14, color: "var(--pink-text)" }), /* @__PURE__ */ React.createElement("span", null, dialog.warning), /* @__PURE__ */ React.createElement(TypeIcon, { name: "warning", size: 14, color: "var(--pink-text)" }))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "8px 16px 16px" } }, !dialog.singleAction && /* @__PURE__ */ React.createElement(
     "button",
     {
       style: {
@@ -9565,14 +9570,14 @@ function SettingsPage({
       title: "\u5F9E\u96F2\u7AEF\u9084\u539F",
       messageList: {
         styled: true,
-        before: "\u5C07\u7528\u9019\u4EFD Google Drive \u96F2\u7AEF\u5099\u4EFD\n\u8986\u84CB\u76EE\u524D\u7684\u8CC7\u6599\uFF1A",
+        before: "\u5C07\u7528\u9019\u4EFD Google Drive \u96F2\u7AEF\u5099\u4EFD\u8986\u84CB\u76EE\u524D\u7684\u8CC7\u6599\uFF1A",
         items: [
-          { text: fileName, card: true },
-          "\u26A0 \u76EE\u524D\u7684\u672C\u6A5F\u8CC7\u6599\u6703 \u5B8C\u5168\u88AB\u53D6\u4EE3\n\u6B64\u52D5\u4F5C \u7121\u6CD5\u5FA9\u539F"
+          { text: fileName, card: true }
         ],
-        after: "\u78BA\u5B9A\u9084\u539F\u55CE\uFF1F"
+        after: "\u532F\u5165\u5F8C\u6703 \u5B8C\u5168\u8986\u84CB \u76EE\u524D\u7684\u8CC7\u6599\u3002"
       },
-      highlightWords: ["\u5B8C\u5168\u88AB\u53D6\u4EE3", "\u7121\u6CD5\u5FA9\u539F"],
+      highlightWords: ["\u5B8C\u5168\u8986\u84CB"],
+      warning: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F",
       confirmText: "\u9084\u539F",
       danger: true,
       onConfirm: async () => {
@@ -9815,19 +9820,16 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
       const accountGroupCount = Array.isArray(data.accountGroups) ? data.accountGroups.length : 0;
       setShowPasteImport(false);
       setPasteImportText("");
-      const items = [
-        { text: `\u4EA4\u6613\u7D00\u9304 ${txnCount} \u7B46`, card: true },
-        { text: `\u5E33\u6236 ${acctCount} \u500B`, card: true }
+      const summaryLines = [
+        `\u4EA4\u6613\u7D00\u9304 ${txnCount} \u7B46`,
+        `\u5E33\u6236 ${acctCount} \u500B`
       ];
-      if (subCategoryCount > 0) {
-        items.push({ text: `\u5B50\u5206\u985E ${subCategoryCount} \u500B`, card: true });
-      }
-      if (holdingCount > 0) {
-        items.push({ text: `\u6301\u80A1 ${holdingCount} \u6A94`, card: true });
-      }
-      if (accountGroupCount > 0) {
-        items.push({ text: `\u5B50\u6A19\u7C64 ${accountGroupCount} \u500B`, card: true });
-      }
+      if (subCategoryCount > 0) summaryLines.push(`\u5B50\u5206\u985E ${subCategoryCount} \u500B`);
+      if (holdingCount > 0) summaryLines.push(`\u6301\u80A1 ${holdingCount} \u6A94`);
+      if (accountGroupCount > 0) summaryLines.push(`\u5B50\u6A19\u7C64 ${accountGroupCount} \u500B`);
+      const items = [
+        { card: true, lines: summaryLines }
+      ];
       if (hasPrefs) {
         items.push("\u4E00\u4F75\u9084\u539F \u504F\u597D\u8A2D\u5B9A");
       }
