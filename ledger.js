@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520DB";
+const APP_VERSION = "1150520DD";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -1486,6 +1486,21 @@ function App() {
     } catch {
     }
   }, [numFont]);
+  const [addTxnTopOffset, setAddTxnTopOffset] = useState(() => {
+    try {
+      const v = localStorage.getItem("ledger_add_txn_top_offset_v1");
+      if (v === "middle" || v === "bottom" || v === "top") return v;
+      return "top";
+    } catch {
+      return "top";
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("ledger_add_txn_top_offset_v1", addTxnTopOffset);
+    } catch {
+    }
+  }, [addTxnTopOffset]);
   const [manageCat, setManageCat] = useState(null);
   const [editAccountId, setEditAccountId] = useState(null);
   const [accountsFromAddTxn, setAccountsFromAddTxn] = useState(false);
@@ -2955,6 +2970,8 @@ function App() {
         setTheme,
         numFont,
         setNumFont,
+        addTxnTopOffset,
+        setAddTxnTopOffset,
         blockOrder: blockOrder.settings,
         moveBlock: moveBlock("settings"),
         setPageOrder: setPageOrder("settings")
@@ -6604,10 +6621,10 @@ function HoldingDetailSheet({ state, holding, onClose, onUpdateMarketValue, onBu
         before: `\u5C07\u6C38\u4E45\u522A\u9664\u9019\u7B46${isBuy ? "\u8CB7\u9032" : "\u8CE3\u51FA"}\u7D00\u9304:`,
         items: [
           `${(trade.date || "").replace(/-/g, "/")}  ${isBuy ? "\u8CB7\u9032" : "\u8CE3\u51FA"} ${trade.shares.toLocaleString()} \u80A1  ${isBuy ? "-" : "+"}${fmt(amt)}`,
-          ...isBuy ? ["\u540C\u6642\u6703\u522A\u9664\u4E3B\u5E33\u672C\u4E0A\u7684\u6263\u6B3E\u7D00\u9304"] : ["\u540C\u6642\u6703\u522A\u9664\u4E3B\u5E33\u672C\u4E0A\u7684\u6536\u6B3E + \u640D\u76CA\u7D00\u9304"]
-        ],
-        after: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F"
+          ...isBuy ? ["\u540C\u6642\u6703\u522A\u9664\u4E3B\u5E33\u672C\u4E0A\u7684\u6263\u6B3E\u7D00\u9304\u3002"] : ["\u540C\u6642\u6703\u522A\u9664\u4E3B\u5E33\u672C\u4E0A\u7684\u6536\u6B3E + \u640D\u76CA\u7D00\u9304\u3002"]
+        ]
       },
+      warning: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F",
       confirmText: "\u522A\u9664",
       danger: true,
       onConfirm: () => {
@@ -8864,6 +8881,8 @@ function SettingsPage({
   setTheme,
   numFont,
   setNumFont,
+  addTxnTopOffset,
+  setAddTxnTopOffset,
   blockOrder,
   moveBlock,
   setPageOrder
@@ -9228,8 +9247,10 @@ function SettingsPage({
     // [v555CP] 備份提醒頻率(7/14/30 天)
     "ledger_drive_folder",
     // [v555CP] Google Drive 資料夾連結(URL)
-    "ledger_hidden_blocks_v1"
+    "ledger_hidden_blocks_v1",
     // [v555CY] 隱藏的首頁 block (eg. investQuick)
+    "ledger_add_txn_top_offset_v1"
+    // [v555DD] 新增收支頁金額垂直位置('top'/'middle'/'bottom')
   ];
   const collectPreferences = () => {
     const prefs = {};
@@ -9359,7 +9380,7 @@ function SettingsPage({
         before: "\u89E3\u9664\u5F8C\u6703\u767C\u751F\u9019\u4E9B\u4E8B\uFF1A",
         items: [
           { text: "\u5C07 \u95DC\u9589 Google Drive \u96F2\u7AEF\u529F\u80FD", card: true },
-          "\u96F2\u7AEF\u4E0A\u5DF2\u5099\u4EFD\u7684\u6A94\u6848 \u4E0D\u6703\u88AB\u522A\u9664\n\u4E4B\u5F8C\u91CD\u65B0\u9023\u7D50\u5373\u53EF\u9084\u539F"
+          "\u96F2\u7AEF\u4E0A\u5DF2\u5099\u4EFD\u7684\u6A94\u6848 \u4E0D\u6703\u88AB\u522A\u9664\u3002\n\u4E4B\u5F8C\u91CD\u65B0\u9023\u7D50\u5373\u53EF\u9084\u539F\u3002"
         ],
         after: "\u78BA\u5B9A\u8981\u89E3\u9664\u9023\u7D50\u55CE\uFF1F"
       },
@@ -10406,7 +10427,43 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
         color: it.color,
         letterSpacing: "-0.3px",
         fontVariantNumeric: "tabular-nums"
-      } }, it.val))))))));
+      } }, it.val)))))), /* @__PURE__ */ React.createElement("div", { style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginTop: 14
+      } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "var(--text)", fontWeight: 500 } }, "\u8A18\u5E33\u8F38\u5165\u4F4D\u7F6E"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)" } }, "\u65B0\u589E\u6536\u652F\u6642\u91D1\u984D\u986F\u793A\u5728\u9801\u9762\u7684\u4F4D\u7F6E")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 0, border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-card)", overflow: "hidden" } }, [
+        { v: "top", label: "\u4E0A" },
+        { v: "middle", label: "\u4E2D" },
+        { v: "bottom", label: "\u4E0B" }
+      ].map((opt, i) => {
+        const isActive = addTxnTopOffset === opt.v;
+        return /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            key: opt.v,
+            onClick: () => !editMode && setAddTxnTopOffset(opt.v),
+            disabled: editMode,
+            style: {
+              width: 41,
+              height: 39,
+              padding: 0,
+              background: isActive ? "var(--mint)" : "transparent",
+              border: "none",
+              borderLeft: i > 0 ? "1px solid var(--border)" : "none",
+              color: isActive ? "var(--on-mint)" : "var(--text-dim)",
+              fontSize: 13,
+              fontWeight: isActive ? 600 : 500,
+              cursor: editMode ? "not-allowed" : "pointer",
+              transition: "background 0.15s, color 0.15s",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center"
+            }
+          },
+          opt.label
+        );
+      })))));
     }
     if (blockKey === "cleanup") {
       return /* @__PURE__ */ React.createElement(Block, { key: "cleanup", ...blockProps, title: "\u6E05\u7406\u6B77\u53F2\u7D00\u9304" }, /* @__PURE__ */ React.createElement(
@@ -13015,6 +13072,14 @@ function AddTxnSheet({ state, type, setType, editing, defaultDate, onSave, onDel
     }
   }, [reopenOtherTypeTrigger]);
   const notePref = useNotePref();
+  const topOffset = (() => {
+    try {
+      return localStorage.getItem("ledger_add_txn_top_offset_v1") || "top";
+    } catch {
+      return "top";
+    }
+  })();
+  const topOffsetPx = topOffset === "middle" ? "calc(25vh - 80px)" : topOffset === "bottom" ? "calc(50vh - 80px)" : "0px";
   const DEFAULT_ADD_TXN_ORDER = ["amount", "typeToggle", "date", "category", "subCategory", "account", "fee", "note"];
   const DEFAULT_TRANSFER_ORDER = ["amount", "typeToggle", "date", "fromAccount", "toAccount", "note"];
   const DEFAULT_LEND_ORDER = ["amount", "typeToggle", "date", "fromAccount", "note", "expectDate"];
@@ -13610,7 +13675,7 @@ function AddTxnSheet({ state, type, setType, editing, defaultDate, onSave, onDel
         )
       )
     ),
-    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll, "data-scroll-container": true }, effectiveOrder.map((blockKey, idx) => {
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll, "data-scroll-container": true }, topOffsetPx !== "0px" && !showCalculator && /* @__PURE__ */ React.createElement("div", { style: { height: topOffsetPx, flexShrink: 0 }, "aria-hidden": "true" }), effectiveOrder.map((blockKey, idx) => {
       const blockProps = {
         key: blockKey,
         blockKey,
@@ -16143,10 +16208,10 @@ function AccountGroupManageSheet({ state, setState, toast, toastRich, initialGro
       messageList: {
         styled: true,
         items: [
-          "\u6B64\u5B50\u6A19\u7C64\u4E0B\u7684\u5E33\u6236\u4E0D\u6703\u88AB\u522A\u9664\n\u53EA\u662F\u812B\u96E2\u5206\u7D44\u8B8A\u6210\u6563\u6236",
-          "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F"
+          "\u6B64\u5B50\u6A19\u7C64\u4E0B\u7684\u5E33\u6236\u4E0D\u6703\u88AB\u522A\u9664\u3002\n\u53EA\u662F\u812B\u96E2\u5206\u7D44\u8B8A\u6210\u6563\u6236\u3002"
         ]
       },
+      warning: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F",
       confirmText: "\u522A\u9664",
       danger: true,
       onConfirm: () => {
@@ -17064,9 +17129,10 @@ function InvestNoteSheet({ state, account, onClose, onSave, toast, toastRich, se
         title: "\u653E\u68C4\u8B8A\u66F4",
         messageList: {
           styled: true,
-          items: ["\u672A\u5132\u5B58\u7684\u5167\u5BB9\u6703 \u5168\u90E8\u6D88\u5931 ", "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F"]
+          items: ["\u672A\u5132\u5B58\u7684\u5167\u5BB9\u6703 \u5168\u90E8\u6D88\u5931\u3002"]
         },
         highlightWords: ["\u5168\u90E8\u6D88\u5931"],
+        warning: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F",
         confirmText: "\u653E\u68C4",
         danger: true,
         onConfirm: onClose
@@ -17082,9 +17148,10 @@ function InvestNoteSheet({ state, account, onClose, onSave, toast, toastRich, se
         title: "\u6E05\u7A7A\u5099\u8A3B",
         messageList: {
           styled: true,
-          items: ["\u5099\u8A3B\u5167\u5BB9\u6703 \u5168\u90E8\u6D88\u5931 \n\u82E5\u8981\u4FDD\u7559\u8ACB\u6309\u53D6\u6D88", "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F"]
+          items: ["\u5099\u8A3B\u5167\u5BB9\u6703 \u5168\u90E8\u6D88\u5931\u3002\n\u82E5\u8981\u4FDD\u7559\u8ACB\u6309\u53D6\u6D88\u3002"]
         },
         highlightWords: ["\u5168\u90E8\u6D88\u5931"],
+        warning: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F",
         confirmText: "\u6E05\u7A7A",
         danger: true,
         onConfirm: () => setContent("")
