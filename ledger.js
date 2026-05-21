@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520CZ";
+const APP_VERSION = "1150520DA";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -4025,14 +4025,27 @@ function ConfirmDialogRenderer({ dialog, onClose }) {
       });
     };
     return /* @__PURE__ */ React.createElement("div", { style: {
-      padding: "4px 20px 14px",
+      padding: "12px 20px 14px",
       fontSize: 14,
       color: "var(--text-dim)",
       lineHeight: 1.6,
       whiteSpace: "pre-wrap"
-    } }, ml.before && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, renderHL(ml.before)), Array.isArray(ml.items) && ml.items.length > 0 && (styled ? /* @__PURE__ */ React.createElement("div", { style: { margin: "0 0 12px", display: "flex", flexDirection: "column", gap: 10 } }, ml.items.map((it, i) => {
+    } }, ml.before && /* @__PURE__ */ React.createElement("div", { style: {
+      marginBottom: 12,
+      fontSize: 13,
+      color: "var(--text-faint)",
+      fontWeight: 500
+    } }, renderHL(ml.before)), Array.isArray(ml.items) && ml.items.length > 0 && (styled ? /* @__PURE__ */ React.createElement("div", { style: { margin: "0 0 12px", display: "flex", flexDirection: "column", gap: 6 } }, ml.items.map((it, i) => {
       const itemText = it && typeof it === "object" ? it.text : it;
       const itemCard = !!(it && typeof it === "object" && it.card);
+      const renderItemContent = (text) => {
+        if (!itemCard) return renderHL(text);
+        const m = text && text.match(/^(.+?)\s+(\d[\d,]*)\s+(.+)$/);
+        if (m) {
+          return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "var(--text-dim)" } }, m[1]), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 18, fontWeight: 700, color: "var(--text)", margin: "0 6px" } }, m[2]), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "var(--text-dim)" } }, m[3]));
+        }
+        return renderHL(text);
+      };
       return /* @__PURE__ */ React.createElement("div", { key: i, style: {
         color: "var(--text)",
         fontWeight: 500,
@@ -4041,9 +4054,9 @@ function ConfirmDialogRenderer({ dialog, onClose }) {
           background: "var(--bg-card-alt)",
           border: "1px solid var(--border)",
           borderRadius: 10,
-          padding: "10px 12px"
-        } : { padding: "0 2px" }
-      } }, renderHL(itemText));
+          padding: "8px 14px"
+        } : { padding: "4px 2px" }
+      } }, renderItemContent(itemText));
     })) : /* @__PURE__ */ React.createElement("div", { style: {
       margin: "0 0 10px",
       display: "flex",
@@ -9787,20 +9800,38 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
       const holdingCount = importedHoldings.filter((h) => holdingShares(h, importedTrades) > 0).length;
       const txnCount = (data.transactions || []).length;
       const acctCount = (data.accounts || []).length;
+      let subCategoryCount = 0;
+      if (data.categories && typeof data.categories === "object") {
+        ["expense", "income"].forEach((k) => {
+          const arr = data.categories[k];
+          if (Array.isArray(arr)) {
+            arr.forEach((c) => {
+              if (Array.isArray(c.children)) subCategoryCount += c.children.length;
+              else if (Array.isArray(c.subs)) subCategoryCount += c.subs.length;
+            });
+          }
+        });
+      }
+      const accountGroupCount = Array.isArray(data.accountGroups) ? data.accountGroups.length : 0;
       setShowPasteImport(false);
       setPasteImportText("");
       const items = [
         { text: `\u4EA4\u6613\u7D00\u9304 ${txnCount} \u7B46`, card: true },
         { text: `\u5E33\u6236 ${acctCount} \u500B`, card: true }
       ];
+      if (subCategoryCount > 0) {
+        items.push({ text: `\u5B50\u5206\u985E ${subCategoryCount} \u500B`, card: true });
+      }
       if (holdingCount > 0) {
         items.push({ text: `\u6301\u80A1 ${holdingCount} \u6A94`, card: true });
       }
-      if (hasPrefs) {
-        items.push("\u4E00\u4F75\u9084\u539F \u504F\u597D\u8A2D\u5B9A (\u4E3B\u984C\u3001\u6392\u5E8F\u3001\u9810\u8A2D\u624B\u7E8C\u8CBB\u5206\u985E\u7B49)");
+      if (accountGroupCount > 0) {
+        items.push({ text: `\u5B50\u6A19\u7C64 ${accountGroupCount} \u500B`, card: true });
       }
-      items.push("\u532F\u5165\u5F8C\u6703 \u5B8C\u5168\u8986\u84CB \u76EE\u524D\u7684\u8CC7\u6599");
-      items.push("\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F");
+      if (hasPrefs) {
+        items.push("\u4E00\u4F75\u9084\u539F \u504F\u597D\u8A2D\u5B9A");
+      }
+      items.push("\u532F\u5165\u5F8C\u6703 \u5B8C\u5168\u8986\u84CB \u76EE\u524D\u7684\u8CC7\u6599\u3002");
       setConfirmDialog({
         title: "\u532F\u5165\u5099\u4EFD",
         messageList: {
@@ -9810,6 +9841,7 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
         },
         highlightWords: ["\u5B8C\u5168\u8986\u84CB"],
         highlightWordsSafe: ["\u504F\u597D\u8A2D\u5B9A"],
+        warning: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F",
         confirmText: "\u532F\u5165",
         danger: true,
         onConfirm: () => {
@@ -12170,7 +12202,17 @@ function DatePicker({ value, onChange, onClose }) {
         );
       })
     ),
-    /* @__PURE__ */ React.createElement("button", { style: { ...styles.saveBtn, background: selectedColor, color: "var(--on-mint)", marginTop: 14 }, onClick: () => selectDate(parseInt(today.slice(8))) }, "\u56DE\u5230\u4ECA\u5929"),
+    /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: { ...styles.saveBtn, background: selectedColor, color: "var(--on-mint)", marginTop: 14 },
+        onClick: () => {
+          onChange(today);
+          onClose();
+        }
+      },
+      "\u56DE\u5230\u4ECA\u5929"
+    ),
     /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, marginTop: 6 }, onClick: onClose }, "\u53D6\u6D88")
   ));
 }
@@ -17098,7 +17140,7 @@ function InvestNoteSheet({ state, account, onClose, onSave, toast, toastRich, se
         placeholder: "\u5728\u9019\u88E1\u5BEB\u4E0B\u4F60\u60F3\u8A18\u7684\u4E8B...",
         style: {
           width: "100%",
-          minHeight: 180,
+          minHeight: 380,
           padding: 0,
           border: "none",
           background: "transparent",
