@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520DE";
+const APP_VERSION = "1150520DG";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -1547,7 +1547,7 @@ function App() {
       txn: ["summary", "period", "list"],
       stats: ["summary", "period", "chart", "compare", "top5", "transfer"],
       settings: ["dataStat", "appearance", "backup-local", "account", "backup-ext", "cleanup", "danger"],
-      addTxn: ["amount", "typeToggle", "date", "category", "subCategory", "note", "account"]
+      addTxn: ["amount", "typeToggle", "date", "category", "subCategory", "note", "account", "spacer1", "spacer2", "spacer3", "spacer4"]
     };
     const merge = (savedPage, defPage) => {
       const defSet = new Set(defPage);
@@ -3047,6 +3047,7 @@ function App() {
       setEditMode,
       blockOrder: blockOrder.addTxn,
       moveBlock: moveBlock("addTxn"),
+      setPageOrder: setPageOrder("addTxn"),
       onManageCategory: (t, initialLabel) => setManageCat({ type: t, initialLabel }),
       onManageAccount: (mode) => {
         if (mode === "__new__") setEditAccountId("__new__");
@@ -4365,7 +4366,13 @@ function ListSortControl({ sortMode, setSortMode }) {
 }
 function EditModeBanner({ editMode, setEditMode }) {
   if (!editMode) return null;
-  return /* @__PURE__ */ React.createElement("div", { style: styles.editModeBannerFloat }, /* @__PURE__ */ React.createElement("span", null, "\u7DE8\u8F2F\u6392\u5E8F\u6A21\u5F0F"), /* @__PURE__ */ React.createElement("button", { style: styles.editDoneBtn, onClick: () => setEditMode(false) }, "\u5B8C\u6210"));
+  return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: styles.editModeBannerFloat }, /* @__PURE__ */ React.createElement("span", null, "\u7DE8\u8F2F\u6392\u5E8F\u6A21\u5F0F"), /* @__PURE__ */ React.createElement("button", { style: styles.editDoneBtn, onClick: () => setEditMode(false) }, "\u5B8C\u6210")), /* @__PURE__ */ React.createElement("div", { style: {
+    textAlign: "center",
+    fontSize: 11.5,
+    color: "var(--text-faint)",
+    margin: "-4px 0 8px",
+    letterSpacing: 0.3
+  } }, "\u9577\u6309\u65B9\u584A\u53EF\u62D6\u66F3\u6392\u5E8F"));
 }
 function Block({ blockKey, title, headerRight, editMode, isFirst, isLast, onMoveUp, onMoveDown, onReorder, children, inline, compactInline, disableReorder }) {
   const elRef = React.useRef(null);
@@ -4760,29 +4767,7 @@ function Block({ blockKey, title, headerRight, editMode, isFirst, isLast, onMove
         ...isCompactView ? { padding: 0, marginBottom: 0, border: "none" } : {}
       }
     },
-    (title || editMode) && !isCompactEditMode && /* @__PURE__ */ React.createElement("div", { style: styles.blockHeader }, /* @__PURE__ */ React.createElement("div", { style: styles.blockTitle }, editMode && /* @__PURE__ */ React.createElement("span", { style: styles.blockHandle }, "\u2630"), /* @__PURE__ */ React.createElement("span", null, title)), editMode && !disableReorder ? /* @__PURE__ */ React.createElement("div", { style: styles.blockMoveBtns }, /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        style: { ...styles.moveBtn, opacity: isFirst ? 0.3 : 1 },
-        onClick: (e) => {
-          e.stopPropagation();
-          if (!isFirst) onMoveUp();
-        },
-        disabled: isFirst
-      },
-      "\u2191"
-    ), /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        style: { ...styles.moveBtn, opacity: isLast ? 0.3 : 1 },
-        onClick: (e) => {
-          e.stopPropagation();
-          if (!isLast) onMoveDown();
-        },
-        disabled: isLast
-      },
-      "\u2193"
-    )) : headerRight),
+    (title || editMode) && !isCompactEditMode && /* @__PURE__ */ React.createElement("div", { style: styles.blockHeader }, /* @__PURE__ */ React.createElement("div", { style: styles.blockTitle }, editMode && /* @__PURE__ */ React.createElement("span", { style: styles.blockHandle }, "\u2630"), /* @__PURE__ */ React.createElement("span", null, title)), editMode && !disableReorder ? null : headerRight),
     /* @__PURE__ */ React.createElement("div", { style: editMode ? { pointerEvents: "none" } : {} }, children)
   );
 }
@@ -13060,7 +13045,7 @@ function fmtExprDisplay(expr) {
   if (!expr) return "";
   return expr.replace(/\*/g, "\xD7").replace(/\//g, "\xF7").replace(/-/g, "\u2212");
 }
-function AddTxnSheet({ state, type, setType, editing, defaultDate, onSave, onDelete, toast, toastRich, alertCenter, noteColor, onClose, editMode, setEditMode, blockOrder, moveBlock, onManageCategory, onManageAccount, onAddSubCategory, setConfirmDialog, onOpenStockEntry, reopenOtherTypeTrigger }) {
+function AddTxnSheet({ state, type, setType, editing, defaultDate, onSave, onDelete, toast, toastRich, alertCenter, noteColor, onClose, editMode, setEditMode, blockOrder, moveBlock, setPageOrder, onManageCategory, onManageAccount, onAddSubCategory, setConfirmDialog, onOpenStockEntry, reopenOtherTypeTrigger }) {
   const [showCalculator, setShowCalculator] = useState(false);
   const [showNotePref, setShowNotePref] = useState(false);
   const [showOtherTypeSheet, setShowOtherTypeSheet] = useState(false);
@@ -13080,9 +13065,9 @@ function AddTxnSheet({ state, type, setType, editing, defaultDate, onSave, onDel
       return false;
     }
   })();
-  const DEFAULT_ADD_TXN_ORDER = ["amount", "typeToggle", "date", "category", "subCategory", "account", "fee", "note"];
-  const DEFAULT_TRANSFER_ORDER = ["amount", "typeToggle", "date", "fromAccount", "toAccount", "note"];
-  const DEFAULT_LEND_ORDER = ["amount", "typeToggle", "date", "fromAccount", "note", "expectDate"];
+  const DEFAULT_ADD_TXN_ORDER = ["amount", "typeToggle", "date", "category", "subCategory", "account", "fee", "note", "spacer1", "spacer2", "spacer3", "spacer4"];
+  const DEFAULT_TRANSFER_ORDER = ["amount", "typeToggle", "date", "fromAccount", "toAccount", "note", "spacer1", "spacer2", "spacer3", "spacer4"];
+  const DEFAULT_LEND_ORDER = ["amount", "typeToggle", "date", "fromAccount", "note", "expectDate", "spacer1", "spacer2", "spacer3", "spacer4"];
   const isTransfer = type === "transfer";
   const isLend = type === "lend";
   const rawOrder = isTransfer ? DEFAULT_TRANSFER_ORDER : isLend ? DEFAULT_LEND_ORDER : blockOrder && blockOrder.length > 0 ? blockOrder : DEFAULT_ADD_TXN_ORDER;
@@ -13098,6 +13083,9 @@ function AddTxnSheet({ state, type, setType, editing, defaultDate, onSave, onDel
       if (noteIdx >= 0) out.splice(noteIdx, 0, "fee");
       else out.push("fee");
     }
+    ["spacer1", "spacer2", "spacer3", "spacer4"].forEach((s) => {
+      if (!out.includes(s)) out.push(s);
+    });
     return out;
   })();
   const [amount, setAmount] = useState(editing ? String(editing.amount) : "0");
@@ -13697,8 +13685,28 @@ function AddTxnSheet({ state, type, setType, editing, defaultDate, onSave, onDel
           isFirst: idx === 0,
           isLast: idx === effectiveOrder.length - 1,
           onMoveUp: () => moveBlock(blockKey, -1),
-          onMoveDown: () => moveBlock(blockKey, 1)
+          onMoveDown: () => moveBlock(blockKey, 1),
+          // [v555DG] 補上 onReorder 讓拖曳排序生效 — 拿掉箭頭按鈕後唯一的重排手段
+          onReorder: setPageOrder
         };
+        if ((blockKey === "spacer1" || blockKey === "spacer2" || blockKey === "spacer3" || blockKey === "spacer4") && !editing) {
+          const num = blockKey.replace("spacer", "");
+          if (editMode) {
+            return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: `\u8ABF\u6574\u4F4D\u7F6E ${num}` }, /* @__PURE__ */ React.createElement("div", { style: {
+              height: 50,
+              background: "rgba(126, 224, 192, 0.06)",
+              border: "1px dashed rgba(126, 224, 192, 0.4)",
+              borderRadius: 10,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--text-faint)",
+              fontSize: 12,
+              letterSpacing: 0.4
+            } }, "\u62D6\u66F3\u6B64\u5340\u584A\u8ABF\u6574\u4F4D\u7F6E"));
+          }
+          return /* @__PURE__ */ React.createElement("div", { key: blockKey, style: { height: 60, flexShrink: 0 }, "aria-hidden": "true" });
+        }
         if (blockKey === "amount") {
           const hasOperator = /[+\-*/]/.test(amount);
           const formatAmount = (raw) => {
@@ -13780,7 +13788,9 @@ function AddTxnSheet({ state, type, setType, editing, defaultDate, onSave, onDel
               },
               style: {
                 ...styles.typeBtn,
-                ...type === "expense" ? { background: "var(--pink)", color: "var(--on-pink)" } : {}
+                ...type === "expense" && !showOtherTypeSheet ? { background: "var(--pink)", color: "var(--on-pink)" } : {},
+                // [v555DF] picker 開啟時淡化支出/收入,讓使用者視覺聚焦在「其他」
+                opacity: showOtherTypeSheet ? 0.45 : 1
               }
             },
             "\u652F\u51FA"
@@ -13792,7 +13802,8 @@ function AddTxnSheet({ state, type, setType, editing, defaultDate, onSave, onDel
               },
               style: {
                 ...styles.typeBtn,
-                ...type === "income" ? { background: "var(--mint)", color: "var(--on-mint)" } : {}
+                ...type === "income" && !showOtherTypeSheet ? { background: "var(--mint)", color: "var(--on-mint)" } : {},
+                opacity: showOtherTypeSheet ? 0.45 : 1
               }
             },
             "\u6536\u5165"
@@ -13804,7 +13815,9 @@ function AddTxnSheet({ state, type, setType, editing, defaultDate, onSave, onDel
               },
               style: {
                 ...styles.typeBtn,
-                ...isOther ? { background: "var(--accent)", color: "var(--on-accent)" } : {},
+                // [v555DF] picker 開啟期間「其他」按鈕亦顯示 active,避免 user 困惑
+                //                   原本只有 type==='transfer' 才 active,但點股票不改 type → 視覺無反饋
+                ...isOther || showOtherTypeSheet ? { background: "var(--accent)", color: "var(--on-accent)" } : {},
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
