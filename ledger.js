@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520DG";
+const APP_VERSION = "1150520DH";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -1486,19 +1486,6 @@ function App() {
     } catch {
     }
   }, [numFont]);
-  const [addTxnCenter, setAddTxnCenter] = useState(() => {
-    try {
-      return localStorage.getItem("ledger_add_txn_center_v1") === "1";
-    } catch {
-      return false;
-    }
-  });
-  useEffect(() => {
-    try {
-      localStorage.setItem("ledger_add_txn_center_v1", addTxnCenter ? "1" : "0");
-    } catch {
-    }
-  }, [addTxnCenter]);
   const [manageCat, setManageCat] = useState(null);
   const [editAccountId, setEditAccountId] = useState(null);
   const [accountsFromAddTxn, setAccountsFromAddTxn] = useState(false);
@@ -1547,7 +1534,7 @@ function App() {
       txn: ["summary", "period", "list"],
       stats: ["summary", "period", "chart", "compare", "top5", "transfer"],
       settings: ["dataStat", "appearance", "backup-local", "account", "backup-ext", "cleanup", "danger"],
-      addTxn: ["amount", "typeToggle", "date", "category", "subCategory", "note", "account", "spacer1", "spacer2", "spacer3", "spacer4"]
+      addTxn: ["amount", "typeToggle", "date", "category", "subCategory", "note", "account", "spacer1", "spacer2"]
     };
     const merge = (savedPage, defPage) => {
       const defSet = new Set(defPage);
@@ -2968,8 +2955,6 @@ function App() {
         setTheme,
         numFont,
         setNumFont,
-        addTxnCenter,
-        setAddTxnCenter,
         blockOrder: blockOrder.settings,
         moveBlock: moveBlock("settings"),
         setPageOrder: setPageOrder("settings")
@@ -4751,6 +4736,25 @@ function Block({ blockKey, title, headerRight, editMode, isFirst, isLast, onMove
   }, [editMode, blockKey]);
   if (inline && !editMode) {
     return /* @__PURE__ */ React.createElement("div", { style: { ...styles.blockInline, ...compactInline ? { marginBottom: 0 } : {} } }, title && /* @__PURE__ */ React.createElement("div", { style: styles.blockInlineTitle }, title), /* @__PURE__ */ React.createElement("div", { style: styles.blockInlineContent }, children), headerRight && /* @__PURE__ */ React.createElement("div", { style: styles.blockInlineRight }, headerRight));
+  }
+  if (inline && editMode && !disableReorder && !compactInline) {
+    return /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        ref: elRef,
+        "data-block-key": blockKey,
+        style: {
+          ...styles.blockInline,
+          border: "1.5px dashed rgba(232, 185, 71, 0.55)",
+          borderRadius: 14,
+          padding: "5.5px 10px",
+          marginBottom: 8,
+          cursor: "grab"
+        }
+      },
+      title && /* @__PURE__ */ React.createElement("div", { style: styles.blockInlineTitle }, /* @__PURE__ */ React.createElement("span", { style: { ...styles.blockHandle, marginRight: 6 } }, "\u2630"), title),
+      /* @__PURE__ */ React.createElement("div", { style: { ...styles.blockInlineContent, pointerEvents: "none" } }, children)
+    );
   }
   const isCompactEditMode = editMode && compactInline;
   const isCompactView = !editMode && compactInline;
@@ -8870,8 +8874,6 @@ function SettingsPage({
   setTheme,
   numFont,
   setNumFont,
-  addTxnCenter,
-  setAddTxnCenter,
   blockOrder,
   moveBlock,
   setPageOrder
@@ -9236,10 +9238,8 @@ function SettingsPage({
     // [v555CP] 備份提醒頻率(7/14/30 天)
     "ledger_drive_folder",
     // [v555CP] Google Drive 資料夾連結(URL)
-    "ledger_hidden_blocks_v1",
+    "ledger_hidden_blocks_v1"
     // [v555CY] 隱藏的首頁 block (eg. investQuick)
-    "ledger_add_txn_center_v1"
-    // [v555DE] 新增收支頁整體置中('1'/'0')
   ];
   const collectPreferences = () => {
     const prefs = {};
@@ -10416,40 +10416,7 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
         color: it.color,
         letterSpacing: "-0.3px",
         fontVariantNumeric: "tabular-nums"
-      } }, it.val)))))), /* @__PURE__ */ React.createElement(
-        "div",
-        {
-          style: {
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginTop: 14,
-            cursor: editMode ? "default" : "pointer"
-          },
-          onClick: () => !editMode && setAddTxnCenter((v) => !v)
-        },
-        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "var(--text)", fontWeight: 500 } }, "\u8A18\u5E33\u8F38\u5165\u5340\u7F6E\u4E2D"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)" } }, "\u65B0\u589E\u6536\u652F\u9801\u9762\u7684\u5167\u5BB9\u5782\u76F4\u7F6E\u4E2D,\u9069\u5408\u5927\u624B\u6A5F")),
-        /* @__PURE__ */ React.createElement("div", { style: {
-          width: 44,
-          height: 26,
-          borderRadius: 13,
-          flexShrink: 0,
-          background: addTxnCenter ? "var(--mint)" : "var(--bg-card-alt)",
-          border: addTxnCenter ? "none" : "1px solid var(--border)",
-          position: "relative",
-          transition: "background 0.15s"
-        } }, /* @__PURE__ */ React.createElement("div", { style: {
-          width: 20,
-          height: 20,
-          borderRadius: "50%",
-          background: "#fff",
-          position: "absolute",
-          top: 2,
-          left: addTxnCenter ? 21 : 3,
-          transition: "left 0.15s",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.3)"
-        } }))
-      )));
+      } }, it.val))))))));
     }
     if (blockKey === "cleanup") {
       return /* @__PURE__ */ React.createElement(Block, { key: "cleanup", ...blockProps, title: "\u6E05\u7406\u6B77\u53F2\u7D00\u9304" }, /* @__PURE__ */ React.createElement(
@@ -13058,16 +13025,9 @@ function AddTxnSheet({ state, type, setType, editing, defaultDate, onSave, onDel
     }
   }, [reopenOtherTypeTrigger]);
   const notePref = useNotePref();
-  const addTxnCenter = (() => {
-    try {
-      return localStorage.getItem("ledger_add_txn_center_v1") === "1";
-    } catch {
-      return false;
-    }
-  })();
-  const DEFAULT_ADD_TXN_ORDER = ["amount", "typeToggle", "date", "category", "subCategory", "account", "fee", "note", "spacer1", "spacer2", "spacer3", "spacer4"];
-  const DEFAULT_TRANSFER_ORDER = ["amount", "typeToggle", "date", "fromAccount", "toAccount", "note", "spacer1", "spacer2", "spacer3", "spacer4"];
-  const DEFAULT_LEND_ORDER = ["amount", "typeToggle", "date", "fromAccount", "note", "expectDate", "spacer1", "spacer2", "spacer3", "spacer4"];
+  const DEFAULT_ADD_TXN_ORDER = ["amount", "typeToggle", "date", "category", "subCategory", "account", "fee", "note", "spacer1", "spacer2"];
+  const DEFAULT_TRANSFER_ORDER = ["amount", "typeToggle", "date", "fromAccount", "toAccount", "note", "spacer1", "spacer2"];
+  const DEFAULT_LEND_ORDER = ["amount", "typeToggle", "date", "fromAccount", "note", "expectDate", "spacer1", "spacer2"];
   const isTransfer = type === "transfer";
   const isLend = type === "lend";
   const rawOrder = isTransfer ? DEFAULT_TRANSFER_ORDER : isLend ? DEFAULT_LEND_ORDER : blockOrder && blockOrder.length > 0 ? blockOrder : DEFAULT_ADD_TXN_ORDER;
@@ -13083,7 +13043,7 @@ function AddTxnSheet({ state, type, setType, editing, defaultDate, onSave, onDel
       if (noteIdx >= 0) out.splice(noteIdx, 0, "fee");
       else out.push("fee");
     }
-    ["spacer1", "spacer2", "spacer3", "spacer4"].forEach((s) => {
+    ["spacer1", "spacer2"].forEach((s) => {
       if (!out.includes(s)) out.push(s);
     });
     return out;
@@ -13663,237 +13623,485 @@ function AddTxnSheet({ state, type, setType, editing, defaultDate, onSave, onDel
         )
       )
     ),
-    /* @__PURE__ */ React.createElement(
-      "div",
-      {
-        style: {
-          ...styles.sheetScroll,
-          // [v555DE] 整體垂直置中:啟用時改 flex column + 前後 spacer 推開內容居中
-          ...addTxnCenter && !showCalculator ? {
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll, "data-scroll-container": true }, effectiveOrder.map((blockKey, idx) => {
+      const blockProps = {
+        key: blockKey,
+        blockKey,
+        editMode,
+        isFirst: idx === 0,
+        isLast: idx === effectiveOrder.length - 1,
+        onMoveUp: () => moveBlock(blockKey, -1),
+        onMoveDown: () => moveBlock(blockKey, 1),
+        // [v555DG] 補上 onReorder 讓拖曳排序生效 — 拿掉箭頭按鈕後唯一的重排手段
+        onReorder: setPageOrder
+      };
+      if ((blockKey === "spacer1" || blockKey === "spacer2") && !editing) {
+        const num = blockKey.replace("spacer", "");
+        if (editMode) {
+          return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: `\u8ABF\u6574\u4F4D\u7F6E ${num}` }, /* @__PURE__ */ React.createElement("div", { style: {
+            height: 38,
+            background: "rgba(126, 224, 192, 0.06)",
+            border: "1px dashed rgba(126, 224, 192, 0.4)",
+            borderRadius: 10,
             display: "flex",
-            flexDirection: "column"
-          } : {}
-        },
-        "data-scroll-container": true
-      },
-      addTxnCenter && !showCalculator && /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 0", minHeight: 0 }, "aria-hidden": "true" }),
-      effectiveOrder.map((blockKey, idx) => {
-        const blockProps = {
-          key: blockKey,
-          blockKey,
-          editMode,
-          isFirst: idx === 0,
-          isLast: idx === effectiveOrder.length - 1,
-          onMoveUp: () => moveBlock(blockKey, -1),
-          onMoveDown: () => moveBlock(blockKey, 1),
-          // [v555DG] 補上 onReorder 讓拖曳排序生效 — 拿掉箭頭按鈕後唯一的重排手段
-          onReorder: setPageOrder
-        };
-        if ((blockKey === "spacer1" || blockKey === "spacer2" || blockKey === "spacer3" || blockKey === "spacer4") && !editing) {
-          const num = blockKey.replace("spacer", "");
-          if (editMode) {
-            return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: `\u8ABF\u6574\u4F4D\u7F6E ${num}` }, /* @__PURE__ */ React.createElement("div", { style: {
-              height: 50,
-              background: "rgba(126, 224, 192, 0.06)",
-              border: "1px dashed rgba(126, 224, 192, 0.4)",
-              borderRadius: 10,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "var(--text-faint)",
-              fontSize: 12,
-              letterSpacing: 0.4
-            } }, "\u62D6\u66F3\u6B64\u5340\u584A\u8ABF\u6574\u4F4D\u7F6E"));
-          }
-          return /* @__PURE__ */ React.createElement("div", { key: blockKey, style: { height: 60, flexShrink: 0 }, "aria-hidden": "true" });
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--text-faint)",
+            fontSize: 11,
+            letterSpacing: 0.4
+          } }, "\u62D6\u66F3\u6B64\u5340\u584A\u8ABF\u6574\u4F4D\u7F6E"));
         }
-        if (blockKey === "amount") {
-          const hasOperator = /[+\-*/]/.test(amount);
-          const formatAmount = (raw) => {
-            if (!raw || raw === "0") return "";
-            if (hasOperator) {
-              return raw.split(/([+\-*/])/).map((part) => {
-                if (/[+\-*/]/.test(part)) {
-                  return " " + fmtExprDisplay(part) + " ";
-                }
-                if (!part) return "";
-                const [intPart2, decPart2] = part.split(".");
-                const withComma2 = intPart2 ? Number(intPart2).toLocaleString("en-US") : "";
-                return decPart2 !== void 0 ? `${withComma2}.${decPart2}` : withComma2;
-              }).join("");
+        return /* @__PURE__ */ React.createElement("div", { key: blockKey, style: { height: 60, flexShrink: 0 }, "aria-hidden": "true" });
+      }
+      if (blockKey === "amount") {
+        const hasOperator = /[+\-*/]/.test(amount);
+        const formatAmount = (raw) => {
+          if (!raw || raw === "0") return "";
+          if (hasOperator) {
+            return raw.split(/([+\-*/])/).map((part) => {
+              if (/[+\-*/]/.test(part)) {
+                return " " + fmtExprDisplay(part) + " ";
+              }
+              if (!part) return "";
+              const [intPart2, decPart2] = part.split(".");
+              const withComma2 = intPart2 ? Number(intPart2).toLocaleString("en-US") : "";
+              return decPart2 !== void 0 ? `${withComma2}.${decPart2}` : withComma2;
+            }).join("");
+          }
+          const [intPart, decPart] = raw.split(".");
+          const withComma = Number(intPart || 0).toLocaleString("en-US");
+          return decPart !== void 0 ? `${withComma}.${decPart}` : withComma;
+        };
+        const displayAmount = formatAmount(amount);
+        const amtLen = displayAmount.length || 1;
+        const dynFontSize = amtLen <= 6 ? 48 : amtLen <= 8 ? 40 : amtLen <= 10 ? 32 : amtLen <= 12 ? 26 : amtLen <= 16 ? 22 : 18;
+        const isLocked = !!editing && fieldsLocked || transferDeletedVirtual;
+        return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: "\u91D1\u984D" }, /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            style: {
+              ...styles.amountBoxCompact,
+              position: "relative",
+              cursor: isLocked ? "not-allowed" : "pointer",
+              opacity: isLocked ? 0.55 : 1
+            },
+            onTouchEnd: (e) => {
+              if (isLocked) return;
+              e.preventDefault();
+              setShowCalculator(true);
+            },
+            onClick: () => {
+              if (isLocked) return;
+              setShowCalculator(true);
             }
-            const [intPart, decPart] = raw.split(".");
-            const withComma = Number(intPart || 0).toLocaleString("en-US");
-            return decPart !== void 0 ? `${withComma}.${decPart}` : withComma;
-          };
-          const displayAmount = formatAmount(amount);
-          const amtLen = displayAmount.length || 1;
-          const dynFontSize = amtLen <= 6 ? 48 : amtLen <= 8 ? 40 : amtLen <= 10 ? 32 : amtLen <= 12 ? 26 : amtLen <= 16 ? 22 : 18;
-          const isLocked = !!editing && fieldsLocked || transferDeletedVirtual;
-          return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: "\u91D1\u984D" }, /* @__PURE__ */ React.createElement(
+          },
+          /* @__PURE__ */ React.createElement(
             "div",
             {
               style: {
-                ...styles.amountBoxCompact,
-                position: "relative",
-                cursor: isLocked ? "not-allowed" : "pointer",
-                opacity: isLocked ? 0.55 : 1
-              },
-              onTouchEnd: (e) => {
-                if (isLocked) return;
-                e.preventDefault();
-                setShowCalculator(true);
-              },
-              onClick: () => {
-                if (isLocked) return;
-                setShowCalculator(true);
-              }
-            },
-            /* @__PURE__ */ React.createElement(
-              "div",
-              {
-                style: {
-                  color: amount && amount !== "0" ? mainColor : "var(--text-faint)",
-                  background: "transparent",
-                  width: "100%",
-                  height: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: dynFontSize,
-                  fontWeight: 700,
-                  fontFamily: "var(--num-font)",
-                  letterSpacing: "-0.5px",
-                  transition: "font-size 0.15s",
-                  padding: "0 12px",
-                  textAlign: "center",
-                  wordBreak: "break-all",
-                  // 計算機開啟且尚未輸入金額時 → 慢速脈動提示
-                  animation: showCalculator && (!amount || amount === "0") ? "amountPulse 1.4s ease-in-out infinite" : "none"
-                }
-              },
-              displayAmount || "0"
-            )
-          ));
-        }
-        if (blockKey === "typeToggle" && !editing) {
-          const otherTypes = ["transfer"];
-          const isOther = otherTypes.includes(type);
-          const otherLabel = type === "transfer" ? "\u8F49\u5E33" : "\u5176\u4ED6";
-          return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: "\u985E\u578B", inline: true }, /* @__PURE__ */ React.createElement("div", { style: styles.typeToggle }, /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              onClick: () => {
-                if (!editMode) changeType("expense");
-              },
-              style: {
-                ...styles.typeBtn,
-                ...type === "expense" && !showOtherTypeSheet ? { background: "var(--pink)", color: "var(--on-pink)" } : {},
-                // [v555DF] picker 開啟時淡化支出/收入,讓使用者視覺聚焦在「其他」
-                opacity: showOtherTypeSheet ? 0.45 : 1
-              }
-            },
-            "\u652F\u51FA"
-          ), /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              onClick: () => {
-                if (!editMode) changeType("income");
-              },
-              style: {
-                ...styles.typeBtn,
-                ...type === "income" && !showOtherTypeSheet ? { background: "var(--mint)", color: "var(--on-mint)" } : {},
-                opacity: showOtherTypeSheet ? 0.45 : 1
-              }
-            },
-            "\u6536\u5165"
-          ), /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              onClick: () => {
-                if (!editMode) setShowOtherTypeSheet(true);
-              },
-              style: {
-                ...styles.typeBtn,
-                // [v555DF] picker 開啟期間「其他」按鈕亦顯示 active,避免 user 困惑
-                //                   原本只有 type==='transfer' 才 active,但點股票不改 type → 視覺無反饋
-                ...isOther || showOtherTypeSheet ? { background: "var(--accent)", color: "var(--on-accent)" } : {},
-                display: "inline-flex",
+                color: amount && amount !== "0" ? mainColor : "var(--text-faint)",
+                background: "transparent",
+                width: "100%",
+                height: "100%",
+                display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: 4
+                fontSize: dynFontSize,
+                fontWeight: 700,
+                fontFamily: "var(--num-font)",
+                letterSpacing: "-0.5px",
+                transition: "font-size 0.15s",
+                padding: "0 12px",
+                textAlign: "center",
+                wordBreak: "break-all",
+                // 計算機開啟且尚未輸入金額時 → 慢速脈動提示
+                animation: showCalculator && (!amount || amount === "0") ? "amountPulse 1.4s ease-in-out infinite" : "none"
               }
             },
-            isOther ? otherLabel : "\u5176\u4ED6",
-            /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, opacity: 0.8 } }, "\u25BE")
-          )));
-        }
-        if (blockKey === "category") {
-          const currentCat = cats.find((c) => c.label === category);
-          const catLocked = !!editing && fieldsLocked;
-          return /* @__PURE__ */ React.createElement(
-            Block,
+            displayAmount || "0"
+          )
+        ));
+      }
+      if (blockKey === "typeToggle" && !editing) {
+        const otherTypes = ["transfer"];
+        const isOther = otherTypes.includes(type);
+        const otherLabel = type === "transfer" ? "\u8F49\u5E33" : "\u5176\u4ED6";
+        return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: "\u985E\u578B", inline: true }, /* @__PURE__ */ React.createElement("div", { style: styles.typeToggle }, /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: () => {
+              if (!editMode) changeType("expense");
+            },
+            style: {
+              ...styles.typeBtn,
+              ...type === "expense" && !showOtherTypeSheet ? { background: "var(--pink)", color: "var(--on-pink)" } : {},
+              // [v555DF] picker 開啟時淡化支出/收入,讓使用者視覺聚焦在「其他」
+              opacity: showOtherTypeSheet ? 0.45 : 1
+            }
+          },
+          "\u652F\u51FA"
+        ), /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: () => {
+              if (!editMode) changeType("income");
+            },
+            style: {
+              ...styles.typeBtn,
+              ...type === "income" && !showOtherTypeSheet ? { background: "var(--mint)", color: "var(--on-mint)" } : {},
+              opacity: showOtherTypeSheet ? 0.45 : 1
+            }
+          },
+          "\u6536\u5165"
+        ), /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: () => {
+              if (!editMode) setShowOtherTypeSheet(true);
+            },
+            style: {
+              ...styles.typeBtn,
+              // [v555DF] picker 開啟期間「其他」按鈕亦顯示 active,避免 user 困惑
+              //                   原本只有 type==='transfer' 才 active,但點股票不改 type → 視覺無反饋
+              ...isOther || showOtherTypeSheet ? { background: "var(--accent)", color: "var(--on-accent)" } : {},
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 4
+            }
+          },
+          isOther ? otherLabel : "\u5176\u4ED6",
+          /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, opacity: 0.8 } }, "\u25BE")
+        )));
+      }
+      if (blockKey === "category") {
+        const currentCat = cats.find((c) => c.label === category);
+        const catLocked = !!editing && fieldsLocked;
+        return /* @__PURE__ */ React.createElement(
+          Block,
+          {
+            ...blockProps,
+            title: "\u5927\u5206\u985E",
+            inline: true,
+            headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: catLocked ? 0.3 : 1 }, onClick: (e) => {
+              e.stopPropagation();
+              !editMode && !catLocked && onManageCategory(type);
+            } }, "\u2699\uFE0F")
+          },
+          /* @__PURE__ */ React.createElement(
+            "div",
             {
-              ...blockProps,
-              title: "\u5927\u5206\u985E",
-              inline: true,
-              headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: catLocked ? 0.3 : 1 }, onClick: (e) => {
+              style: { ...styles.selectFieldCompact, opacity: catLocked ? 0.55 : 1, cursor: catLocked ? "not-allowed" : "pointer" },
+              onClick: () => !editMode && !catLocked && setShowCategorySheet(true)
+            },
+            currentCat ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: type === "income" ? "rgba(126, 224, 192, 0.15)" : "rgba(245, 181, 192, 0.15)" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: currentCat.icon, size: 16, color: mainColor })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, currentCat.label)) : /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldPlaceholder }, "\u9078\u64C7\u5927\u5206\u985E"),
+            /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
+          )
+        );
+      }
+      if (blockKey === "subCategory") {
+        const currentCat = cats.find((c) => c.label === category);
+        const subLocked = !!editing && fieldsLocked;
+        return /* @__PURE__ */ React.createElement(
+          Block,
+          {
+            ...blockProps,
+            title: "\u5B50\u5206\u985E",
+            inline: true,
+            headerRight: /* @__PURE__ */ React.createElement(
+              "span",
+              {
+                style: { ...styles.gearBtn, opacity: currentCat && !subLocked ? 1 : 0.3 },
+                onClick: (e) => {
+                  e.stopPropagation();
+                  if (!editMode && currentCat && !subLocked) onManageCategory(type, category);
+                }
+              },
+              "\u2699\uFE0F"
+            )
+          },
+          /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: { ...styles.selectFieldCompact, opacity: subLocked ? 0.55 : 1, cursor: subLocked ? "not-allowed" : "pointer" },
+              onClick: () => !editMode && !subLocked && setShowSubCategorySheet(true)
+            },
+            subCategory ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: type === "income" ? "rgba(126, 224, 192, 0.15)" : "rgba(245, 181, 192, 0.15)" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: currentCat?.icon || "note", size: 16, color: mainColor })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, subCategory)) : /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldPlaceholder }, "\u9078\u64C7\u5B50\u5206\u985E\uFF08\u9078\u586B\uFF09"),
+            /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
+          )
+        );
+      }
+      if (blockKey === "fee") {
+        if (isTransfer || isLend) return null;
+        const feeGearLocked = !!editing && fieldsLocked;
+        const feeLockedNow = !!editing && fieldsLocked;
+        const feeDisplayValue = fee === "0" ? "" : fee;
+        return /* @__PURE__ */ React.createElement(
+          Block,
+          {
+            ...blockProps,
+            title: "\u624B\u7E8C\u8CBB\u7528",
+            inline: true,
+            headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: feeGearLocked ? 0.3 : 1 }, onClick: (e) => {
+              e.stopPropagation();
+              !editMode && !feeGearLocked && openFeeCatPicker();
+            } }, "\u2699\uFE0F")
+          },
+          /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldCompact, opacity: feeLockedNow ? 0.55 : 1 } }, /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: { ...styles.selectFieldIconSm, background: "var(--accent)", cursor: feeLockedNow ? "not-allowed" : "pointer" },
+              onClick: (e) => {
                 e.stopPropagation();
-                !editMode && !catLocked && onManageCategory(type);
-              } }, "\u2699\uFE0F")
+                !editMode && !feeLockedNow && openFeeCatPicker();
+              }
             },
-            /* @__PURE__ */ React.createElement(
-              "div",
-              {
-                style: { ...styles.selectFieldCompact, opacity: catLocked ? 0.55 : 1, cursor: catLocked ? "not-allowed" : "pointer" },
-                onClick: () => !editMode && !catLocked && setShowCategorySheet(true)
+            /* @__PURE__ */ React.createElement(TypeIcon, { name: "coin", size: 16, color: "#fff" })
+          ), /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: { ...styles.selectFieldLabelCompact, cursor: feeLockedNow ? "not-allowed" : "pointer", flex: "none", maxWidth: "55%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+              onClick: (e) => {
+                e.stopPropagation();
+                !editMode && !feeLockedNow && openFeeCatPicker();
+              }
+            },
+            feeSubCategory || feeCategory
+          ), /* @__PURE__ */ React.createElement(
+            "input",
+            {
+              type: "text",
+              inputMode: "decimal",
+              readOnly: feeLockedNow,
+              style: {
+                flex: 1,
+                background: "transparent",
+                border: "none",
+                outline: "none",
+                color: "var(--text)",
+                fontSize: 14,
+                textAlign: "right",
+                padding: 0,
+                margin: 0,
+                fontFamily: "var(--num-font)",
+                minWidth: 0,
+                height: "100%",
+                boxSizing: "border-box",
+                cursor: feeLockedNow ? "not-allowed" : "text"
               },
-              currentCat ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: type === "income" ? "rgba(126, 224, 192, 0.15)" : "rgba(245, 181, 192, 0.15)" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: currentCat.icon, size: 16, color: mainColor })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, currentCat.label)) : /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldPlaceholder }, "\u9078\u64C7\u5927\u5206\u985E"),
-              /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
-            )
-          );
-        }
-        if (blockKey === "subCategory") {
-          const currentCat = cats.find((c) => c.label === category);
-          const subLocked = !!editing && fieldsLocked;
+              value: feeDisplayValue,
+              onChange: (e) => {
+                if (feeLockedNow) return;
+                const v = e.target.value;
+                if (v === "" || /^\d*\.?\d*$/.test(v)) setFee(v);
+              },
+              onFocus: (e) => {
+                if (feeLockedNow) {
+                  e.target.blur();
+                  return;
+                }
+                if (fee === "0") setFee("");
+                e.target.select();
+              },
+              onClick: (e) => {
+                if (!feeLockedNow) e.target.select();
+              },
+              onBlur: () => {
+                if (fee === "") setFee("0");
+              },
+              placeholder: "\u9078\u586B",
+              disabled: editMode
+            }
+          ))
+        );
+      }
+      if (blockKey === "note") {
+        const noteLocked = !!editing && fieldsLocked;
+        const inputBg = notePref.applyToInput && notePref.bgColor ? notePref.bgColor : "var(--bg-card)";
+        const inputColor = notePref.applyToInput && notePref.textColor ? notePref.textColor : noteColor || "var(--text)";
+        return /* @__PURE__ */ React.createElement(
+          Block,
+          {
+            ...blockProps,
+            title: "\u5099\u8A3B",
+            inline: true,
+            headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: noteLocked || editMode ? 0.3 : 1 }, onClick: (e) => {
+              e.stopPropagation();
+              if (!editMode && !noteLocked) setShowNotePref(true);
+            } }, "\u2699\uFE0F")
+          },
+          /* @__PURE__ */ React.createElement("div", { style: { position: "relative", width: "100%" } }, /* @__PURE__ */ React.createElement(
+            "textarea",
+            {
+              value: note,
+              onChange: (e) => setNote(e.target.value),
+              onInput: (e) => {
+                e.target.style.height = "auto";
+                e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
+              },
+              ref: (el) => {
+                if (el && note) {
+                  el.style.height = "auto";
+                  el.style.height = Math.min(el.scrollHeight, 160) + "px";
+                }
+              },
+              placeholder: "\u9078\u586B\uFF08 \u4E0A\u9650 100 \u5B57 \uFF09",
+              disabled: noteLocked,
+              maxLength: 100,
+              rows: 1,
+              style: {
+                ...styles.selectFieldCompact,
+                border: "none",
+                outline: "none",
+                background: inputBg,
+                color: inputColor,
+                fontSize: 14,
+                width: "100%",
+                opacity: noteLocked ? 0.55 : 1,
+                cursor: noteLocked ? "not-allowed" : "text",
+                resize: "none",
+                height: 44,
+                minHeight: 44,
+                maxHeight: 160,
+                fontFamily: "inherit",
+                lineHeight: "22px",
+                padding: "11px 12px",
+                boxSizing: "border-box",
+                overflow: "hidden",
+                display: "block"
+              }
+            }
+          ), note.length > 0 && !noteLocked && /* @__PURE__ */ React.createElement("div", { style: {
+            position: "absolute",
+            bottom: 4,
+            right: 10,
+            fontSize: 10,
+            color: note.length >= 90 ? "var(--pink)" : "var(--text-faint)",
+            pointerEvents: "none",
+            fontVariantNumeric: "tabular-nums",
+            fontWeight: note.length >= 90 ? 600 : 400
+          } }, note.length, " / 100"))
+        );
+      }
+      if (blockKey === "account") {
+        const currentAcct = state.accounts.find((a) => a.id === accountId);
+        const currentTypeMeta = currentAcct ? state.accountTypes.find((t) => t.value === currentAcct.type) : null;
+        const acctLocked = !!editing && fieldsLocked;
+        return /* @__PURE__ */ React.createElement(
+          Block,
+          {
+            ...blockProps,
+            title: "\u6536\u652F\u5E33\u6236",
+            inline: true,
+            headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: acctLocked ? 0.3 : 1 }, onClick: (e) => {
+              e.stopPropagation();
+              !editMode && !acctLocked && onManageAccount();
+            } }, "\u2699\uFE0F")
+          },
+          state.accounts.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: styles.emptyAccountHint, onClick: () => !editMode && !acctLocked && onManageAccount() }, "\u5C1A\u672A\u5EFA\u7ACB\u5E33\u6236\uFF0C\u9EDE\u9019\u88E1\u6216 \u2699\uFE0F \u65B0\u589E") : /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: { ...styles.selectFieldCompact, opacity: acctLocked ? 0.55 : 1, cursor: acctLocked ? "not-allowed" : "pointer" },
+              onClick: () => !editMode && !acctLocked && setShowAccountSheet(true)
+            },
+            currentAcct ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: currentTypeMeta?.color || "#f5c29c" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: currentTypeMeta?.icon || "box", size: 16, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, currentAcct.name), /* @__PURE__ */ React.createElement("span", { style: styles.selectFieldSubInline }, (() => {
+              const b = calcBalance(currentAcct, state.transactions);
+              return b.toLocaleString();
+            })())) : /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldPlaceholder }, "\u9078\u64C7\u5E33\u6236"),
+            /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
+          )
+        );
+      }
+      if (blockKey === "fromAccount") {
+        const currentAcct = state.accounts.find((a) => a.id === fromAccountId);
+        const currentTypeMeta = currentAcct ? state.accountTypes.find((t) => t.value === currentAcct.type) : null;
+        const isDeletedFrom = editingTransfer && editOut?._deletedAccountName;
+        const deletedFromName = isDeletedFrom ? editOut._deletedAccountName : "";
+        const gearLocked = !!editing && fieldsLocked;
+        const fromLocked = gearLocked || isDeletedFrom || transferDeletedVirtual;
+        const blockTitle = isLend ? "\u4ED8\u6B3E\u5E33\u6236" : "\u8F49\u51FA\u5E33\u6236";
+        const placeholder = isLend ? "\u9078\u64C7\u4ED8\u6B3E\u5E33\u6236" : "\u9078\u64C7\u8F49\u51FA\u5E33\u6236";
+        return /* @__PURE__ */ React.createElement(
+          Block,
+          {
+            ...blockProps,
+            title: blockTitle,
+            inline: true,
+            headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: gearLocked ? 0.3 : 1 }, onClick: (e) => {
+              e.stopPropagation();
+              !editMode && !gearLocked && onManageAccount();
+            } }, "\u2699\uFE0F")
+          },
+          state.accounts.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: styles.emptyAccountHint, onClick: () => !editMode && !fromLocked && onManageAccount() }, "\u5C1A\u672A\u5EFA\u7ACB\u5E33\u6236\uFF0C\u9EDE\u9019\u88E1\u6216 \u2699\uFE0F \u65B0\u589E") : /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: { ...styles.selectFieldCompact, opacity: fromLocked ? 0.55 : 1, cursor: fromLocked ? "not-allowed" : "pointer" },
+              onClick: () => !editMode && !fromLocked && setShowFromSheet(true)
+            },
+            isDeletedFrom ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: "var(--text-faint)" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "box", size: 16, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, deletedFromName), /* @__PURE__ */ React.createElement("span", { style: {
+              color: "var(--text-faint)",
+              fontSize: 10,
+              fontWeight: 500,
+              marginLeft: 6,
+              padding: "1px 6px",
+              borderRadius: 4,
+              background: "rgba(140, 140, 140, 0.12)"
+            } }, "\u5E33\u865F\u5DF2\u522A")) : currentAcct ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: currentTypeMeta?.color || "#f5c29c" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: currentTypeMeta?.icon || "box", size: 16, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, currentAcct.name), /* @__PURE__ */ React.createElement("span", { style: styles.selectFieldSubInline }, (() => {
+              const b = calcBalance(currentAcct, state.transactions);
+              return b.toLocaleString();
+            })())) : /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldPlaceholder }, placeholder),
+            /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
+          )
+        );
+      }
+      if (blockKey === "toAccount") {
+        const currentAcct = state.accounts.find((a) => a.id === toAccountId);
+        const currentTypeMeta = currentAcct ? state.accountTypes.find((t) => t.value === currentAcct.type) : null;
+        const sameAcct = fromAccountId && toAccountId && fromAccountId === toAccountId;
+        const isDeletedTo = editingTransfer && editIn?._deletedAccountName;
+        const deletedToName = isDeletedTo ? editIn._deletedAccountName : "";
+        const toGearLocked = !!editing && fieldsLocked;
+        const toLocked = toGearLocked || isDeletedTo || transferDeletedVirtual;
+        const feeGearLocked = !!editing && fieldsLocked;
+        const feeLockedNow = !!editing && fieldsLocked || transferDeletedVirtual;
+        return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+          Block,
+          {
+            ...blockProps,
+            title: "\u8F49\u5165\u5E33\u6236",
+            inline: true,
+            headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: toGearLocked ? 0.3 : 1 }, onClick: (e) => {
+              e.stopPropagation();
+              !editMode && !toGearLocked && onManageAccount();
+            } }, "\u2699\uFE0F")
+          },
+          state.accounts.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: styles.emptyAccountHint, onClick: () => !editMode && !toLocked && onManageAccount() }, "\u5C1A\u672A\u5EFA\u7ACB\u5E33\u6236\uFF0C\u9EDE\u9019\u88E1\u6216 \u2699\uFE0F \u65B0\u589E") : /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: { ...styles.selectFieldCompact, opacity: toLocked ? 0.55 : 1, cursor: toLocked ? "not-allowed" : "pointer", ...sameAcct ? { borderColor: "var(--pink)" } : {} },
+              onClick: () => !editMode && !toLocked && setShowToSheet(true)
+            },
+            isDeletedTo ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: "var(--text-faint)" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "box", size: 16, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, deletedToName), /* @__PURE__ */ React.createElement("span", { style: {
+              color: "var(--text-faint)",
+              fontSize: 10,
+              fontWeight: 500,
+              marginLeft: 6,
+              padding: "1px 6px",
+              borderRadius: 4,
+              background: "rgba(140, 140, 140, 0.12)"
+            } }, "\u5E33\u865F\u5DF2\u522A")) : currentAcct ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: currentTypeMeta?.color || "#f5c29c" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: currentTypeMeta?.icon || "box", size: 16, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, currentAcct.name), /* @__PURE__ */ React.createElement("span", { style: styles.selectFieldSubInline }, (() => {
+              const b = calcBalance(currentAcct, state.transactions);
+              return b.toLocaleString();
+            })())) : /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldPlaceholder }, "\u9078\u64C7\u8F49\u5165\u5E33\u6236"),
+            /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
+          )
+        ), sameAcct && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--pink-text)", marginTop: -4, marginBottom: 6, padding: "0 14px" } }, "\u8F49\u51FA\u8207\u8F49\u5165\u5E33\u6236\u4E0D\u80FD\u76F8\u540C"), state.accounts.length > 0 && (() => {
+          const feeCatData = (state.categories.expense || []).find((c) => c.label === feeCategory);
           return /* @__PURE__ */ React.createElement(
             Block,
             {
-              ...blockProps,
-              title: "\u5B50\u5206\u985E",
-              inline: true,
-              headerRight: /* @__PURE__ */ React.createElement(
-                "span",
-                {
-                  style: { ...styles.gearBtn, opacity: currentCat && !subLocked ? 1 : 0.3 },
-                  onClick: (e) => {
-                    e.stopPropagation();
-                    if (!editMode && currentCat && !subLocked) onManageCategory(type, category);
-                  }
-                },
-                "\u2699\uFE0F"
-              )
-            },
-            /* @__PURE__ */ React.createElement(
-              "div",
-              {
-                style: { ...styles.selectFieldCompact, opacity: subLocked ? 0.55 : 1, cursor: subLocked ? "not-allowed" : "pointer" },
-                onClick: () => !editMode && !subLocked && setShowSubCategorySheet(true)
-              },
-              subCategory ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: type === "income" ? "rgba(126, 224, 192, 0.15)" : "rgba(245, 181, 192, 0.15)" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: currentCat?.icon || "note", size: 16, color: mainColor })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, subCategory)) : /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldPlaceholder }, "\u9078\u64C7\u5B50\u5206\u985E\uFF08\u9078\u586B\uFF09"),
-              /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
-            )
-          );
-        }
-        if (blockKey === "fee") {
-          if (isTransfer || isLend) return null;
-          const feeGearLocked = !!editing && fieldsLocked;
-          const feeLockedNow = !!editing && fieldsLocked;
-          const feeDisplayValue = fee === "0" ? "" : fee;
-          return /* @__PURE__ */ React.createElement(
-            Block,
-            {
-              ...blockProps,
+              blockKey: "fee",
+              editMode,
               title: "\u624B\u7E8C\u8CBB\u7528",
               inline: true,
               headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: feeGearLocked ? 0.3 : 1 }, onClick: (e) => {
@@ -13943,7 +14151,7 @@ function AddTxnSheet({ state, type, setType, editing, defaultDate, onSave, onDel
                   boxSizing: "border-box",
                   cursor: feeLockedNow ? "not-allowed" : "text"
                 },
-                value: feeDisplayValue,
+                value: fee === "0" ? "" : fee,
                 onChange: (e) => {
                   if (feeLockedNow) return;
                   const v = e.target.value;
@@ -13968,443 +14176,176 @@ function AddTxnSheet({ state, type, setType, editing, defaultDate, onSave, onDel
               }
             ))
           );
-        }
-        if (blockKey === "note") {
-          const noteLocked = !!editing && fieldsLocked;
-          const inputBg = notePref.applyToInput && notePref.bgColor ? notePref.bgColor : "var(--bg-card)";
-          const inputColor = notePref.applyToInput && notePref.textColor ? notePref.textColor : noteColor || "var(--text)";
-          return /* @__PURE__ */ React.createElement(
-            Block,
-            {
-              ...blockProps,
-              title: "\u5099\u8A3B",
-              inline: true,
-              headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: noteLocked || editMode ? 0.3 : 1 }, onClick: (e) => {
-                e.stopPropagation();
-                if (!editMode && !noteLocked) setShowNotePref(true);
-              } }, "\u2699\uFE0F")
-            },
-            /* @__PURE__ */ React.createElement("div", { style: { position: "relative", width: "100%" } }, /* @__PURE__ */ React.createElement(
-              "textarea",
+        })());
+      }
+      if (blockKey === "date") {
+        const [y, m, d] = date.split("-");
+        const dObj = /* @__PURE__ */ new Date(`${date}T00:00:00`);
+        const wd = ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][dObj.getDay()];
+        const dayOfWeek = dObj.getDay();
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        const dateLabel = `${y}/${String(m).padStart(2, "0")}/${String(d).padStart(2, "0")}`;
+        const dateLocked = !!editing && fieldsLocked;
+        return /* @__PURE__ */ React.createElement(
+          Block,
+          {
+            ...blockProps,
+            title: "\u65E5\u671F",
+            inline: true,
+            headerRight: /* @__PURE__ */ React.createElement(
+              "span",
               {
-                value: note,
-                onChange: (e) => setNote(e.target.value),
-                onInput: (e) => {
-                  e.target.style.height = "auto";
-                  e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
-                },
-                ref: (el) => {
-                  if (el && note) {
-                    el.style.height = "auto";
-                    el.style.height = Math.min(el.scrollHeight, 160) + "px";
-                  }
-                },
-                placeholder: "\u9078\u586B\uFF08 \u4E0A\u9650 100 \u5B57 \uFF09",
-                disabled: noteLocked,
-                maxLength: 100,
-                rows: 1,
-                style: {
-                  ...styles.selectFieldCompact,
-                  border: "none",
-                  outline: "none",
-                  background: inputBg,
-                  color: inputColor,
-                  fontSize: 14,
-                  width: "100%",
-                  opacity: noteLocked ? 0.55 : 1,
-                  cursor: noteLocked ? "not-allowed" : "text",
-                  resize: "none",
-                  height: 44,
-                  minHeight: 44,
-                  maxHeight: 160,
-                  fontFamily: "inherit",
-                  lineHeight: "22px",
-                  padding: "11px 12px",
-                  boxSizing: "border-box",
-                  overflow: "hidden",
-                  display: "block"
-                }
-              }
-            ), note.length > 0 && !noteLocked && /* @__PURE__ */ React.createElement("div", { style: {
-              position: "absolute",
-              bottom: 4,
-              right: 10,
-              fontSize: 10,
-              color: note.length >= 90 ? "var(--pink)" : "var(--text-faint)",
-              pointerEvents: "none",
-              fontVariantNumeric: "tabular-nums",
-              fontWeight: note.length >= 90 ? 600 : 400
-            } }, note.length, " / 100"))
-          );
-        }
-        if (blockKey === "account") {
-          const currentAcct = state.accounts.find((a) => a.id === accountId);
-          const currentTypeMeta = currentAcct ? state.accountTypes.find((t) => t.value === currentAcct.type) : null;
-          const acctLocked = !!editing && fieldsLocked;
-          return /* @__PURE__ */ React.createElement(
-            Block,
-            {
-              ...blockProps,
-              title: "\u6536\u652F\u5E33\u6236",
-              inline: true,
-              headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: acctLocked ? 0.3 : 1 }, onClick: (e) => {
-                e.stopPropagation();
-                !editMode && !acctLocked && onManageAccount();
-              } }, "\u2699\uFE0F")
-            },
-            state.accounts.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: styles.emptyAccountHint, onClick: () => !editMode && !acctLocked && onManageAccount() }, "\u5C1A\u672A\u5EFA\u7ACB\u5E33\u6236\uFF0C\u9EDE\u9019\u88E1\u6216 \u2699\uFE0F \u65B0\u589E") : /* @__PURE__ */ React.createElement(
-              "div",
-              {
-                style: { ...styles.selectFieldCompact, opacity: acctLocked ? 0.55 : 1, cursor: acctLocked ? "not-allowed" : "pointer" },
-                onClick: () => !editMode && !acctLocked && setShowAccountSheet(true)
-              },
-              currentAcct ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: currentTypeMeta?.color || "#f5c29c" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: currentTypeMeta?.icon || "box", size: 16, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, currentAcct.name), /* @__PURE__ */ React.createElement("span", { style: styles.selectFieldSubInline }, (() => {
-                const b = calcBalance(currentAcct, state.transactions);
-                return b.toLocaleString();
-              })())) : /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldPlaceholder }, "\u9078\u64C7\u5E33\u6236"),
-              /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
-            )
-          );
-        }
-        if (blockKey === "fromAccount") {
-          const currentAcct = state.accounts.find((a) => a.id === fromAccountId);
-          const currentTypeMeta = currentAcct ? state.accountTypes.find((t) => t.value === currentAcct.type) : null;
-          const isDeletedFrom = editingTransfer && editOut?._deletedAccountName;
-          const deletedFromName = isDeletedFrom ? editOut._deletedAccountName : "";
-          const gearLocked = !!editing && fieldsLocked;
-          const fromLocked = gearLocked || isDeletedFrom || transferDeletedVirtual;
-          const blockTitle = isLend ? "\u4ED8\u6B3E\u5E33\u6236" : "\u8F49\u51FA\u5E33\u6236";
-          const placeholder = isLend ? "\u9078\u64C7\u4ED8\u6B3E\u5E33\u6236" : "\u9078\u64C7\u8F49\u51FA\u5E33\u6236";
-          return /* @__PURE__ */ React.createElement(
-            Block,
-            {
-              ...blockProps,
-              title: blockTitle,
-              inline: true,
-              headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: gearLocked ? 0.3 : 1 }, onClick: (e) => {
-                e.stopPropagation();
-                !editMode && !gearLocked && onManageAccount();
-              } }, "\u2699\uFE0F")
-            },
-            state.accounts.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: styles.emptyAccountHint, onClick: () => !editMode && !fromLocked && onManageAccount() }, "\u5C1A\u672A\u5EFA\u7ACB\u5E33\u6236\uFF0C\u9EDE\u9019\u88E1\u6216 \u2699\uFE0F \u65B0\u589E") : /* @__PURE__ */ React.createElement(
-              "div",
-              {
-                style: { ...styles.selectFieldCompact, opacity: fromLocked ? 0.55 : 1, cursor: fromLocked ? "not-allowed" : "pointer" },
-                onClick: () => !editMode && !fromLocked && setShowFromSheet(true)
-              },
-              isDeletedFrom ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: "var(--text-faint)" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "box", size: 16, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, deletedFromName), /* @__PURE__ */ React.createElement("span", { style: {
-                color: "var(--text-faint)",
-                fontSize: 10,
-                fontWeight: 500,
-                marginLeft: 6,
-                padding: "1px 6px",
-                borderRadius: 4,
-                background: "rgba(140, 140, 140, 0.12)"
-              } }, "\u5E33\u865F\u5DF2\u522A")) : currentAcct ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: currentTypeMeta?.color || "#f5c29c" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: currentTypeMeta?.icon || "box", size: 16, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, currentAcct.name), /* @__PURE__ */ React.createElement("span", { style: styles.selectFieldSubInline }, (() => {
-                const b = calcBalance(currentAcct, state.transactions);
-                return b.toLocaleString();
-              })())) : /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldPlaceholder }, placeholder),
-              /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
-            )
-          );
-        }
-        if (blockKey === "toAccount") {
-          const currentAcct = state.accounts.find((a) => a.id === toAccountId);
-          const currentTypeMeta = currentAcct ? state.accountTypes.find((t) => t.value === currentAcct.type) : null;
-          const sameAcct = fromAccountId && toAccountId && fromAccountId === toAccountId;
-          const isDeletedTo = editingTransfer && editIn?._deletedAccountName;
-          const deletedToName = isDeletedTo ? editIn._deletedAccountName : "";
-          const toGearLocked = !!editing && fieldsLocked;
-          const toLocked = toGearLocked || isDeletedTo || transferDeletedVirtual;
-          const feeGearLocked = !!editing && fieldsLocked;
-          const feeLockedNow = !!editing && fieldsLocked || transferDeletedVirtual;
-          return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
-            Block,
-            {
-              ...blockProps,
-              title: "\u8F49\u5165\u5E33\u6236",
-              inline: true,
-              headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: toGearLocked ? 0.3 : 1 }, onClick: (e) => {
-                e.stopPropagation();
-                !editMode && !toGearLocked && onManageAccount();
-              } }, "\u2699\uFE0F")
-            },
-            state.accounts.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: styles.emptyAccountHint, onClick: () => !editMode && !toLocked && onManageAccount() }, "\u5C1A\u672A\u5EFA\u7ACB\u5E33\u6236\uFF0C\u9EDE\u9019\u88E1\u6216 \u2699\uFE0F \u65B0\u589E") : /* @__PURE__ */ React.createElement(
-              "div",
-              {
-                style: { ...styles.selectFieldCompact, opacity: toLocked ? 0.55 : 1, cursor: toLocked ? "not-allowed" : "pointer", ...sameAcct ? { borderColor: "var(--pink)" } : {} },
-                onClick: () => !editMode && !toLocked && setShowToSheet(true)
-              },
-              isDeletedTo ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: "var(--text-faint)" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "box", size: 16, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, deletedToName), /* @__PURE__ */ React.createElement("span", { style: {
-                color: "var(--text-faint)",
-                fontSize: 10,
-                fontWeight: 500,
-                marginLeft: 6,
-                padding: "1px 6px",
-                borderRadius: 4,
-                background: "rgba(140, 140, 140, 0.12)"
-              } }, "\u5E33\u865F\u5DF2\u522A")) : currentAcct ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldIconSm, background: currentTypeMeta?.color || "#f5c29c" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: currentTypeMeta?.icon || "box", size: 16, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, currentAcct.name), /* @__PURE__ */ React.createElement("span", { style: styles.selectFieldSubInline }, (() => {
-                const b = calcBalance(currentAcct, state.transactions);
-                return b.toLocaleString();
-              })())) : /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldPlaceholder }, "\u9078\u64C7\u8F49\u5165\u5E33\u6236"),
-              /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
-            )
-          ), sameAcct && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--pink-text)", marginTop: -4, marginBottom: 6, padding: "0 14px" } }, "\u8F49\u51FA\u8207\u8F49\u5165\u5E33\u6236\u4E0D\u80FD\u76F8\u540C"), state.accounts.length > 0 && (() => {
-            const feeCatData = (state.categories.expense || []).find((c) => c.label === feeCategory);
-            return /* @__PURE__ */ React.createElement(
-              Block,
-              {
-                blockKey: "fee",
-                editMode,
-                title: "\u624B\u7E8C\u8CBB\u7528",
-                inline: true,
-                headerRight: /* @__PURE__ */ React.createElement("span", { style: { ...styles.gearBtn, opacity: feeGearLocked ? 0.3 : 1 }, onClick: (e) => {
-                  e.stopPropagation();
-                  !editMode && !feeGearLocked && openFeeCatPicker();
-                } }, "\u2699\uFE0F")
-              },
-              /* @__PURE__ */ React.createElement("div", { style: { ...styles.selectFieldCompact, opacity: feeLockedNow ? 0.55 : 1 } }, /* @__PURE__ */ React.createElement(
-                "div",
-                {
-                  style: { ...styles.selectFieldIconSm, background: "var(--accent)", cursor: feeLockedNow ? "not-allowed" : "pointer" },
-                  onClick: (e) => {
-                    e.stopPropagation();
-                    !editMode && !feeLockedNow && openFeeCatPicker();
-                  }
-                },
-                /* @__PURE__ */ React.createElement(TypeIcon, { name: "coin", size: 16, color: "#fff" })
-              ), /* @__PURE__ */ React.createElement(
-                "div",
-                {
-                  style: { ...styles.selectFieldLabelCompact, cursor: feeLockedNow ? "not-allowed" : "pointer", flex: "none", maxWidth: "55%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-                  onClick: (e) => {
-                    e.stopPropagation();
-                    !editMode && !feeLockedNow && openFeeCatPicker();
-                  }
-                },
-                feeSubCategory || feeCategory
-              ), /* @__PURE__ */ React.createElement(
-                "input",
-                {
-                  type: "text",
-                  inputMode: "decimal",
-                  readOnly: feeLockedNow,
-                  style: {
-                    flex: 1,
-                    background: "transparent",
-                    border: "none",
-                    outline: "none",
-                    color: "var(--text)",
-                    fontSize: 14,
-                    textAlign: "right",
-                    padding: 0,
-                    margin: 0,
-                    fontFamily: "var(--num-font)",
-                    minWidth: 0,
-                    height: "100%",
-                    boxSizing: "border-box",
-                    cursor: feeLockedNow ? "not-allowed" : "text"
-                  },
-                  value: fee === "0" ? "" : fee,
-                  onChange: (e) => {
-                    if (feeLockedNow) return;
-                    const v = e.target.value;
-                    if (v === "" || /^\d*\.?\d*$/.test(v)) setFee(v);
-                  },
-                  onFocus: (e) => {
-                    if (feeLockedNow) {
-                      e.target.blur();
-                      return;
-                    }
-                    if (fee === "0") setFee("");
-                    e.target.select();
-                  },
-                  onClick: (e) => {
-                    if (!feeLockedNow) e.target.select();
-                  },
-                  onBlur: () => {
-                    if (fee === "") setFee("0");
-                  },
-                  placeholder: "\u9078\u586B",
-                  disabled: editMode
-                }
-              ))
-            );
-          })());
-        }
-        if (blockKey === "date") {
-          const [y, m, d] = date.split("-");
-          const dObj = /* @__PURE__ */ new Date(`${date}T00:00:00`);
-          const wd = ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][dObj.getDay()];
-          const dayOfWeek = dObj.getDay();
-          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-          const dateLabel = `${y}/${String(m).padStart(2, "0")}/${String(d).padStart(2, "0")}`;
-          const dateLocked = !!editing && fieldsLocked;
-          return /* @__PURE__ */ React.createElement(
-            Block,
-            {
-              ...blockProps,
-              title: "\u65E5\u671F",
-              inline: true,
-              headerRight: /* @__PURE__ */ React.createElement(
-                "span",
-                {
-                  style: { ...styles.gearBtn, opacity: dateLocked ? 0.3 : 1 },
-                  onClick: (e) => {
-                    e.stopPropagation();
-                    !editMode && !dateLocked && setShowDateColorSettings(true);
-                  }
-                },
-                "\u2699\uFE0F"
-              )
-            },
-            /* @__PURE__ */ React.createElement(
-              "div",
-              {
-                style: { ...styles.selectFieldCompact, opacity: dateLocked ? 0.55 : 1, cursor: dateLocked ? "not-allowed" : "pointer" },
-                onClick: () => !editMode && !dateLocked && setShowDatePicker(true)
-              },
-              /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, dateLabel, /* @__PURE__ */ React.createElement("span", { style: { color: isWeekend ? weekendColor : "var(--text-dim)", marginLeft: 6, fontSize: 13 } }, "(", wd, ")")),
-              /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
-            )
-          );
-        }
-        if (blockKey === "expectDate") {
-          const dateLabel = expectDate ? expectDate.replace(/-/g, "/") : "";
-          const wd = expectDate ? ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][new Date(expectDate).getDay()] : "";
-          return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: "\u9810\u8A08\u6536\u56DE", inline: true }, /* @__PURE__ */ React.createElement(
-            "div",
-            {
-              style: { ...styles.selectFieldCompact, cursor: "pointer" },
-              onClick: () => !editMode && setShowExpectDateSheet(true)
-            },
-            /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, expectDate ? /* @__PURE__ */ React.createElement(React.Fragment, null, dateLabel, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", marginLeft: 6, fontSize: 13 } }, "(", wd, ")")) : /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "\u9078\u586B")),
-            expectDate && /* @__PURE__ */ React.createElement(
-              "button",
-              {
+                style: { ...styles.gearBtn, opacity: dateLocked ? 0.3 : 1 },
                 onClick: (e) => {
                   e.stopPropagation();
-                  setExpectDate("");
-                },
-                style: {
-                  background: "transparent",
-                  border: "none",
-                  color: "var(--text-faint)",
-                  fontSize: 18,
-                  cursor: "pointer",
-                  marginRight: 4,
-                  padding: "0 4px"
+                  !editMode && !dateLocked && setShowDateColorSettings(true);
                 }
               },
-              "\xD7"
-            ),
+              "\u2699\uFE0F"
+            )
+          },
+          /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              style: { ...styles.selectFieldCompact, opacity: dateLocked ? 0.55 : 1, cursor: dateLocked ? "not-allowed" : "pointer" },
+              onClick: () => !editMode && !dateLocked && setShowDatePicker(true)
+            },
+            /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, dateLabel, /* @__PURE__ */ React.createElement("span", { style: { color: isWeekend ? weekendColor : "var(--text-dim)", marginLeft: 6, fontSize: 13 } }, "(", wd, ")")),
             /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
-          ));
-        }
-        if (blockKey === "note") {
-          return null;
-        }
+          )
+        );
+      }
+      if (blockKey === "expectDate") {
+        const dateLabel = expectDate ? expectDate.replace(/-/g, "/") : "";
+        const wd = expectDate ? ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][new Date(expectDate).getDay()] : "";
+        return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: "\u9810\u8A08\u6536\u56DE", inline: true }, /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            style: { ...styles.selectFieldCompact, cursor: "pointer" },
+            onClick: () => !editMode && setShowExpectDateSheet(true)
+          },
+          /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldLabelCompact }, expectDate ? /* @__PURE__ */ React.createElement(React.Fragment, null, dateLabel, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", marginLeft: 6, fontSize: 13 } }, "(", wd, ")")) : /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "\u9078\u586B")),
+          expectDate && /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              onClick: (e) => {
+                e.stopPropagation();
+                setExpectDate("");
+              },
+              style: {
+                background: "transparent",
+                border: "none",
+                color: "var(--text-faint)",
+                fontSize: 18,
+                cursor: "pointer",
+                marginRight: 4,
+                padding: "0 4px"
+              }
+            },
+            "\xD7"
+          ),
+          /* @__PURE__ */ React.createElement("div", { style: styles.selectFieldArrow }, "\u203A")
+        ));
+      }
+      if (blockKey === "note") {
         return null;
-      }),
-      editing && isTransfer && editingTransfer && /* @__PURE__ */ React.createElement(
-        "div",
-        {
-          onClick: () => !editMode && setTransferAcked((v) => !v),
-          style: {
-            margin: "12px 0 0",
-            padding: "12px 14px",
-            background: transferAcked ? "rgba(126,224,192,0.08)" : "rgba(143,127,240,0.08)",
-            border: `1px solid ${transferAcked ? "rgba(126,224,192,0.35)" : "rgba(143,127,240,0.30)"}`,
-            borderRadius: 10,
-            cursor: editMode ? "default" : "pointer",
-            userSelect: "none",
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 10,
-            transition: "background 0.2s, border-color 0.2s"
-          }
-        },
-        /* @__PURE__ */ React.createElement("div", { style: {
-          width: 20,
-          height: 20,
-          borderRadius: 5,
-          border: `2px solid ${transferAcked ? "var(--mint)" : "var(--accent-text)"}`,
-          background: transferAcked ? "var(--mint)" : "transparent",
+      }
+      return null;
+    }), editing && isTransfer && editingTransfer && /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick: () => !editMode && setTransferAcked((v) => !v),
+        style: {
+          margin: "12px 0 0",
+          padding: "12px 14px",
+          background: transferAcked ? "rgba(126,224,192,0.08)" : "rgba(143,127,240,0.08)",
+          border: `1px solid ${transferAcked ? "rgba(126,224,192,0.35)" : "rgba(143,127,240,0.30)"}`,
+          borderRadius: 10,
+          cursor: editMode ? "default" : "pointer",
+          userSelect: "none",
           display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-          marginTop: 1,
-          transition: "all 0.18s"
-        } }, transferAcked && /* @__PURE__ */ React.createElement("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "var(--on-mint)", strokeWidth: "3.5", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "5 12 10 17 19 8" }))),
-        /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 13, color: "var(--text)", lineHeight: 1.55 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 600, marginBottom: 3 } }, "\u9019\u662F\u4E00\u7D44\u8F49\u5E33(\u5171 ", transferGroup ? transferGroup.length : 2, " \u7B46\u95DC\u806F\u8F49\u5E33\u7D00\u9304)"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)" } }, "\u6211\u5DF2\u4E86\u89E3 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", fontWeight: 600 } }, "\u4FEE\u6539\u5F8C\u5132\u5B58"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "/"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontWeight: 600 } }, "\u9078\u64C7\u522A\u9664"), " \u5F8C,\u6703\u540C\u6B65 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", fontWeight: 600 } }, "\u66F4\u65B0"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "/"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontWeight: 600 } }, "\u522A\u9664"), " \u6240\u6709\u95DC\u806F\u7D00\u9304"))
-      ),
-      /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          style: {
-            ...styles.saveBtn,
-            background: isTransfer ? "var(--accent)" : mainColor,
-            color: isTransfer ? "var(--on-accent)" : onMainColor || "#1a1a1a",
-            marginTop: 10,
-            opacity: editing && fieldsLocked || editing && isTransfer && editingTransfer && !transferAcked ? 0.4 : 1,
-            cursor: editing && fieldsLocked || editing && isTransfer && editingTransfer && !transferAcked ? "not-allowed" : "pointer"
-          },
-          onClick: () => {
-            if (editMode) return;
-            if (editing && fieldsLocked) {
-              (alertCenter || toast)("\u8ACB\u5148\u89E3\u9396\u624D\u80FD\u7DE8\u8F2F");
-              return;
-            }
-            if (editing && isTransfer && editingTransfer && !transferAcked) {
-              (alertCenter || toast)("\u8ACB\u5148\u52FE\u9078\u78BA\u8A8D\u5F8C\u518D\u5132\u5B58");
-              return;
-            }
-            isTransfer ? handleSaveTransfer() : isLend ? handleSaveLend() : handleSave();
+          alignItems: "flex-start",
+          gap: 10,
+          transition: "background 0.2s, border-color 0.2s"
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: {
+        width: 20,
+        height: 20,
+        borderRadius: 5,
+        border: `2px solid ${transferAcked ? "var(--mint)" : "var(--accent-text)"}`,
+        background: transferAcked ? "var(--mint)" : "transparent",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        marginTop: 1,
+        transition: "all 0.18s"
+      } }, transferAcked && /* @__PURE__ */ React.createElement("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "var(--on-mint)", strokeWidth: "3.5", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "5 12 10 17 19 8" }))),
+      /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 13, color: "var(--text)", lineHeight: 1.55 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 600, marginBottom: 3 } }, "\u9019\u662F\u4E00\u7D44\u8F49\u5E33(\u5171 ", transferGroup ? transferGroup.length : 2, " \u7B46\u95DC\u806F\u8F49\u5E33\u7D00\u9304)"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)" } }, "\u6211\u5DF2\u4E86\u89E3 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", fontWeight: 600 } }, "\u4FEE\u6539\u5F8C\u5132\u5B58"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "/"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontWeight: 600 } }, "\u9078\u64C7\u522A\u9664"), " \u5F8C,\u6703\u540C\u6B65 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", fontWeight: 600 } }, "\u66F4\u65B0"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "/"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontWeight: 600 } }, "\u522A\u9664"), " \u6240\u6709\u95DC\u806F\u7D00\u9304"))
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          ...styles.saveBtn,
+          background: isTransfer ? "var(--accent)" : mainColor,
+          color: isTransfer ? "var(--on-accent)" : onMainColor || "#1a1a1a",
+          marginTop: 10,
+          opacity: editing && fieldsLocked || editing && isTransfer && editingTransfer && !transferAcked ? 0.4 : 1,
+          cursor: editing && fieldsLocked || editing && isTransfer && editingTransfer && !transferAcked ? "not-allowed" : "pointer"
+        },
+        onClick: () => {
+          if (editMode) return;
+          if (editing && fieldsLocked) {
+            (alertCenter || toast)("\u8ACB\u5148\u89E3\u9396\u624D\u80FD\u7DE8\u8F2F");
+            return;
           }
-        },
-        "\u5132\u5B58"
-      ),
-      editing && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 6 } }, /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          style: {
-            ...styles.deleteBtn,
-            flex: 1,
-            marginTop: 0,
-            opacity: isTransfer && editingTransfer && !transferAcked ? 0.4 : 1,
-            cursor: isTransfer && editingTransfer && !transferAcked ? "not-allowed" : "pointer"
-          },
-          onClick: () => {
-            if (editMode) return;
-            if (isTransfer && editingTransfer && !transferAcked) {
-              (alertCenter || toast)("\u8ACB\u5148\u52FE\u9078\u78BA\u8A8D\u5F8C\u518D\u522A\u9664");
-              return;
-            }
-            onDelete(editing.id);
+          if (editing && isTransfer && editingTransfer && !transferAcked) {
+            (alertCenter || toast)("\u8ACB\u5148\u52FE\u9078\u78BA\u8A8D\u5F8C\u518D\u5132\u5B58");
+            return;
           }
+          isTransfer ? handleSaveTransfer() : isLend ? handleSaveLend() : handleSave();
+        }
+      },
+      "\u5132\u5B58"
+    ), editing && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 6 } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          ...styles.deleteBtn,
+          flex: 1,
+          marginTop: 0,
+          opacity: isTransfer && editingTransfer && !transferAcked ? 0.4 : 1,
+          cursor: isTransfer && editingTransfer && !transferAcked ? "not-allowed" : "pointer"
         },
-        "\u522A\u9664"
-      ), /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          style: {
-            flex: 1,
-            padding: "12px",
-            background: "var(--bg-card)",
-            border: "1px solid var(--text-dim)",
-            borderRadius: 10,
-            color: "var(--text)",
-            fontSize: 15,
-            fontWeight: 500,
-            cursor: "pointer"
-          },
-          onClick: onClose
+        onClick: () => {
+          if (editMode) return;
+          if (isTransfer && editingTransfer && !transferAcked) {
+            (alertCenter || toast)("\u8ACB\u5148\u52FE\u9078\u78BA\u8A8D\u5F8C\u518D\u522A\u9664");
+            return;
+          }
+          onDelete(editing.id);
+        }
+      },
+      "\u522A\u9664"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          flex: 1,
+          padding: "12px",
+          background: "var(--bg-card)",
+          border: "1px solid var(--text-dim)",
+          borderRadius: 10,
+          color: "var(--text)",
+          fontSize: 15,
+          fontWeight: 500,
+          cursor: "pointer"
         },
-        "\u53D6\u6D88"
-      )),
-      addTxnCenter && !showCalculator && /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 0", minHeight: 0 }, "aria-hidden": "true" })
-    ),
+        onClick: onClose
+      },
+      "\u53D6\u6D88"
+    ))),
     showCalculator && /* @__PURE__ */ React.createElement(
       CalculatorSheet,
       {
