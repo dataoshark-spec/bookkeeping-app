@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520CT";
+const APP_VERSION = "1150520CU";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -16950,7 +16950,7 @@ function InvestNoteSheet({ state, account, onClose, onSave, toast, toastRich, se
         placeholder: "\u5728\u9019\u88E1\u5BEB\u4E0B\u4F60\u60F3\u8A18\u7684\u4E8B...",
         style: {
           width: "100%",
-          minHeight: "50vh",
+          minHeight: 180,
           padding: 0,
           border: "none",
           background: "transparent",
@@ -16961,8 +16961,7 @@ function InvestNoteSheet({ state, account, onClose, onSave, toast, toastRich, se
           boxSizing: "border-box",
           fontFamily: "inherit",
           outline: "none"
-        },
-        autoFocus: !content
+        }
       }
     ), /* @__PURE__ */ React.createElement("div", { style: {
       marginTop: 10,
