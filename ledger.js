@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520DJ";
+const APP_VERSION = "1150520DK";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -8968,12 +8968,19 @@ function StatsPage({ state, catIcon, currentMonth, setCurrentMonth, editMode, se
   const stockChartData = React.useMemo(() => {
     const holdings = state.holdings || [];
     const trades = state.trades || [];
+    const accounts = state.accounts || [];
     const markets = state.stockMarkets || DEFAULT_STOCK_MARKETS;
     const subTags = state.stockSubTags || [];
+    const acctMarketMap = {};
+    accounts.forEach((a) => {
+      if (a.type !== "invest") return;
+      if ((a.investSubType || "stock") !== "stock") return;
+      acctMarketMap[a.id] = a.stockMarketId || DEFAULT_STOCK_MARKET_ID;
+    });
     const active = holdings.filter((h) => holdingShares(h, trades) > 0);
     const byMarket = {};
     active.forEach((h) => {
-      const mid = h.stockMarketId || markets[0]?.id || "sm_tw";
+      const mid = acctMarketMap[h.accountId] || DEFAULT_STOCK_MARKET_ID;
       if (!byMarket[mid]) byMarket[mid] = { cost: 0, marketValue: 0, holdings: [] };
       const c = holdingCost(h, trades);
       const mv = h.marketValue || 0;
@@ -8986,7 +8993,7 @@ function StatsPage({ state, catIcon, currentMonth, setCurrentMonth, editMode, se
     const totalCost = marketCostData.reduce((s, [, v]) => s + v, 0);
     const totalMarket = marketValueData.reduce((s, [, v]) => s + v, 0);
     return { byMarket, marketCostData, marketValueData, totalCost, totalMarket, markets, subTags };
-  }, [state.holdings, state.trades, state.stockMarkets, state.stockSubTags]);
+  }, [state.holdings, state.trades, state.stockMarkets, state.stockSubTags, state.accounts]);
   const stockDrillData = React.useMemo(() => {
     if (chartType !== "stock" || !drillCat) return null;
     const marketEntry = stockChartData.byMarket[drillCat];
