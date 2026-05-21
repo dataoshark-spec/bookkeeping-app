@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520CX";
+const APP_VERSION = "1150520CZ";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -1129,6 +1129,12 @@ function TypeIcon({ name, size = 22, color = "#fff" }) {
     // 筆記/備註/其他
     case "note":
       return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M5 4 L15 4 L19 8 L19 20 L5 20 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M15 4 L15 8 L19 8" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "12", x2: "16", y2: "12" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "15", x2: "14", y2: "15" }));
+    // [v555CY] 眼睛(顯示中)
+    case "eye":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M2 12 Q7 5 12 5 Q17 5 22 12 Q17 19 12 19 Q7 19 2 12 Z" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "3" }));
+    // [v555CY] 眼睛(隱藏)
+    case "eye-off":
+      return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M2 12 Q7 5 12 5 Q17 5 22 12 Q17 19 12 19 Q7 19 2 12 Z" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "3" }), /* @__PURE__ */ React.createElement("line", { x1: "3", y1: "3", x2: "21", y2: "21" }));
     // 薪資錢袋
     case "salary":
       return /* @__PURE__ */ React.createElement("svg", { ...props }, /* @__PURE__ */ React.createElement("path", { d: "M7 8 Q7 4 12 4 Q17 4 17 8 L19 20 L5 20 Z" }), /* @__PURE__ */ React.createElement("path", { d: "M10 12 L14 12 M10 14 L14 14 M12 10 L12 16" }));
@@ -1569,6 +1575,32 @@ function App() {
   };
   const setPageOrder = (pageKey) => (newOrder) => {
     setBlockOrder((o) => ({ ...o, [pageKey]: newOrder }));
+  };
+  const [hiddenBlocks, setHiddenBlocks] = useState(() => {
+    try {
+      const raw = localStorage.getItem("ledger_hidden_blocks_v1");
+      if (raw) return JSON.parse(raw) || {};
+    } catch {
+    }
+    return {};
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("ledger_hidden_blocks_v1", JSON.stringify(hiddenBlocks));
+    } catch {
+    }
+  }, [hiddenBlocks]);
+  const isBlockHidden = (pageKey, blockKey) => {
+    return Array.isArray(hiddenBlocks[pageKey]) && hiddenBlocks[pageKey].includes(blockKey);
+  };
+  const toggleBlockHidden = (pageKey, blockKey) => {
+    setHiddenBlocks((o) => {
+      const arr = Array.isArray(o[pageKey]) ? [...o[pageKey]] : [];
+      const idx = arr.indexOf(blockKey);
+      if (idx >= 0) arr.splice(idx, 1);
+      else arr.push(blockKey);
+      return { ...o, [pageKey]: arr };
+    });
   };
   React.useEffect(() => {
     let startY = null;
@@ -2850,6 +2882,8 @@ function App() {
         onOpenDate: (date) => setDetailDate(date),
         onOpenLend: (lendOut) => setLendDetail(lendOut),
         onOpenInvestPicker: () => setShowStockEntryPicker(true),
+        isBlockHidden: (blockKey) => isBlockHidden("home", blockKey),
+        toggleBlockHidden: (blockKey) => toggleBlockHidden("home", blockKey),
         editMode,
         setEditMode,
         blockOrder: blockOrder.home,
@@ -3111,7 +3145,43 @@ function App() {
     }
   ), showStockEntryPicker && (() => {
     const investAccounts = state.accounts.filter((a) => a.type === "invest" && !a.isSystem && (a.investSubType || "stock") === "stock");
-    return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: () => setShowStockEntryPicker(false) }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.centerDialogCard, maxHeight: "80vh", display: "flex", flexDirection: "column" }, onClick: (e) => e.stopPropagation(), ...stockEntryPickerSwipe }, /* @__PURE__ */ React.createElement("div", { style: { padding: "14px 18px", borderBottom: "1px solid var(--border)" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600 } }, "\u9078\u64C7\u6295\u8CC7\u5E33\u6236"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2 } }, "\u9032\u5165\u5E33\u6236\u5F8C\u53EF\u8CB7\u9032\u3001\u8CE3\u51FA\u3001\u4F30\u5E02\u503C")), /* @__PURE__ */ React.createElement("div", { style: { overflowY: "auto", maxHeight: "60vh" } }, investAccounts.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { padding: 32, textAlign: "center", color: "var(--text-faint)", fontSize: 13 } }, "\u5C1A\u672A\u5EFA\u7ACB\u6295\u8CC7\u5E33\u6236", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11 } }, "\u8ACB\u5148\u5230\u300C\u5E33\u6236\u7BA1\u7406\u300D\u65B0\u589E\u6295\u8CC7\u985E\u578B\u5E33\u6236")) : /* @__PURE__ */ React.createElement("div", { style: { padding: 12, display: "flex", flexDirection: "column", gap: 6 } }, investAccounts.map((a) => {
+    const homeBlockHidden = isBlockHidden("home", "investQuick");
+    return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: () => setShowStockEntryPicker(false) }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.centerDialogCard, maxHeight: "80vh", display: "flex", flexDirection: "column" }, onClick: (e) => e.stopPropagation(), ...stockEntryPickerSwipe }, /* @__PURE__ */ React.createElement("div", { style: {
+      padding: "14px 18px",
+      borderBottom: "1px solid var(--border)",
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 8
+    } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600 } }, "\u9078\u64C7\u6295\u8CC7\u5E33\u6236"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2 } }, "\u9032\u5165\u5E33\u6236\u5F8C\u53EF\u8CB7\u9032\u3001\u8CE3\u51FA\u3001\u4F30\u5E02\u503C")), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: (e) => {
+          e.stopPropagation();
+          toggleBlockHidden("home", "investQuick");
+          toastRich && toastRich({
+            title: homeBlockHidden ? "\u5DF2\u986F\u793A \u9996\u9801\u6295\u8CC7\u5FEB\u6377" : "\u5DF2\u96B1\u85CF \u9996\u9801\u6295\u8CC7\u5FEB\u6377",
+            amount: "\u2713",
+            amountColor: homeBlockHidden ? "var(--mint-text)" : "var(--text-faint)"
+          }, 1400);
+        },
+        style: {
+          background: "transparent",
+          border: "1px solid var(--border)",
+          borderRadius: 8,
+          padding: "6px 10px",
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
+          cursor: "pointer",
+          color: homeBlockHidden ? "var(--text-faint)" : "var(--mint-text)",
+          fontSize: 11,
+          flexShrink: 0
+        },
+        "aria-label": homeBlockHidden ? "\u986F\u793A\u9996\u9801\u5FEB\u6377" : "\u96B1\u85CF\u9996\u9801\u5FEB\u6377"
+      },
+      /* @__PURE__ */ React.createElement(TypeIcon, { name: homeBlockHidden ? "eye-off" : "eye", size: 14, color: "currentColor" }),
+      /* @__PURE__ */ React.createElement("span", null, homeBlockHidden ? "\u5DF2\u96B1\u85CF" : "\u5728\u9996\u9801")
+    )), /* @__PURE__ */ React.createElement("div", { style: { overflowY: "auto", maxHeight: "60vh" } }, investAccounts.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { padding: 32, textAlign: "center", color: "var(--text-faint)", fontSize: 13 } }, "\u5C1A\u672A\u5EFA\u7ACB\u6295\u8CC7\u5E33\u6236", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11 } }, "\u8ACB\u5148\u5230\u300C\u5E33\u6236\u7BA1\u7406\u300D\u65B0\u589E\u6295\u8CC7\u985E\u578B\u5E33\u6236")) : /* @__PURE__ */ React.createElement("div", { style: { padding: 12, display: "flex", flexDirection: "column", gap: 6 } }, investAccounts.map((a) => {
       const summary = investAccountSummary(a, state.holdings, state.trades);
       const myHoldings = state.holdings.filter((h) => h.accountId === a.id);
       const activeCount = myHoldings.filter((h) => holdingShares(h, state.trades) > 0).length;
@@ -6850,7 +6920,7 @@ function AccountPickerSheet({ state, currentId, excludeIds, onPick, onClose, tit
     })))
   );
 }
-function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, selectedDate, setSelectedDate, onAdd, onClickTxn, onViewAll, onOpenPeriod, onOpenAccount, onOpenDate, onOpenLend, onOpenInvestPicker, editMode, setEditMode, blockOrder, moveBlock, setPageOrder, setConfirmDialog, toastRich, toast, onSelectModeChange }) {
+function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, selectedDate, setSelectedDate, onAdd, onClickTxn, onViewAll, onOpenPeriod, onOpenAccount, onOpenDate, onOpenLend, onOpenInvestPicker, editMode, setEditMode, blockOrder, moveBlock, setPageOrder, setConfirmDialog, toastRich, toast, onSelectModeChange, isBlockHidden, toggleBlockHidden }) {
   const [recentFilter, setRecentFilter] = useState(() => {
     try {
       return localStorage.getItem("ledger_recent_filter") || "all";
@@ -7126,6 +7196,7 @@ function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, sel
       return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: "\u5FEB\u901F\u52D5\u4F5C" }, /* @__PURE__ */ React.createElement("div", { style: styles.addRow }, /* @__PURE__ */ React.createElement("button", { style: styles.recordBtn, onClick: () => !editMode && onAdd("expense") }, /* @__PURE__ */ React.createElement("span", { style: styles.recordBtnIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cash", size: 20, color: "#1a1a1a" })), /* @__PURE__ */ React.createElement("span", null, "\u8A18\u4E00\u7B46")), /* @__PURE__ */ React.createElement("button", { style: styles.addAcctBtn, onClick: () => !editMode && onOpenAccount() }, /* @__PURE__ */ React.createElement("span", { style: styles.recordBtnIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "bank", size: 18, color: "var(--text-dim)" })), /* @__PURE__ */ React.createElement("span", null, "\u5E33\u6236"))));
     }
     if (blockKey === "investQuick") {
+      if (isBlockHidden && isBlockHidden("investQuick")) return null;
       const investAccounts = state.accounts.filter(
         (a) => a.type === "invest" && !a.isSystem && (a.investSubType || "stock") === "stock"
       );
@@ -9137,8 +9208,10 @@ function SettingsPage({
     // 股票賣出預設帳戶
     "ledger_backup_reminder_days",
     // [v555CP] 備份提醒頻率(7/14/30 天)
-    "ledger_drive_folder"
+    "ledger_drive_folder",
     // [v555CP] Google Drive 資料夾連結(URL)
+    "ledger_hidden_blocks_v1"
+    // [v555CY] 隱藏的首頁 block (eg. investQuick)
   ];
   const collectPreferences = () => {
     const prefs = {};
@@ -9712,16 +9785,31 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
       const importedHoldings = Array.isArray(data.holdings) ? data.holdings : [];
       const importedTrades = Array.isArray(data.trades) ? data.trades : [];
       const holdingCount = importedHoldings.filter((h) => holdingShares(h, importedTrades) > 0).length;
-      const baseMsg = `\u6A94\u6848\u542B ${data.transactions.length} \u7B46\u7D00\u9304${holdingCount > 0 ? ` (\u6301\u80A1 ${holdingCount} \u6A94)` : ""}\u3001${(data.accounts || []).length} \u500B\u5E33\u6236`;
-      const prefMsg = hasPrefs ? "\n\n\u6703\u4E00\u4F75\u9084\u539F\u504F\u597D\u8A2D\u5B9A(\u4E3B\u984C\u3001\u6392\u5E8F\u3001\u9810\u8A2D\u624B\u7E8C\u8CBB\u5206\u985E\u7B49)" : "";
+      const txnCount = (data.transactions || []).length;
+      const acctCount = (data.accounts || []).length;
       setShowPasteImport(false);
       setPasteImportText("");
+      const items = [
+        { text: `\u4EA4\u6613\u7D00\u9304 ${txnCount} \u7B46`, card: true },
+        { text: `\u5E33\u6236 ${acctCount} \u500B`, card: true }
+      ];
+      if (holdingCount > 0) {
+        items.push({ text: `\u6301\u80A1 ${holdingCount} \u6A94`, card: true });
+      }
+      if (hasPrefs) {
+        items.push("\u4E00\u4F75\u9084\u539F \u504F\u597D\u8A2D\u5B9A (\u4E3B\u984C\u3001\u6392\u5E8F\u3001\u9810\u8A2D\u624B\u7E8C\u8CBB\u5206\u985E\u7B49)");
+      }
+      items.push("\u532F\u5165\u5F8C\u6703 \u5B8C\u5168\u8986\u84CB \u76EE\u524D\u7684\u8CC7\u6599");
+      items.push("\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F");
       setConfirmDialog({
         title: "\u532F\u5165\u5099\u4EFD",
-        message: `${baseMsg}${prefMsg}
-
-\u532F\u5165\u5F8C\u6703\u300C\u8986\u84CB\u300D\u76EE\u524D\u7684\u8CC7\u6599,\u7121\u6CD5\u9084\u539F
-\u78BA\u5B9A\u7E7C\u7E8C\u55CE?`,
+        messageList: {
+          styled: true,
+          before: "\u5373\u5C07\u532F\u5165\u4EE5\u4E0B\u5167\u5BB9:",
+          items
+        },
+        highlightWords: ["\u5B8C\u5168\u8986\u84CB"],
+        highlightWordsSafe: ["\u504F\u597D\u8A2D\u5B9A"],
         confirmText: "\u532F\u5165",
         danger: true,
         onConfirm: () => {
