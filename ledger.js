@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520DL";
+const APP_VERSION = "1150520DN";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -17983,6 +17983,12 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
       if (blockKey === "holdings" && account.type === "invest" && (account.investSubType || "stock") === "stock") {
         const myHoldings = state.holdings.filter((h) => h.accountId === account.id);
         const activeHoldings = myHoldings.filter((h) => holdingShares(h, state.trades) > 0);
+        const myMarketId = account.stockMarketId || DEFAULT_STOCK_MARKET_ID;
+        const sameMarketAccountIds = new Set(
+          state.accounts.filter((a) => a.type === "invest" && (a.investSubType || "stock") === "stock" && (a.stockMarketId || DEFAULT_STOCK_MARKET_ID) === myMarketId).map((a) => a.id)
+        );
+        const marketTotalCost = state.holdings.filter((h) => sameMarketAccountIds.has(h.accountId) && holdingShares(h, state.trades) > 0).reduce((sum, h) => sum + holdingCost(h, state.trades), 0);
+        const marketLabel = (state.stockMarkets || DEFAULT_STOCK_MARKETS).find((m) => m.id === myMarketId)?.label || "\u672C\u5E02\u5834";
         return /* @__PURE__ */ React.createElement(Block, { key: "holdings", ...blockProps }, /* @__PURE__ */ React.createElement("div", { style: {
           fontSize: 13,
           color: "var(--text-dim)",
@@ -18065,7 +18071,28 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
               fontSize: 12,
               color: "var(--mint-text)",
               fontWeight: 600
-            } }, "\u9EDE\u6B64\u8A2D\u5B9A\u5E02\u503C"))
+            } }, "\u9EDE\u6B64\u8A2D\u5B9A\u5E02\u503C"), marketTotalCost > 0 && cost > 0 && (() => {
+              const sharePct = cost / marketTotalCost * 100;
+              return /* @__PURE__ */ React.createElement("div", { style: {
+                marginTop: 6,
+                paddingTop: 6,
+                borderTop: "1px dashed var(--border)",
+                display: "flex",
+                alignItems: "baseline",
+                justifyContent: "flex-end",
+                gap: 4,
+                fontFamily: "var(--num-font)"
+              } }, /* @__PURE__ */ React.createElement("span", { style: {
+                fontSize: 10,
+                color: "var(--text-faint)",
+                fontFamily: "inherit"
+              } }, "\u4F54", marketLabel, "\u6210\u672C"), /* @__PURE__ */ React.createElement("span", { style: {
+                fontSize: 15,
+                fontWeight: 800,
+                color: "var(--text-dim)",
+                letterSpacing: 0.3
+              } }, sharePct.toFixed(1), "%"));
+            })())
           );
         })), /* @__PURE__ */ React.createElement(
           "button",
