@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520CU";
+const APP_VERSION = "1150520CX";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -1524,7 +1524,7 @@ function App() {
   });
   const [blockOrder, setBlockOrder] = useState(() => {
     const defaults = {
-      home: ["summary", "dateStrip", "actions", "periods", "recent"],
+      home: ["summary", "dateStrip", "actions", "investQuick", "periods", "recent"],
       txn: ["summary", "period", "list"],
       stats: ["summary", "period", "chart", "compare", "top5", "transfer"],
       settings: ["dataStat", "appearance", "backup-local", "account", "backup-ext", "cleanup", "danger"],
@@ -2849,6 +2849,7 @@ function App() {
         onOpenAccount: () => setSheet("accounts"),
         onOpenDate: (date) => setDetailDate(date),
         onOpenLend: (lendOut) => setLendDetail(lendOut),
+        onOpenInvestPicker: () => setShowStockEntryPicker(true),
         editMode,
         setEditMode,
         blockOrder: blockOrder.home,
@@ -6849,7 +6850,7 @@ function AccountPickerSheet({ state, currentId, excludeIds, onPick, onClose, tit
     })))
   );
 }
-function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, selectedDate, setSelectedDate, onAdd, onClickTxn, onViewAll, onOpenPeriod, onOpenAccount, onOpenDate, onOpenLend, editMode, setEditMode, blockOrder, moveBlock, setPageOrder, setConfirmDialog, toastRich, toast, onSelectModeChange }) {
+function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, selectedDate, setSelectedDate, onAdd, onClickTxn, onViewAll, onOpenPeriod, onOpenAccount, onOpenDate, onOpenLend, onOpenInvestPicker, editMode, setEditMode, blockOrder, moveBlock, setPageOrder, setConfirmDialog, toastRich, toast, onSelectModeChange }) {
   const [recentFilter, setRecentFilter] = useState(() => {
     try {
       return localStorage.getItem("ledger_recent_filter") || "all";
@@ -7123,6 +7124,65 @@ function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, sel
     }
     if (blockKey === "actions") {
       return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: "\u5FEB\u901F\u52D5\u4F5C" }, /* @__PURE__ */ React.createElement("div", { style: styles.addRow }, /* @__PURE__ */ React.createElement("button", { style: styles.recordBtn, onClick: () => !editMode && onAdd("expense") }, /* @__PURE__ */ React.createElement("span", { style: styles.recordBtnIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cash", size: 20, color: "#1a1a1a" })), /* @__PURE__ */ React.createElement("span", null, "\u8A18\u4E00\u7B46")), /* @__PURE__ */ React.createElement("button", { style: styles.addAcctBtn, onClick: () => !editMode && onOpenAccount() }, /* @__PURE__ */ React.createElement("span", { style: styles.recordBtnIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "bank", size: 18, color: "var(--text-dim)" })), /* @__PURE__ */ React.createElement("span", null, "\u5E33\u6236"))));
+    }
+    if (blockKey === "investQuick") {
+      const investAccounts = state.accounts.filter(
+        (a) => a.type === "invest" && !a.isSystem && (a.investSubType || "stock") === "stock"
+      );
+      if (investAccounts.length === 0) return null;
+      let totalMarket = 0;
+      let totalCost = 0;
+      investAccounts.forEach((a) => {
+        const s = investAccountSummary(a, state.holdings, state.trades);
+        if (s) {
+          totalMarket += s.totalMarket || 0;
+          totalCost += s.totalCost || 0;
+        }
+      });
+      const totalPnl = totalMarket - totalCost;
+      const pnlPct = totalCost > 0 ? totalPnl / totalCost * 100 : 0;
+      const pnlColor = totalPnl >= 0 ? "var(--mint-text)" : "var(--pink-text)";
+      const hasMarket = totalMarket > 0 || totalCost > 0;
+      return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: "\u6295\u8CC7\u5FEB\u6377" }, /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          onClick: () => !editMode && onOpenInvestPicker && onOpenInvestPicker(),
+          style: {
+            background: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            borderRadius: 14,
+            padding: "14px 16px",
+            cursor: editMode ? "default" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            minHeight: 60,
+            boxSizing: "border-box"
+          }
+        },
+        /* @__PURE__ */ React.createElement("div", { style: {
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          background: "#9ae0d4",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0
+        } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "chart", size: 18, color: "#fff" })),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: "var(--text)" } }, hasMarket ? "\u7E3D\u5E02\u503C" : "\u6295\u8CC7\u5E33\u6236", /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, fontSize: 11, color: "var(--text-faint)", fontWeight: 400 } }, investAccounts.length, " \u500B\u5E33\u6236")), hasMarket ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 8, marginTop: 2 } }, /* @__PURE__ */ React.createElement("span", { style: {
+          fontSize: 17,
+          fontWeight: 700,
+          color: "var(--text)",
+          fontFamily: "var(--num-font)"
+        } }, fmt(totalMarket)), totalCost > 0 && /* @__PURE__ */ React.createElement("span", { style: {
+          fontSize: 12,
+          color: pnlColor,
+          fontWeight: 600,
+          fontFamily: "var(--num-font)"
+        } }, totalPnl >= 0 ? "+" : "", pnlPct.toFixed(2), "%")) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginTop: 2 } }, "\u9EDE\u6B64\u9032\u5165\u6295\u8CC7\u7BA1\u7406")),
+        /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 18, flexShrink: 0 } }, "\u203A")
+      ));
     }
     if (blockKey === "lendReminder") {
       const lendOuts = state.transactions.filter((t) => t.transferRole === "lend_out" && (t.lendMeta?.status === "pending" || t.lendMeta?.status === "partial")).sort((a, b) => {
@@ -18330,6 +18390,32 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
           });
         }
       });
+      if (groups.length > 0 && ungroupedAccounts.length > 0) {
+        rendered.push(
+          /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              key: "ungrouped-divider",
+              style: {
+                margin: "14px 6px 10px",
+                borderTop: "1px dashed var(--border)",
+                position: "relative",
+                display: "flex",
+                justifyContent: "center"
+              }
+            },
+            /* @__PURE__ */ React.createElement("span", { style: {
+              position: "absolute",
+              top: -8,
+              background: "var(--bg)",
+              padding: "0 10px",
+              fontSize: 11,
+              color: "var(--text-faint)",
+              letterSpacing: 0.5
+            } }, "\u672A\u5206\u985E")
+          )
+        );
+      }
       ungroupedAccounts.forEach((a) => {
         if (renderedAcctIds.has(a.id)) return;
         renderedAcctIds.add(a.id);
