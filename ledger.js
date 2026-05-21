@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520DH";
+const APP_VERSION = "1150520DI";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -15293,10 +15293,8 @@ function PeriodDetailSheet({ state, setState, catIcon, periodKey, onClose, onCli
             counted += shown.length;
           }
           return visibleGroups.map(({ date, items }) => {
-            const dInc = items.filter((t) => isRealFlow(t) && t.type === "income").reduce((s, t) => s + t.amount, 0);
-            const dExp = items.filter((t) => isRealFlow(t) && t.type === "expense").reduce((s, t) => s + t.amount, 0);
             const wd = ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"][new Date(date).getDay()];
-            return /* @__PURE__ */ React.createElement(React.Fragment, { key: date }, /* @__PURE__ */ React.createElement("div", { style: styles.groupDate }, /* @__PURE__ */ React.createElement("span", null, date.replace(/-/g, "/"), " \xB7 \u9031", wd), /* @__PURE__ */ React.createElement("span", { style: styles.groupDateAmt }, dInc > 0 && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)" } }, "+", fmt(dInc), " "), dExp > 0 && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)" } }, "-", fmt(dExp)))), items.map((t) => /* @__PURE__ */ React.createElement(
+            return /* @__PURE__ */ React.createElement(React.Fragment, { key: date }, /* @__PURE__ */ React.createElement("div", { style: styles.groupDate }, /* @__PURE__ */ React.createElement("span", null, date.replace(/-/g, "/"), " \xB7 \u9031", wd)), items.map((t) => /* @__PURE__ */ React.createElement(
               TxnRow,
               {
                 key: t.id,
