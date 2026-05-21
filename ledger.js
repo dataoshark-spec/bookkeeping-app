@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520CQ";
+const APP_VERSION = "1150520CT";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -1488,6 +1488,7 @@ function App() {
   const [buyHoldingSheet, setBuyHoldingSheet] = useState(null);
   const [sellHoldingSheet, setSellHoldingSheet] = useState(null);
   const [marketValueDialog, setMarketValueDialog] = useState(null);
+  const [investNoteSheet, setInvestNoteSheet] = useState(null);
   const [highlightedTxnInfo, setHighlightedTxnInfo] = useState(null);
   const highlightTokenRef = React.useRef(0);
   const [editHoldingDialog, setEditHoldingDialog] = useState(null);
@@ -3053,7 +3054,8 @@ function App() {
       onBuyHolding: (acct, prefillSymbol) => setBuyHoldingSheet({ account: acct, prefillSymbol }),
       onSellHolding: (holding) => setSellHoldingSheet({ holding }),
       onUpdateMarketValue: (holding) => setMarketValueDialog({ holding }),
-      onOpenHolding: (holding) => setHoldingDetailSheet({ holding })
+      onOpenHolding: (holding) => setHoldingDetailSheet({ holding }),
+      onEditInvestNote: (acct) => setInvestNoteSheet({ account: acct })
     }
   ), sellSheet && /* @__PURE__ */ React.createElement(
     SellSheet,
@@ -3203,6 +3205,24 @@ function App() {
       setConfirmDialog,
       onEditHolding: (holding, field) => setEditHoldingDialog({ holding, field }),
       onEditTrade: (trade, holding) => setEditBuyTradeDialog({ trade, holding })
+    }
+  ), investNoteSheet && /* @__PURE__ */ React.createElement(
+    InvestNoteSheet,
+    {
+      state,
+      account: state.accounts.find((a) => a.id === investNoteSheet.account.id) || investNoteSheet.account,
+      onClose: () => setInvestNoteSheet(null),
+      onSave: (accountId, content) => {
+        setState((s) => ({
+          ...s,
+          accounts: s.accounts.map(
+            (a) => a.id === accountId ? { ...a, investNote: content } : a
+          )
+        }));
+      },
+      toast,
+      toastRich,
+      setConfirmDialog
     }
   ), marketValueDialog && (() => {
     const h = marketValueDialog.holding;
@@ -16824,7 +16844,161 @@ function StockMarketManageSheet({ state, setState, toast, toastRich, onClose, se
     )))
   );
 }
-function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSell, onBuyHolding, onSellHolding, onUpdateMarketValue, onOpenHolding }) {
+function InvestNoteSheet({ state, account, onClose, onSave, toast, toastRich, setConfirmDialog }) {
+  const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
+  const [content, setContent] = useState(account.investNote || "");
+  const originalContent = account.investNote || "";
+  const dirty = content !== originalContent;
+  const save = () => {
+    if (onSave) onSave(account.id, content);
+    if (toastRich) {
+      toastRich({
+        title: content.trim() ? "\u5DF2\u5132\u5B58\u5099\u8A3B" : "\u5DF2\u6E05\u7A7A\u5099\u8A3B",
+        amount: "\u2713",
+        amountColor: "var(--mint-text)"
+      }, 1200);
+    } else if (toast) {
+      toast("\u5DF2\u5132\u5B58");
+    }
+    onClose();
+  };
+  const cancel = () => {
+    if (!dirty) {
+      onClose();
+      return;
+    }
+    if (setConfirmDialog) {
+      setConfirmDialog({
+        title: "\u653E\u68C4\u8B8A\u66F4",
+        messageList: {
+          styled: true,
+          items: ["\u672A\u5132\u5B58\u7684\u5167\u5BB9\u6703 \u5168\u90E8\u6D88\u5931 ", "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F"]
+        },
+        highlightWords: ["\u5168\u90E8\u6D88\u5931"],
+        confirmText: "\u653E\u68C4",
+        danger: true,
+        onConfirm: onClose
+      });
+    } else {
+      onClose();
+    }
+  };
+  const clearAll = () => {
+    if (!content.trim()) return;
+    if (setConfirmDialog) {
+      setConfirmDialog({
+        title: "\u6E05\u7A7A\u5099\u8A3B",
+        messageList: {
+          styled: true,
+          items: ["\u5099\u8A3B\u5167\u5BB9\u6703 \u5168\u90E8\u6D88\u5931 \n\u82E5\u8981\u4FDD\u7559\u8ACB\u6309\u53D6\u6D88", "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F"]
+        },
+        highlightWords: ["\u5168\u90E8\u6D88\u5931"],
+        confirmText: "\u6E05\u7A7A",
+        danger: true,
+        onConfirm: () => setContent("")
+      });
+    } else {
+      setContent("");
+    }
+  };
+  const charCount = content.length;
+  const lineCount = content === "" ? 0 : content.split("\n").length;
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      "data-sheet": "true",
+      style: {
+        ...styles.sheet,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      ref: swipe.ref
+    },
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: { width: 50 } }), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, "\u5099\u8A3B"), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 50, display: "flex", justifyContent: "flex-end" } }, content.trim() && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: clearAll,
+        style: {
+          background: "transparent",
+          border: "none",
+          color: "var(--text-faint)",
+          fontSize: 12,
+          cursor: "pointer",
+          padding: "4px 8px"
+        },
+        "aria-label": "\u6E05\u7A7A"
+      },
+      "\u6E05\u7A7A"
+    ))),
+    /* @__PURE__ */ React.createElement("div", { style: { ...styles.sheetScroll, paddingTop: 0 } }, /* @__PURE__ */ React.createElement("div", { style: {
+      background: "var(--bg-card)",
+      border: "1px solid var(--border)",
+      borderRadius: 14,
+      padding: "14px 16px",
+      marginBottom: 10,
+      display: "flex",
+      flexDirection: "column"
+    } }, /* @__PURE__ */ React.createElement("div", { style: {
+      paddingBottom: 10,
+      borderBottom: "1px solid var(--border-soft)",
+      marginBottom: 10
+    } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginBottom: 4 } }, "\u5E33\u6236"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "var(--text)", fontWeight: 500 } }, account.name)), /* @__PURE__ */ React.createElement(
+      "textarea",
+      {
+        value: content,
+        onChange: (e) => setContent(e.target.value),
+        placeholder: "\u5728\u9019\u88E1\u5BEB\u4E0B\u4F60\u60F3\u8A18\u7684\u4E8B...",
+        style: {
+          width: "100%",
+          minHeight: "50vh",
+          padding: 0,
+          border: "none",
+          background: "transparent",
+          color: "var(--text)",
+          fontSize: 14,
+          lineHeight: 1.7,
+          resize: "none",
+          boxSizing: "border-box",
+          fontFamily: "inherit",
+          outline: "none"
+        },
+        autoFocus: !content
+      }
+    ), /* @__PURE__ */ React.createElement("div", { style: {
+      marginTop: 10,
+      paddingTop: 10,
+      borderTop: "1px solid var(--border-soft)",
+      fontSize: 11,
+      color: "var(--text-faint)",
+      display: "flex",
+      justifyContent: "space-between"
+    } }, /* @__PURE__ */ React.createElement("span", null, lineCount, " \u884C   ", charCount, " \u5B57"), dirty && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--accent-text)" } }, "\u6709\u672A\u5132\u5B58\u7684\u8B8A\u66F4"))), /* @__PURE__ */ React.createElement("div", { style: {
+      padding: "10px 14px",
+      background: "var(--bg-card)",
+      border: "1px solid var(--border-soft)",
+      borderRadius: 12,
+      fontSize: 11,
+      color: "var(--text-faint)",
+      lineHeight: 1.6
+    } }, "\u6B64\u5099\u8A3B\u6703\u8DDF\u8457\u5E33\u6236\u8CC7\u6599\u4E00\u8D77 \u532F\u51FA / \u96F2\u7AEF\u5099\u4EFD / \u5FEB\u7167\u3002")),
+    /* @__PURE__ */ React.createElement("div", { style: styles.stickyFooterBar }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: { ...styles.saveBtn, background: "var(--mint)", color: "var(--on-mint)", marginTop: 0 },
+        onClick: save
+      },
+      "\u5132\u5B58"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: { ...styles.deleteBtn, marginTop: 8, background: "transparent", border: "1px solid var(--border)", color: "var(--text-dim)" },
+        onClick: cancel
+      },
+      "\u53D6\u6D88"
+    ))
+  );
+}
+function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSell, onBuyHolding, onSellHolding, onUpdateMarketValue, onOpenHolding, onEditInvestNote }) {
   const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
   const [currentMonth, setCurrentMonth] = useState(todayStr().slice(0, 7));
   const [showFilter, setShowFilter] = useState(false);
@@ -16985,8 +17159,41 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
             border: "1px solid var(--border)",
             borderRadius: 16,
             padding: "20px 18px 18px",
-            textAlign: "center"
-          } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", letterSpacing: 1, marginBottom: 6 } }, "\u7E3D\u5E02\u503C"), /* @__PURE__ */ React.createElement("div", { style: {
+            textAlign: "center",
+            position: "relative"
+          } }, /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              onClick: (e) => {
+                e.stopPropagation();
+                if (onEditInvestNote) onEditInvestNote(account);
+              },
+              style: {
+                position: "absolute",
+                top: 12,
+                right: 12,
+                width: 32,
+                height: 32,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 8,
+                cursor: "pointer",
+                color: account.investNote && account.investNote.trim() ? "var(--mint-text)" : "var(--text-faint)"
+              },
+              "aria-label": "\u7DE8\u8F2F\u5099\u8A3B"
+            },
+            /* @__PURE__ */ React.createElement(TypeIcon, { name: "note", size: 18, color: "currentColor" }),
+            account.investNote && account.investNote.trim() && /* @__PURE__ */ React.createElement("span", { style: {
+              position: "absolute",
+              top: 6,
+              right: 6,
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: "var(--mint)"
+            } })
+          ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", letterSpacing: 1, marginBottom: 6 } }, "\u7E3D\u5E02\u503C"), /* @__PURE__ */ React.createElement("div", { style: {
             fontSize: 34,
             fontWeight: 800,
             letterSpacing: 0.5,
