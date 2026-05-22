@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520EA";
+const APP_VERSION = "1150520EB";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -366,6 +366,65 @@ const DEFAULT_STOCK_MARKETS = [
   { id: "sm_us", label: "\u7F8E\u80A1" }
 ];
 const DEFAULT_STOCK_MARKET_ID = "sm_tw";
+const EXPORTABLE_PREF_KEYS_MODULE = [
+  "ledger_theme_v1",
+  "ledger_note_color_v1",
+  "ledger_note_pref_v1",
+  "ledger_block_order_v12",
+  "ledger_block_order_v13",
+  "ledger_block_order_v14",
+  "ledger_block_order_v15",
+  "ledger_account_order",
+  "ledger_period_order",
+  "ledger_day_order",
+  "ledger_thirdparty_order",
+  "ledger_invest_account_order",
+  "ledger_dp_selected",
+  "ledger_dp_weekend",
+  "ledger_list_sort_v1",
+  "ledger_recent_filter",
+  "ledger_num_font_v1",
+  "ledger_fee_cat",
+  "ledger_fee_sub",
+  "ledger_fee_sub_expense",
+  "ledger_fee_sub_income",
+  "ledger_last_acct_expense",
+  "ledger_last_acct_income",
+  "ledger_last_acct_transfer_from",
+  "ledger_last_acct_transfer_to",
+  "ledger_default_buy_account_v1",
+  "ledger_default_sell_account_v1",
+  "ledger_backup_reminder_days",
+  "ledger_drive_folder",
+  "ledger_hidden_blocks_v1"
+];
+const collectPreferencesModule = () => {
+  const prefs = {};
+  EXPORTABLE_PREF_KEYS_MODULE.forEach((k) => {
+    try {
+      const v = localStorage.getItem(k);
+      if (v !== null) prefs[k] = v;
+    } catch {
+    }
+  });
+  return prefs;
+};
+const buildExportPayloadModule = (state) => JSON.stringify({
+  transactions: state.transactions,
+  accounts: state.accounts,
+  categories: state.categories,
+  accountTypes: state.accountTypes,
+  holdings: state.holdings,
+  trades: state.trades,
+  stockMarkets: state.stockMarkets,
+  defaultStockMarketId: state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID,
+  accountGroups: state.accountGroups || [],
+  stockSubTags: state.stockSubTags || [],
+  stockSubTagGroups: state.stockSubTagGroups || [],
+  preferences: collectPreferencesModule(),
+  exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+  exportVersion: 3
+}, null, 2);
 const TYPE_ICONS = [
   "cash",
   "bank",
@@ -1345,7 +1404,7 @@ function App() {
     broadcastDriveStatus("syncing");
     const tryBackup = async () => {
       const token = await GDrive.ensureToken();
-      const payload = buildExportPayload();
+      const payload = buildExportPayloadModule(state);
       await GDrive.uploadBackup(token, payload);
       await GDrive.pruneOldBackups(token);
     };
@@ -10790,7 +10849,7 @@ function SettingsPage({
       }
     });
   };
-  const buildExportPayload2 = () => JSON.stringify({
+  const buildExportPayload = () => JSON.stringify({
     transactions: state.transactions,
     accounts: state.accounts,
     categories: state.categories,
@@ -10960,7 +11019,7 @@ function SettingsPage({
     if (!silent) toast("\u958B\u59CB\u5099\u4EFD\u22EF");
     try {
       const token = await GDrive.ensureToken();
-      const payload = buildExportPayload2();
+      const payload = buildExportPayload();
       await GDrive.uploadBackup(token, payload);
       await GDrive.pruneOldBackups(token);
       const now = Date.now();
@@ -11319,7 +11378,7 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
     return () => clearTimeout(timer);
   }, [driveLinked, driveAuto, driveLastSync, driveRemindMode]);
   const doExport = () => {
-    const data = buildExportPayload2();
+    const data = buildExportPayload();
     try {
       const blob = new Blob([data], { type: "application/json" });
       const url = URL.createObjectURL(blob);
@@ -11359,7 +11418,7 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
   };
   const [exportTextDialog, setExportTextDialog] = useState(null);
   const doCopyJSON = () => {
-    const data = buildExportPayload2();
+    const data = buildExportPayload();
     setExportTextDialog(data);
   };
   const fileInputRef = React.useRef(null);
