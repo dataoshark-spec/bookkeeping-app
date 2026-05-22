@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520DZ";
+const APP_VERSION = "1150520EA";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -10849,6 +10849,16 @@ function SettingsPage({
     }
   }, [driveLastSync]);
   useEffect(() => {
+    const onStatus = (status) => {
+      if (status === "pending") setDrivePending(true);
+      else if (status === "idle") setDrivePending(false);
+    };
+    driveStatusListeners.add(onStatus);
+    return () => {
+      driveStatusListeners.delete(onStatus);
+    };
+  }, []);
+  useEffect(() => {
     driveLastSyncListeners.add(setDriveLastSync);
     return () => {
       driveLastSyncListeners.delete(setDriveLastSync);
@@ -11593,7 +11603,7 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
         /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u9023\u7D50 Google Drive"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, "\u5099\u4EFD\u8CC7\u6599\u5230\u96F2\u7AEF,\u63DB\u624B\u6A5F / \u6E05\u9664\u700F\u89BD\u5668\u4E5F\u4E0D\u6015\u907A\u5931")),
         driveSyncing ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)" } }, "\u9023\u7D50\u4E2D\u2026") : /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
       ) : /* @__PURE__ */ React.createElement(React.Fragment, null, (() => {
-        const stuck = drivePending && (driveLastSync === 0 || Date.now() - driveLastSync > 24 * 60 * 60 * 1e3);
+        const stuck = drivePending;
         return /* @__PURE__ */ React.createElement("div", { style: {
           padding: "12px 14px",
           background: stuck ? "rgba(217, 104, 119, 0.08)" : "var(--bg-card)",
