@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520DX";
+const APP_VERSION = "1150520DY";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -3232,19 +3232,29 @@ function App() {
           style: { ...styles.navItem, color },
           onClick: () => setPage(p.k)
         },
-        /* @__PURE__ */ React.createElement("div", { style: { ...styles.navIcon, position: "relative" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: p.icon, size: 22, color }), showStatusDot && dotColor && /* @__PURE__ */ React.createElement("span", { style: {
+        /* @__PURE__ */ React.createElement("div", { style: {
+          ...styles.navIcon,
+          position: "relative",
+          width: 22,
+          height: 22,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center"
+        } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: p.icon, size: 22, color }), showStatusDot && dotColor && /* @__PURE__ */ React.createElement("span", { style: {
           position: "absolute",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          pointerEvents: "none"
+        } }, /* @__PURE__ */ React.createElement("span", { style: {
           width: 8,
           height: 8,
           borderRadius: "50%",
           background: dotColor,
           boxShadow: `0 0 0 1.5px var(--bg), 0 0 4px ${dotColor}`,
-          animation: dotBlink ? "ledgerStatusBlink 1s ease-in-out infinite" : void 0,
-          pointerEvents: "none"
-        } })),
+          animation: dotBlink ? "ledgerStatusBlink 1s ease-in-out infinite" : void 0
+        } }))),
         /* @__PURE__ */ React.createElement("div", null, p.label)
       );
     })
@@ -21043,8 +21053,8 @@ function Style({ theme = "dark", numFont = DEFAULT_NUM_FONT }) {
         80%, 100% { opacity: 0.2; }
       }
       @keyframes ledgerStatusBlink {
-        0%, 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-        50% { opacity: 0.35; transform: translate(-50%, -50%) scale(0.7); }
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.35; transform: scale(0.7); }
       }
       @keyframes toastSlideIn {
         from { opacity: 0; transform: translate(-50%, -50%) scale(0.92); }
