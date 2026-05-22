@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520EE";
+const APP_VERSION = "1150520EG";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -1639,6 +1639,16 @@ function App() {
         newHoldings = newHoldingsFiltered;
         migrated = true;
       }
+      const dedupSeenIds = /* @__PURE__ */ new Set();
+      const newHoldingsDedup = newHoldings.filter((h) => {
+        if (dedupSeenIds.has(h.id)) return false;
+        dedupSeenIds.add(h.id);
+        return true;
+      });
+      if (newHoldingsDedup.length !== newHoldings.length) {
+        newHoldings = newHoldingsDedup;
+        migrated = true;
+      }
       if (!migrated) return s;
       return { ...s, accounts: newAccounts, transactions: newTxns2, trades: newTrades, holdings: newHoldings };
     });
@@ -2780,9 +2790,15 @@ function App() {
   const setHoldingsOrder = (accountId, newOrderIds) => {
     setState((s) => {
       const map = new Map(s.holdings.map((h) => [h.id, h]));
-      const reordered = newOrderIds.map((id) => map.get(id)).filter(Boolean);
-      const seen = new Set(newOrderIds);
-      const others = s.holdings.filter((h) => !seen.has(h.id));
+      const seen = /* @__PURE__ */ new Set();
+      const dedupIds = newOrderIds.filter((id) => {
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+      const reordered = dedupIds.map((id) => map.get(id)).filter(Boolean);
+      const reorderedSet = new Set(dedupIds);
+      const others = s.holdings.filter((h) => !reorderedSet.has(h.id));
       return { ...s, holdings: [...reordered, ...others] };
     });
   };
@@ -18970,6 +18986,7 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
   };
   const [editMode, setEditMode] = useState(false);
   const [holdingsSortMode, setHoldingsSortMode] = useState(false);
+  const [holdingsRenderEpoch, setHoldingsRenderEpoch] = useState(0);
   React.useEffect(() => {
     if (editMode && holdingsSortMode) setHoldingsSortMode(false);
   }, [editMode]);
@@ -19072,6 +19089,8 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
         top: ${rect.top}px;
         left: ${rect.left}px;
         width: ${rect.width}px;
+        height: ${rect.height}px;
+        box-sizing: border-box;
         z-index: 9998;
         opacity: 0.55;
         transform: scale(1.03) rotate(-0.5deg);
@@ -19146,17 +19165,21 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
           return;
         }
         const newOrder = [];
+        const seen = /* @__PURE__ */ new Set();
+        const pushId = (id) => {
+          if (!id || seen.has(id)) return;
+          seen.add(id);
+          newOrder.push(id);
+        };
         const draggedId = draggedEl.getAttribute("data-drag-id");
         Array.from(container.children).forEach((el) => {
           if (el.getAttribute && el.getAttribute("data-placeholder-for")) {
-            newOrder.push(el.getAttribute("data-placeholder-for"));
+            pushId(el.getAttribute("data-placeholder-for"));
           } else if (el !== draggedEl && el.getAttribute && el.getAttribute("data-drag-row") === "true") {
-            newOrder.push(el.getAttribute("data-drag-id"));
+            pushId(el.getAttribute("data-drag-id"));
           }
         });
-        if (draggedId && !newOrder.includes(draggedId)) {
-          newOrder.push(draggedId);
-        }
+        pushId(draggedId);
         if (draggedClone) {
           draggedClone.remove();
           draggedClone = null;
@@ -19177,6 +19200,7 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
         draggedEl = null;
         if (navigator.vibrate) navigator.vibrate(15);
         onSetHoldingsOrder(account.id, newOrder);
+        setHoldingsRenderEpoch((n) => n + 1);
       };
       const onDown = (e) => {
         const handle = e.target.closest && e.target.closest('[data-drag-handle="true"]');
@@ -19427,7 +19451,7 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
               return /* @__PURE__ */ React.createElement(
                 "div",
                 {
-                  key: h.id,
+                  key: `${h.id}-${holdingsRenderEpoch}`,
                   "data-drag-row": "true",
                   "data-drag-handle": holdingsSortMode ? "true" : void 0,
                   "data-drag-id": h.id,
