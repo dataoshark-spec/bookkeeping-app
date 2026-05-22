@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520EB";
+const APP_VERSION = "1150520EC";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -5014,6 +5014,7 @@ function Block({ blockKey, title, headerRight, editMode, isFirst, isLast, onMove
     let longPressTimer = null;
     const onTouchStart = (e) => {
       if (e.target.closest("input, select, textarea, button")) return;
+      if (e.target.closest("[data-holdings-drag-container]")) return;
       const t = e.touches[0];
       startX = t.clientX;
       startY = t.clientY;
@@ -5053,6 +5054,7 @@ function Block({ blockKey, title, headerRight, editMode, isFirst, isLast, onMove
     let mouseLongPressTimer = null;
     const onMouseDown = (e) => {
       if (e.target.closest("input, select, textarea, button")) return;
+      if (e.target.closest("[data-holdings-drag-container]")) return;
       startX = e.clientX;
       startY = e.clientY;
       moved = false;
