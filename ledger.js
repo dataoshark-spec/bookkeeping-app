@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520DQ";
+const APP_VERSION = "1150520DR";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -7390,33 +7390,54 @@ function HoldingSubTagPickerSheet({
       draggedGroupId = rowEl.getAttribute("data-drag-group-id") || null;
       if (draggedGroupId === "null") draggedGroupId = null;
       const rect = rowEl.getBoundingClientRect();
+      const computedStyle = window.getComputedStyle(rowEl);
+      const elRadius = computedStyle.borderRadius || "12px";
       offsetX = x - rect.left;
       offsetY = y - rect.top;
       draggedClone = rowEl.cloneNode(true);
       draggedClone.style.cssText = `
         position: fixed;
-        left: ${rect.left}px;
         top: ${rect.top}px;
+        left: ${rect.left}px;
         width: ${rect.width}px;
-        z-index: 9999;
+        z-index: 9998;
+        opacity: 0.55;
+        transform: scale(1.03) rotate(-0.5deg);
+        box-shadow: 0 16px 40px rgba(0,0,0,0.6), 0 0 0 2px rgba(126,224,192,0.4);
         pointer-events: none;
-        opacity: 0.95;
-        box-shadow: 0 18px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(126,224,192,0.4);
-        transform: scale(1.04) rotate(-0.6deg);
-        transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
-        background: var(--bg);
+        margin: 0;
+        border-radius: ${elRadius};
       `;
       document.body.appendChild(draggedClone);
-      const computedMargin = window.getComputedStyle(rowEl);
       placeholder = document.createElement("div");
       placeholder.style.cssText = `
         height: ${rect.height}px;
-        background: rgba(126, 224, 192, 0.15);
-        border: 2px dashed var(--mint);
-        border-radius: 12px;
-        margin-bottom: ${computedMargin.marginBottom};
+        margin: 0 0 ${computedStyle.marginBottom} 0;
+        border-radius: ${elRadius};
+        background: rgba(126, 224, 192, 0.18);
+        border: 2px dashed rgba(126, 224, 192, 0.85);
         box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
       `;
+      const labelEl = document.createElement("div");
+      const sizeCandidates = [18, 15, 13, 11];
+      const minHeightFor = (fs) => fs + 8;
+      const minWidthFor = (fs) => 4 * (fs + 1) + 24;
+      let chosen = null;
+      for (const fs of sizeCandidates) {
+        if (rect.height >= minHeightFor(fs) && rect.width >= minWidthFor(fs)) {
+          chosen = fs;
+          break;
+        }
+      }
+      const showText = chosen !== null;
+      const fontSize = chosen ?? 11;
+      labelEl.style.cssText = `color:var(--mint, #7ee0c0);font-size:${fontSize}px;font-weight:600;letter-spacing:1px;opacity:0.85;pointer-events:none;white-space:nowrap;`;
+      labelEl.textContent = showText ? "\u653E\u5728\u9019\u88E1" : "\u2022 \u2022 \u2022";
+      placeholder.appendChild(labelEl);
       rowEl.parentNode.insertBefore(placeholder, rowEl);
       rowEl.style.display = "none";
       setDraggingId(rowEl.getAttribute("data-drag-id"));
@@ -7640,7 +7661,7 @@ function HoldingSubTagPickerSheet({
           flexShrink: 0,
           touchAction: "none"
         } }, /* @__PURE__ */ React.createElement("svg", { width: "14", height: "18", viewBox: "0 0 14 18", fill: "currentColor" }, /* @__PURE__ */ React.createElement("circle", { cx: "3", cy: "3", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "3", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "3", cy: "9", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "9", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "3", cy: "15", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "15", r: "1.5" }))),
-        /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: "var(--text)", lineHeight: 1.2 } }, tag.name), usedCount > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 3 } }, usedCount, " \u6A94\u6301\u80A1")),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: "var(--text)", lineHeight: 1.2 } }, tag.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 3 } }, usedCount, " \u6A94\u6301\u80A1")),
         /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, flexShrink: 0 } }, /* @__PURE__ */ React.createElement(
           "button",
           {
@@ -7743,7 +7764,7 @@ function HoldingSubTagPickerSheet({
           minHeight: 56
         }
       },
-      /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: "var(--text)", lineHeight: 1.2 } }, tag.name), usedCount > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 3 } }, usedCount, " \u6A94\u6301\u80A1")),
+      /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: "var(--text)", lineHeight: 1.2 } }, tag.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 3 } }, usedCount, " \u6A94\u6301\u80A1")),
       isSelected && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "var(--mint-text)", fontWeight: 700, flexShrink: 0 } }, "\u2713")
     );
   };
@@ -7924,25 +7945,30 @@ function HoldingSubTagPickerSheet({
       },
       mode === "edit" ? "\u5B8C\u6210" : "\u7DE8\u8F2F"
     )),
-    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: { padding: "4px 16px 0", fontSize: 12, color: "var(--text-faint)" } }, mode === "edit" ? "\u9577\u6309\u62D6\u66F3\u624B\u67C4\u53EF\u6392\u5E8F;\u7FA4\u7D44\u53EA\u80FD\u8DDF\u7FA4\u7D44\u6392\u5E8F\u3001\u5206\u985E\u53EA\u80FD\u5728\u540C\u7FA4\u7D44\u5167\u6392\u5E8F;\u8DE8\u7FA4\u7D44\u8ACB\u7528 \u79FB\u52D5 \u6309\u9215\u3002" : `\u7D66 ${holding.symbol} \u5206\u5230\u81EA\u8A02\u7684\u4E3B\u984C\u985E\u5225,\u5982 \u592A\u7A7A / AI / \u6A5F\u5668\u4EBA / \u7F8E\u50B5 \u7B49\u3002`), /* @__PURE__ */ React.createElement("div", { ref: containerRef, style: { padding: 12 } }, mode === "pick" && /* @__PURE__ */ React.createElement(
-      "div",
-      {
-        onClick: () => onPick && onPick(null),
-        style: {
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "14px 16px",
-          borderRadius: 12,
-          background: "var(--bg-card)",
-          border: !currentId ? "2px solid var(--mint)" : "1.5px solid var(--border)",
-          cursor: "pointer",
-          marginBottom: 10
-        }
-      },
-      /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 14, color: "var(--text-dim)" } }, "\u672A\u5206\u985E"),
-      !currentId && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--mint-text)", fontWeight: 700 } }, "\u2713")
-    ), groups.map((g) => renderGroupBlock(g)), groups.length > 0 ? /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: {
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: { padding: "4px 16px 0", fontSize: 12, color: "var(--text-faint)" } }, mode === "edit" ? "\u9577\u6309\u62D6\u66F3\u624B\u67C4\u53EF\u6392\u5E8F;\u7FA4\u7D44\u53EA\u80FD\u8DDF\u7FA4\u7D44\u6392\u5E8F\u3001\u5206\u985E\u53EA\u80FD\u5728\u540C\u7FA4\u7D44\u5167\u6392\u5E8F;\u8DE8\u7FA4\u7D44\u8ACB\u7528 \u79FB\u52D5 \u6309\u9215\u3002" : `\u7D66 ${holding.symbol} \u5206\u5230\u81EA\u8A02\u7684\u4E3B\u984C\u985E\u5225,\u5982 \u592A\u7A7A / AI / \u6A5F\u5668\u4EBA / \u7F8E\u50B5 \u7B49\u3002`), /* @__PURE__ */ React.createElement("div", { ref: containerRef, style: { padding: 12 } }, mode === "pick" && (() => {
+      const noTagCount = state.holdings.filter((h) => !h.subTagId).length;
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          onClick: () => onPick && onPick(null),
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "14px 16px",
+            borderRadius: 12,
+            background: "var(--bg-card)",
+            border: !currentId ? "2px solid var(--mint)" : "1.5px solid var(--border)",
+            cursor: "pointer",
+            marginBottom: 10,
+            minHeight: 56,
+            boxSizing: "border-box"
+          }
+        },
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: "var(--text-dim)", lineHeight: 1.2 } }, "\u672A\u5206\u985E"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 3 } }, noTagCount, " \u6A94\u6301\u80A1")),
+        !currentId && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "var(--mint-text)", fontWeight: 700, flexShrink: 0 } }, "\u2713")
+      );
+    })(), groups.map((g) => renderGroupBlock(g)), groups.length > 0 ? /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: {
       padding: "8px 6px 8px 4px",
       fontSize: 12,
       color: "var(--text-dim)",
@@ -18612,162 +18638,202 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
   };
   React.useEffect(() => {
     if (!editMode || !isInvest || !onSetHoldingsOrder || !account) return;
-    const container = document.querySelector(`[data-holdings-drag-container="${account.id}"]`);
-    if (!container) return;
-    let draggedEl = null;
-    let draggedClone = null;
-    let placeholder = null;
-    let startX = 0, startY = 0;
-    let offsetX = 0, offsetY = 0;
-    let longPressTimer = null;
-    let moved = false;
-    const cleanup = () => {
-      if (draggedClone) {
-        draggedClone.remove();
-        draggedClone = null;
-      }
-      if (placeholder && placeholder.parentNode) {
-        if (draggedEl) {
-          placeholder.parentNode.replaceChild(draggedEl, placeholder);
-          draggedEl.style.removeProperty("display");
-        } else {
-          placeholder.remove();
+    let container = null;
+    let cleanupFn = null;
+    const attach = () => {
+      container = document.querySelector(`[data-holdings-drag-container="${account.id}"]`);
+      if (!container) return false;
+      let draggedEl = null;
+      let draggedClone = null;
+      let placeholder = null;
+      let startX = 0, startY = 0;
+      let offsetX = 0, offsetY = 0;
+      let longPressTimer = null;
+      let moved = false;
+      const cleanup = () => {
+        if (draggedClone) {
+          draggedClone.remove();
+          draggedClone = null;
         }
-        placeholder = null;
-      }
-      draggedEl = null;
-    };
-    const startDrag = (rowEl, x, y) => {
-      draggedEl = rowEl;
-      const rect = rowEl.getBoundingClientRect();
-      offsetX = x - rect.left;
-      offsetY = y - rect.top;
-      draggedClone = rowEl.cloneNode(true);
-      draggedClone.style.cssText = `
+        if (placeholder && placeholder.parentNode) {
+          if (draggedEl) {
+            placeholder.parentNode.replaceChild(draggedEl, placeholder);
+            draggedEl.style.removeProperty("display");
+          } else {
+            placeholder.remove();
+          }
+          placeholder = null;
+        }
+        draggedEl = null;
+      };
+      const startDrag = (rowEl, x, y) => {
+        draggedEl = rowEl;
+        const rect = rowEl.getBoundingClientRect();
+        const computedStyle = window.getComputedStyle(rowEl);
+        const elRadius = computedStyle.borderRadius || "14px";
+        offsetX = x - rect.left;
+        offsetY = y - rect.top;
+        draggedClone = rowEl.cloneNode(true);
+        draggedClone.style.cssText = `
         position: fixed;
-        left: ${rect.left}px;
         top: ${rect.top}px;
+        left: ${rect.left}px;
         width: ${rect.width}px;
-        z-index: 9999;
+        z-index: 9998;
+        opacity: 0.55;
+        transform: scale(1.03) rotate(-0.5deg);
+        box-shadow: 0 16px 40px rgba(0,0,0,0.6), 0 0 0 2px rgba(126,224,192,0.4);
         pointer-events: none;
-        opacity: 0.95;
-        box-shadow: 0 18px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(126,224,192,0.4);
-        transform: scale(1.04) rotate(-0.6deg);
-        transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
-        background: var(--bg);
+        margin: 0;
+        border-radius: ${elRadius};
       `;
-      document.body.appendChild(draggedClone);
-      const computedMargin = window.getComputedStyle(rowEl);
-      placeholder = document.createElement("div");
-      placeholder.style.cssText = `
+        document.body.appendChild(draggedClone);
+        placeholder = document.createElement("div");
+        placeholder.style.cssText = `
         height: ${rect.height}px;
-        background: rgba(126, 224, 192, 0.15);
-        border: 2px dashed var(--mint);
-        border-radius: 14px;
-        margin-bottom: ${computedMargin.marginBottom};
+        margin: 0 0 ${computedStyle.marginBottom} 0;
+        border-radius: ${elRadius};
+        background: rgba(126, 224, 192, 0.18);
+        border: 2px dashed rgba(126, 224, 192, 0.85);
         box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
       `;
-      rowEl.parentNode.insertBefore(placeholder, rowEl);
-      rowEl.style.display = "none";
-      if (navigator.vibrate) navigator.vibrate(20);
-    };
-    const moveDrag = (x, y) => {
-      if (!draggedClone) return;
-      draggedClone.style.left = x - offsetX + "px";
-      draggedClone.style.top = y - offsetY + "px";
-      const elsBelow = document.elementsFromPoint(x, y);
-      const targetRow = elsBelow.find((el) => {
-        if (!el.getAttribute) return false;
-        if (el === draggedClone || el === placeholder || el === draggedEl) return false;
-        if (el.getAttribute("data-drag-row") !== "true") return false;
-        return container.contains(el);
-      });
-      if (!targetRow) return;
-      const tRect = targetRow.getBoundingClientRect();
-      const insertBefore = y < tRect.top + tRect.height / 2;
-      const parent = targetRow.parentNode;
-      if (insertBefore) {
-        if (placeholder.nextSibling !== targetRow) {
-          parent.insertBefore(placeholder, targetRow);
+        const labelEl = document.createElement("div");
+        const sizeCandidates = [18, 15, 13, 11];
+        const minHeightFor = (fs) => fs + 8;
+        const minWidthFor = (fs) => 4 * (fs + 1) + 24;
+        let chosen = null;
+        for (const fs of sizeCandidates) {
+          if (rect.height >= minHeightFor(fs) && rect.width >= minWidthFor(fs)) {
+            chosen = fs;
+            break;
+          }
         }
-      } else {
-        if (targetRow.nextSibling !== placeholder) {
-          parent.insertBefore(placeholder, targetRow.nextSibling);
+        const showText = chosen !== null;
+        const fontSize = chosen ?? 11;
+        labelEl.style.cssText = `color:var(--mint, #7ee0c0);font-size:${fontSize}px;font-weight:600;letter-spacing:1px;opacity:0.85;pointer-events:none;white-space:nowrap;`;
+        labelEl.textContent = showText ? "\u653E\u5728\u9019\u88E1" : "\u2022 \u2022 \u2022";
+        placeholder.appendChild(labelEl);
+        rowEl.parentNode.insertBefore(placeholder, rowEl);
+        rowEl.style.display = "none";
+        if (navigator.vibrate) navigator.vibrate(20);
+      };
+      const moveDrag = (x, y) => {
+        if (!draggedClone) return;
+        draggedClone.style.left = x - offsetX + "px";
+        draggedClone.style.top = y - offsetY + "px";
+        const elsBelow = document.elementsFromPoint(x, y);
+        const targetRow = elsBelow.find((el) => {
+          if (!el.getAttribute) return false;
+          if (el === draggedClone || el === placeholder || el === draggedEl) return false;
+          if (el.getAttribute("data-drag-row") !== "true") return false;
+          return container.contains(el);
+        });
+        if (!targetRow) return;
+        const tRect = targetRow.getBoundingClientRect();
+        const insertBefore = y < tRect.top + tRect.height / 2;
+        const parent = targetRow.parentNode;
+        if (insertBefore) {
+          if (placeholder.nextSibling !== targetRow) {
+            parent.insertBefore(placeholder, targetRow);
+          }
+        } else {
+          if (targetRow.nextSibling !== placeholder) {
+            parent.insertBefore(placeholder, targetRow.nextSibling);
+          }
         }
-      }
-    };
-    const commitDrop = () => {
-      if (!draggedEl || !placeholder) {
-        cleanup();
-        return;
-      }
-      placeholder.parentNode.replaceChild(draggedEl, placeholder);
-      draggedEl.style.removeProperty("display");
-      placeholder = null;
-      const newOrder = [];
-      container.querySelectorAll('[data-drag-row="true"]').forEach((el) => {
-        newOrder.push(el.getAttribute("data-drag-id"));
-      });
-      onSetHoldingsOrder(account.id, newOrder);
-      if (draggedClone) {
-        draggedClone.remove();
-        draggedClone = null;
-      }
-      draggedEl = null;
-      if (navigator.vibrate) navigator.vibrate(15);
-    };
-    const onDown = (e) => {
-      const handle = e.target.closest && e.target.closest('[data-drag-handle="true"]');
-      if (!handle) return;
-      const rowEl = handle.closest('[data-drag-row="true"]');
-      if (!rowEl || !container.contains(rowEl)) return;
-      const touch = e.touches ? e.touches[0] : e;
-      startX = touch.clientX;
-      startY = touch.clientY;
-      moved = false;
-      longPressTimer = setTimeout(() => {
-        if (!moved) startDrag(rowEl, startX, startY);
-      }, 350);
-    };
-    const onMove = (e) => {
-      const touch = e.touches ? e.touches[0] : e;
-      if (longPressTimer && !draggedEl) {
-        const dx = touch.clientX - startX;
-        const dy = touch.clientY - startY;
-        if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
-          moved = true;
+      };
+      const commitDrop = () => {
+        if (!draggedEl || !placeholder) {
+          cleanup();
+          return;
+        }
+        placeholder.parentNode.replaceChild(draggedEl, placeholder);
+        draggedEl.style.removeProperty("display");
+        placeholder = null;
+        const newOrder = [];
+        container.querySelectorAll('[data-drag-row="true"]').forEach((el) => {
+          newOrder.push(el.getAttribute("data-drag-id"));
+        });
+        onSetHoldingsOrder(account.id, newOrder);
+        if (draggedClone) {
+          draggedClone.remove();
+          draggedClone = null;
+        }
+        draggedEl = null;
+        if (navigator.vibrate) navigator.vibrate(15);
+      };
+      const onDown = (e) => {
+        const handle = e.target.closest && e.target.closest('[data-drag-handle="true"]');
+        if (!handle) return;
+        const rowEl = handle.closest('[data-drag-row="true"]');
+        if (!rowEl || !container.contains(rowEl)) return;
+        const touch = e.touches ? e.touches[0] : e;
+        startX = touch.clientX;
+        startY = touch.clientY;
+        moved = false;
+        longPressTimer = setTimeout(() => {
+          if (!moved) startDrag(rowEl, startX, startY);
+        }, 350);
+      };
+      const onMove = (e) => {
+        const touch = e.touches ? e.touches[0] : e;
+        if (longPressTimer && !draggedEl) {
+          const dx = touch.clientX - startX;
+          const dy = touch.clientY - startY;
+          if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+            moved = true;
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+          }
+          return;
+        }
+        if (!draggedEl) return;
+        e.preventDefault();
+        moveDrag(touch.clientX, touch.clientY);
+      };
+      const onUp = () => {
+        if (longPressTimer) {
           clearTimeout(longPressTimer);
           longPressTimer = null;
         }
-        return;
-      }
-      if (!draggedEl) return;
-      e.preventDefault();
-      moveDrag(touch.clientX, touch.clientY);
+        if (draggedEl) commitDrop();
+      };
+      container.addEventListener("touchstart", onDown, { passive: true });
+      container.addEventListener("touchmove", onMove, { passive: false });
+      container.addEventListener("touchend", onUp);
+      container.addEventListener("touchcancel", onUp);
+      container.addEventListener("mousedown", onDown);
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+      cleanupFn = () => {
+        cleanup();
+        container.removeEventListener("touchstart", onDown);
+        container.removeEventListener("touchmove", onMove);
+        container.removeEventListener("touchend", onUp);
+        container.removeEventListener("touchcancel", onUp);
+        container.removeEventListener("mousedown", onDown);
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+      };
+      return true;
     };
-    const onUp = () => {
-      if (longPressTimer) {
-        clearTimeout(longPressTimer);
-        longPressTimer = null;
-      }
-      if (draggedEl) commitDrop();
-    };
-    container.addEventListener("touchstart", onDown, { passive: true });
-    container.addEventListener("touchmove", onMove, { passive: false });
-    container.addEventListener("touchend", onUp);
-    container.addEventListener("touchcancel", onUp);
-    container.addEventListener("mousedown", onDown);
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    if (!attach()) {
+      let tries = 0;
+      const timer = setInterval(() => {
+        tries += 1;
+        if (attach() || tries >= 5) clearInterval(timer);
+      }, 60);
+      return () => {
+        clearInterval(timer);
+        if (cleanupFn) cleanupFn();
+      };
+    }
     return () => {
-      cleanup();
-      container.removeEventListener("touchstart", onDown);
-      container.removeEventListener("touchmove", onMove);
-      container.removeEventListener("touchend", onUp);
-      container.removeEventListener("touchcancel", onUp);
-      container.removeEventListener("mousedown", onDown);
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      if (cleanupFn) cleanupFn();
     };
   }, [editMode, isInvest, account?.id, onSetHoldingsOrder]);
   return /* @__PURE__ */ React.createElement(
@@ -18883,7 +18949,7 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
         );
         const marketTotalCost = state.holdings.filter((h) => sameMarketAccountIds.has(h.accountId) && holdingShares(h, state.trades) > 0).reduce((sum, h) => sum + holdingCost(h, state.trades), 0);
         const marketLabel = (state.stockMarkets || DEFAULT_STOCK_MARKETS).find((m) => m.id === myMarketId)?.label || "\u672C\u5E02\u5834";
-        return /* @__PURE__ */ React.createElement(Block, { key: "holdings", ...blockProps }, /* @__PURE__ */ React.createElement("div", { style: {
+        return /* @__PURE__ */ React.createElement(Block, { key: "holdings", ...blockProps, disableReorder: true }, /* @__PURE__ */ React.createElement("div", { style: {
           fontSize: 13,
           color: "var(--text-dim)",
           fontWeight: 500,
