@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520EG";
+const APP_VERSION = "1150520EH";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -18987,6 +18987,11 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
   const [editMode, setEditMode] = useState(false);
   const [holdingsSortMode, setHoldingsSortMode] = useState(false);
   const [holdingsRenderEpoch, setHoldingsRenderEpoch] = useState(0);
+  const [holdingsDraftOrder, setHoldingsDraftOrder] = useState(null);
+  React.useEffect(() => {
+    setHoldingsSortMode(false);
+    setHoldingsDraftOrder(null);
+  }, [account?.id]);
   React.useEffect(() => {
     if (editMode && holdingsSortMode) setHoldingsSortMode(false);
   }, [editMode]);
@@ -19098,6 +19103,7 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
         pointer-events: none;
         margin: 0;
         border-radius: ${elRadius};
+        overflow: hidden;
       `;
         document.body.appendChild(draggedClone);
         placeholder = document.createElement("div");
@@ -19199,7 +19205,7 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
         }
         draggedEl = null;
         if (navigator.vibrate) navigator.vibrate(15);
-        onSetHoldingsOrder(account.id, newOrder);
+        setHoldingsDraftOrder(newOrder);
         setHoldingsRenderEpoch((n) => n + 1);
       };
       const onDown = (e) => {
@@ -19378,7 +19384,15 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
       }
       if (blockKey === "holdings" && account.type === "invest" && (account.investSubType || "stock") === "stock") {
         const myHoldings = state.holdings.filter((h) => h.accountId === account.id);
-        const activeHoldings = myHoldings.filter((h) => holdingShares(h, state.trades) > 0);
+        const activeHoldingsRaw = myHoldings.filter((h) => holdingShares(h, state.trades) > 0);
+        let activeHoldings = activeHoldingsRaw;
+        if (holdingsSortMode && holdingsDraftOrder && holdingsDraftOrder.length > 0) {
+          const map = new Map(activeHoldingsRaw.map((h) => [h.id, h]));
+          const ordered = holdingsDraftOrder.map((id) => map.get(id)).filter(Boolean);
+          const orderedSet = new Set(holdingsDraftOrder);
+          const rest = activeHoldingsRaw.filter((h) => !orderedSet.has(h.id));
+          activeHoldings = [...ordered, ...rest];
+        }
         const myMarketId = account.stockMarketId || DEFAULT_STOCK_MARKET_ID;
         const sameMarketAccountIds = new Set(
           state.accounts.filter((a) => a.type === "invest" && (a.investSubType || "stock") === "stock" && (a.stockMarketId || DEFAULT_STOCK_MARKET_ID) === myMarketId).map((a) => a.id)
@@ -19411,7 +19425,16 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
             {
               onClick: (e) => {
                 e.stopPropagation();
-                setHoldingsSortMode((v) => !v);
+                if (holdingsSortMode) {
+                  if (holdingsDraftOrder && holdingsDraftOrder.length > 0) {
+                    onSetHoldingsOrder(account.id, holdingsDraftOrder);
+                  }
+                  setHoldingsDraftOrder(null);
+                  setHoldingsSortMode(false);
+                } else {
+                  setHoldingsDraftOrder(activeHoldings.map((h) => h.id));
+                  setHoldingsSortMode(true);
+                }
               },
               onTouchStart: (e) => e.stopPropagation(),
               style: {
