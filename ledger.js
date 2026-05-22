@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520EC";
+const APP_VERSION = "1150520ED";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -18969,6 +18969,10 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
     setShowFilter(false);
   };
   const [editMode, setEditMode] = useState(false);
+  const [holdingsSortMode, setHoldingsSortMode] = useState(false);
+  React.useEffect(() => {
+    if (editMode && holdingsSortMode) setHoldingsSortMode(false);
+  }, [editMode]);
   const [blockOrder, setBlockOrder] = useState(() => {
     const defaults = isInvest ? ["hero", "holdings", "list"] : ["hero", "monthBar", "summary", "list"];
     const blockOrderKey = isInvest ? "ledger_invest_account_order" : "ledger_account_order";
@@ -19022,7 +19026,7 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
     });
   };
   React.useEffect(() => {
-    if (!editMode || !isInvest || !onSetHoldingsOrder || !account) return;
+    if (!holdingsSortMode || !isInvest || !onSetHoldingsOrder || !account) return;
     let container = null;
     let cleanupFn = null;
     const attach = () => {
@@ -19243,7 +19247,7 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
     return () => {
       if (cleanupFn) cleanupFn();
     };
-  }, [editMode, isInvest, account?.id, onSetHoldingsOrder]);
+  }, [holdingsSortMode, isInvest, account?.id, onSetHoldingsOrder]);
   return /* @__PURE__ */ React.createElement(
     "div",
     {
@@ -19357,153 +19361,184 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
         );
         const marketTotalCost = state.holdings.filter((h) => sameMarketAccountIds.has(h.accountId) && holdingShares(h, state.trades) > 0).reduce((sum, h) => sum + holdingCost(h, state.trades), 0);
         const marketLabel = (state.stockMarkets || DEFAULT_STOCK_MARKETS).find((m) => m.id === myMarketId)?.label || "\u672C\u5E02\u5834";
-        return /* @__PURE__ */ React.createElement(Block, { key: "holdings", ...blockProps }, /* @__PURE__ */ React.createElement("div", { style: {
-          fontSize: 13,
-          color: "var(--text-dim)",
-          fontWeight: 500,
-          marginBottom: 8,
-          paddingLeft: 4
-        } }, "\u6301\u80A1"), activeHoldings.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: {
-          padding: "24px 16px",
-          textAlign: "center",
-          color: "var(--text-faint)",
-          fontSize: 13
-        } }, "\u5C1A\u672A\u6301\u6709\u4EFB\u4F55\u80A1\u7968") : /* @__PURE__ */ React.createElement(
-          "div",
+        return /* @__PURE__ */ React.createElement(
+          Block,
           {
-            "data-holdings-drag-container": editMode ? account.id : void 0,
-            style: { display: "flex", flexDirection: "column", gap: 10 }
-          },
-          activeHoldings.map((h) => {
-            const shares = holdingShares(h, state.trades);
-            const cost = holdingCost(h, state.trades);
-            const market = h.marketValue || 0;
-            const pnl = market - cost;
-            const pnlPct = cost > 0 ? pnl / cost * 100 : 0;
-            const avgPrice = shares > 0 ? cost / shares : 0;
-            const hasMarket = market > 0;
-            const pnlColor = pnl >= 0 ? "var(--mint-text)" : "var(--pink-text)";
-            return /* @__PURE__ */ React.createElement(
-              "div",
+            key: "holdings",
+            ...blockProps,
+            disableReorder: holdingsSortMode,
+            headerRight: isInvest && activeHoldings.length >= 2 && !editMode ? /* @__PURE__ */ React.createElement(
+              "button",
               {
-                key: h.id,
-                "data-drag-row": "true",
-                "data-drag-handle": editMode ? "true" : void 0,
-                "data-drag-id": h.id,
-                onClick: () => {
-                  if (!editMode && onOpenHolding) onOpenHolding(h);
+                onClick: (e) => {
+                  e.stopPropagation();
+                  setHoldingsSortMode((v) => !v);
                 },
-                onTouchStart: editMode ? (e) => e.stopPropagation() : void 0,
+                onTouchStart: (e) => e.stopPropagation(),
                 style: {
-                  padding: "14px 16px",
-                  borderRadius: 14,
-                  background: "var(--bg-card)",
-                  border: "1px solid var(--border)",
-                  cursor: editMode ? "grab" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  boxSizing: "border-box",
-                  touchAction: editMode ? "none" : void 0
+                  padding: "6px 14px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  background: holdingsSortMode ? "var(--mint)" : "transparent",
+                  color: holdingsSortMode ? "#0a1410" : "var(--mint-text)",
+                  border: `1.5px solid var(--mint)`,
+                  borderRadius: 999,
+                  cursor: "pointer"
                 }
               },
-              /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: {
-                fontSize: 18,
-                fontWeight: 800,
-                letterSpacing: 0.3,
-                lineHeight: 1.15
-              } }, h.symbol), h.name && /* @__PURE__ */ React.createElement("div", { style: {
-                fontSize: 12,
-                color: "var(--text-dim)",
-                marginTop: 2,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap"
-              } }, h.name), (() => {
-                const tag = h.subTagId ? (state.stockSubTags || []).find((t) => t.id === h.subTagId) : null;
-                if (!tag) return null;
-                return /* @__PURE__ */ React.createElement("div", { style: { marginTop: 4 } }, /* @__PURE__ */ React.createElement("span", { style: {
-                  display: "inline-block",
-                  padding: "2px 8px",
-                  borderRadius: 8,
-                  background: "rgba(126, 224, 192, 0.15)",
-                  color: "var(--mint-text)",
-                  fontSize: 10,
-                  fontWeight: 600,
-                  letterSpacing: 0.2
-                } }, tag.name));
-              })(), /* @__PURE__ */ React.createElement("div", { style: {
-                fontSize: 11,
-                color: "var(--text-faint)",
-                marginTop: 6,
-                fontFamily: "var(--num-font)"
-              } }, shares.toLocaleString(), " \u80A1 \xB7 \u5747\u50F9 ", avgPrice >= 100 ? fmt(Math.round(avgPrice)) : avgPrice.toFixed(2))),
-              /* @__PURE__ */ React.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, hasMarket ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: {
-                fontSize: 17,
-                fontWeight: 700,
-                fontFamily: "var(--num-font)",
-                lineHeight: 1.15
-              } }, fmt(market)), /* @__PURE__ */ React.createElement("div", { style: {
-                marginTop: 4,
-                fontSize: 12,
-                fontWeight: 700,
-                color: pnlColor,
-                fontFamily: "var(--num-font)"
-              } }, pnl >= 0 ? "+" : "", fmt(pnl), " (", pnl >= 0 ? "+" : "", pnlPct.toFixed(2), "%)")) : /* @__PURE__ */ React.createElement("div", { style: {
-                fontSize: 12,
-                color: "var(--mint-text)",
-                fontWeight: 600
-              } }, "\u9EDE\u6B64\u8A2D\u5B9A\u5E02\u503C"), marketTotalCost > 0 && cost > 0 && (() => {
-                const sharePct = cost / marketTotalCost * 100;
-                return /* @__PURE__ */ React.createElement("div", { style: {
-                  marginTop: 8,
-                  paddingTop: 8,
-                  borderTop: "1px dashed var(--border)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "flex-end",
-                  gap: 6,
-                  fontFamily: "var(--num-font)"
-                } }, /* @__PURE__ */ React.createElement("span", { style: {
-                  fontSize: 11,
-                  color: "var(--text-dim)",
-                  fontWeight: 600,
-                  fontFamily: "inherit",
-                  letterSpacing: 0.2
-                } }, "\u4F54", marketLabel, "\u6210\u672C"), /* @__PURE__ */ React.createElement("span", { style: {
-                  fontSize: 13,
-                  fontWeight: 800,
-                  color: "var(--text)",
-                  marginLeft: -2,
-                  marginRight: -2
-                } }, ":"), /* @__PURE__ */ React.createElement("span", { style: {
-                  fontSize: 18,
-                  fontWeight: 900,
-                  color: "var(--text)",
-                  letterSpacing: 0.5
-                } }, sharePct.toFixed(1), "%"));
-              })())
-            );
-          })
-        ), /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            onClick: () => onBuyHolding && onBuyHolding(account, null),
-            style: {
-              marginTop: 12,
-              width: "100%",
-              padding: "12px",
-              background: "var(--mint)",
-              color: "#fff",
-              border: "none",
-              borderRadius: 12,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer"
-            }
+              holdingsSortMode ? "\u5B8C\u6210" : "\u6392\u5E8F\u6301\u80A1"
+            ) : null
           },
-          "+ \u8CB7\u9032\u80A1\u7968"
-        ));
+          /* @__PURE__ */ React.createElement("div", { style: {
+            fontSize: 13,
+            color: "var(--text-dim)",
+            fontWeight: 500,
+            marginBottom: 8,
+            paddingLeft: 4
+          } }, "\u6301\u80A1", holdingsSortMode && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", marginLeft: 8, fontSize: 11 } }, "\u9577\u6309\u62D6\u66F3\u6392\u5E8F")),
+          activeHoldings.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: {
+            padding: "24px 16px",
+            textAlign: "center",
+            color: "var(--text-faint)",
+            fontSize: 13
+          } }, "\u5C1A\u672A\u6301\u6709\u4EFB\u4F55\u80A1\u7968") : /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              "data-holdings-drag-container": holdingsSortMode ? account.id : void 0,
+              style: { display: "flex", flexDirection: "column", gap: 10 }
+            },
+            activeHoldings.map((h) => {
+              const shares = holdingShares(h, state.trades);
+              const cost = holdingCost(h, state.trades);
+              const market = h.marketValue || 0;
+              const pnl = market - cost;
+              const pnlPct = cost > 0 ? pnl / cost * 100 : 0;
+              const avgPrice = shares > 0 ? cost / shares : 0;
+              const hasMarket = market > 0;
+              const pnlColor = pnl >= 0 ? "var(--mint-text)" : "var(--pink-text)";
+              return /* @__PURE__ */ React.createElement(
+                "div",
+                {
+                  key: h.id,
+                  "data-drag-row": "true",
+                  "data-drag-handle": holdingsSortMode ? "true" : void 0,
+                  "data-drag-id": h.id,
+                  onClick: () => {
+                    if (!holdingsSortMode && onOpenHolding) onOpenHolding(h);
+                  },
+                  onTouchStart: holdingsSortMode ? (e) => e.stopPropagation() : void 0,
+                  style: {
+                    padding: "14px 16px",
+                    borderRadius: 14,
+                    background: "var(--bg-card)",
+                    border: holdingsSortMode ? "1.5px dashed rgba(232, 185, 71, 0.55)" : "1px solid var(--border)",
+                    cursor: holdingsSortMode ? "grab" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    boxSizing: "border-box",
+                    touchAction: holdingsSortMode ? "none" : void 0
+                  }
+                },
+                /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: {
+                  fontSize: 18,
+                  fontWeight: 800,
+                  letterSpacing: 0.3,
+                  lineHeight: 1.15
+                } }, h.symbol), h.name && /* @__PURE__ */ React.createElement("div", { style: {
+                  fontSize: 12,
+                  color: "var(--text-dim)",
+                  marginTop: 2,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap"
+                } }, h.name), (() => {
+                  const tag = h.subTagId ? (state.stockSubTags || []).find((t) => t.id === h.subTagId) : null;
+                  if (!tag) return null;
+                  return /* @__PURE__ */ React.createElement("div", { style: { marginTop: 4 } }, /* @__PURE__ */ React.createElement("span", { style: {
+                    display: "inline-block",
+                    padding: "2px 8px",
+                    borderRadius: 8,
+                    background: "rgba(126, 224, 192, 0.15)",
+                    color: "var(--mint-text)",
+                    fontSize: 10,
+                    fontWeight: 600,
+                    letterSpacing: 0.2
+                  } }, tag.name));
+                })(), /* @__PURE__ */ React.createElement("div", { style: {
+                  fontSize: 11,
+                  color: "var(--text-faint)",
+                  marginTop: 6,
+                  fontFamily: "var(--num-font)"
+                } }, shares.toLocaleString(), " \u80A1 \xB7 \u5747\u50F9 ", avgPrice >= 100 ? fmt(Math.round(avgPrice)) : avgPrice.toFixed(2))),
+                /* @__PURE__ */ React.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, hasMarket ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: {
+                  fontSize: 17,
+                  fontWeight: 700,
+                  fontFamily: "var(--num-font)",
+                  lineHeight: 1.15
+                } }, fmt(market)), /* @__PURE__ */ React.createElement("div", { style: {
+                  marginTop: 4,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: pnlColor,
+                  fontFamily: "var(--num-font)"
+                } }, pnl >= 0 ? "+" : "", fmt(pnl), " (", pnl >= 0 ? "+" : "", pnlPct.toFixed(2), "%)")) : /* @__PURE__ */ React.createElement("div", { style: {
+                  fontSize: 12,
+                  color: "var(--mint-text)",
+                  fontWeight: 600
+                } }, "\u9EDE\u6B64\u8A2D\u5B9A\u5E02\u503C"), marketTotalCost > 0 && cost > 0 && (() => {
+                  const sharePct = cost / marketTotalCost * 100;
+                  return /* @__PURE__ */ React.createElement("div", { style: {
+                    marginTop: 8,
+                    paddingTop: 8,
+                    borderTop: "1px dashed var(--border)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "flex-end",
+                    gap: 6,
+                    fontFamily: "var(--num-font)"
+                  } }, /* @__PURE__ */ React.createElement("span", { style: {
+                    fontSize: 11,
+                    color: "var(--text-dim)",
+                    fontWeight: 600,
+                    fontFamily: "inherit",
+                    letterSpacing: 0.2
+                  } }, "\u4F54", marketLabel, "\u6210\u672C"), /* @__PURE__ */ React.createElement("span", { style: {
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: "var(--text)",
+                    marginLeft: -2,
+                    marginRight: -2
+                  } }, ":"), /* @__PURE__ */ React.createElement("span", { style: {
+                    fontSize: 18,
+                    fontWeight: 900,
+                    color: "var(--text)",
+                    letterSpacing: 0.5
+                  } }, sharePct.toFixed(1), "%"));
+                })())
+              );
+            })
+          ),
+          /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              onClick: () => onBuyHolding && onBuyHolding(account, null),
+              style: {
+                marginTop: 12,
+                width: "100%",
+                padding: "12px",
+                background: "var(--mint)",
+                color: "#fff",
+                border: "none",
+                borderRadius: 12,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer"
+              }
+            },
+            "+ \u8CB7\u9032\u80A1\u7968"
+          )
+        );
       }
       if (blockKey === "monthBar") {
         return /* @__PURE__ */ React.createElement(Block, { key: "monthBar", ...blockProps }, filterMode ? /* @__PURE__ */ React.createElement("div", { style: styles.filterBadge }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)" } }, "\u7BE9\u9078\u7D50\u679C"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text)" } }, fStart.replace(/-/g, "/"), " ~ ", fEnd.replace(/-/g, "/"), fType !== "all" && ` \xB7 ${fType === "income" ? "\u6536\u5165" : fType === "expense" ? "\u652F\u51FA" : "\u80A1\u7968"}`, fKeyword && ` \xB7 "${fKeyword}"`)), /* @__PURE__ */ React.createElement("div", { style: styles.filterClearBtn, onClick: () => !editMode && clearFilter() }, "\u2715")) : /* @__PURE__ */ React.createElement("div", { style: styles.acctMonthBar }, /* @__PURE__ */ React.createElement("div", { style: styles.dpNav, onClick: () => !editMode && shiftMonth(-1) }, "\u2039"), /* @__PURE__ */ React.createElement("div", { style: styles.dpMonthTitle }, currentMonth.slice(0, 4), " \u5E74 ", parseInt(currentMonth.slice(5, 7)), " \u6708"), /* @__PURE__ */ React.createElement("div", { style: styles.dpNav, onClick: () => !editMode && shiftMonth(1) }, "\u203A")));
