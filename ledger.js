@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520DR";
+const APP_VERSION = "1150520DS";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -5421,6 +5421,17 @@ function SellSheet({ state, account, onClose, onConfirm, toast }) {
 function UpdateMarketValueDialog({ holding, shares, cost, onClose, onConfirm }) {
   const [value, setValue] = useState(String(holding.marketValue || ""));
   const [locked, setLocked] = useState(true);
+  const inputRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!locked && inputRef.current) {
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          inputRef.current.select();
+        }
+      }, 50);
+    }
+  }, [locked]);
   const handleSubmit = () => {
     const trimmed = String(value || "").trim();
     if (trimmed === "") {
@@ -5452,10 +5463,13 @@ function UpdateMarketValueDialog({ holding, shares, cost, onClose, onConfirm }) 
   ))), /* @__PURE__ */ React.createElement("div", { style: { padding: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 8 } }, "\u6301\u6709 ", shares.toLocaleString(), " \u80A1 \xB7 \u76EE\u524D\u5E02\u503C\u7E3D\u984D(NT$)"), /* @__PURE__ */ React.createElement(
     "input",
     {
+      ref: inputRef,
       type: "number",
       inputMode: "decimal",
       value,
       onChange: (e) => setValue(e.target.value),
+      onFocus: (e) => e.target.select(),
+      onClick: (e) => e.target.select(),
       disabled: locked,
       placeholder: cost ? String(cost) : "0",
       style: {
@@ -7479,15 +7493,16 @@ function HoldingSubTagPickerSheet({
         cleanup();
         return;
       }
-      placeholder.parentNode.replaceChild(draggedEl, placeholder);
       draggedEl.style.removeProperty("display");
+      placeholder.parentNode.replaceChild(draggedEl, placeholder);
       placeholder = null;
+      let newOrderPayload = null;
       if (draggedType === "group") {
         const newOrder = [];
         container.querySelectorAll('[data-drag-type="group"]').forEach((el) => {
           newOrder.push(el.getAttribute("data-drag-id"));
         });
-        onSetGroupOrder && onSetGroupOrder(newOrder);
+        newOrderPayload = { type: "group", newOrder };
       } else if (draggedType === "tag") {
         const newOrder = [];
         container.querySelectorAll("[data-drag-zone]").forEach((zone) => {
@@ -7497,17 +7512,28 @@ function HoldingSubTagPickerSheet({
             newOrder.push({ id: tEl.getAttribute("data-drag-id"), groupId: gidVal });
           });
         });
-        onSetTagsOrder && onSetTagsOrder(newOrder);
+        newOrderPayload = { type: "tag", newOrder };
       }
       if (draggedClone) {
         draggedClone.remove();
         draggedClone = null;
       }
+      const targetEl = draggedEl;
       draggedEl = null;
       draggedType = null;
       draggedGroupId = null;
       setDraggingId(null);
       if (navigator.vibrate) navigator.vibrate(15);
+      if (targetEl && targetEl.parentNode) {
+        targetEl.parentNode.removeChild(targetEl);
+      }
+      if (newOrderPayload) {
+        if (newOrderPayload.type === "group") {
+          onSetGroupOrder && onSetGroupOrder(newOrderPayload.newOrder);
+        } else {
+          onSetTagsOrder && onSetTagsOrder(newOrderPayload.newOrder);
+        }
+      }
     };
     const onDown = (e) => {
       const handle = e.target.closest && e.target.closest('[data-drag-handle="true"]');
@@ -7630,6 +7656,7 @@ function HoldingSubTagPickerSheet({
         {
           key: tag.id,
           "data-drag-row": "true",
+          "data-drag-handle": "true",
           "data-drag-type": "tag",
           "data-drag-id": tag.id,
           "data-drag-group-id": tag.groupId || "null",
@@ -7647,20 +7674,11 @@ function HoldingSubTagPickerSheet({
             marginBottom: 8,
             opacity: isDragging ? 0.3 : 1,
             boxSizing: "border-box",
-            minHeight: 56
+            minHeight: 56,
+            touchAction: "none",
+            cursor: "grab"
           }
         },
-        /* @__PURE__ */ React.createElement("div", { "data-drag-handle": "true", style: {
-          width: 24,
-          height: 32,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "grab",
-          color: "var(--text-faint)",
-          flexShrink: 0,
-          touchAction: "none"
-        } }, /* @__PURE__ */ React.createElement("svg", { width: "14", height: "18", viewBox: "0 0 14 18", fill: "currentColor" }, /* @__PURE__ */ React.createElement("circle", { cx: "3", cy: "3", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "3", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "3", cy: "9", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "9", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "3", cy: "15", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "15", r: "1.5" }))),
         /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: "var(--text)", lineHeight: 1.2 } }, tag.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 3 } }, usedCount, " \u6A94\u6301\u80A1")),
         /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, flexShrink: 0 } }, /* @__PURE__ */ React.createElement(
           "button",
@@ -7838,61 +7856,88 @@ function HoldingSubTagPickerSheet({
         border: "1px solid var(--border)",
         fontSize: 13,
         cursor: "pointer"
-      } }, "\u53D6\u6D88")) : /* @__PURE__ */ React.createElement("div", { style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "8px 6px 8px 4px",
-        marginBottom: 4
-      } }, mode === "edit" && /* @__PURE__ */ React.createElement("div", { "data-drag-handle": "true", style: {
-        width: 22,
-        height: 28,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        cursor: "grab",
-        color: "var(--text-faint)",
-        flexShrink: 0,
-        touchAction: "none"
-      } }, /* @__PURE__ */ React.createElement("svg", { width: "14", height: "18", viewBox: "0 0 14 18", fill: "currentColor" }, /* @__PURE__ */ React.createElement("circle", { cx: "3", cy: "3", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "3", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "3", cy: "9", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "9", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "3", cy: "15", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "15", r: "1.5" }))), /* @__PURE__ */ React.createElement(
-        "button",
+      } }, "\u53D6\u6D88")) : /* @__PURE__ */ React.createElement(
+        "div",
         {
-          onClick: () => onToggleGroupCollapsed && onToggleGroupCollapsed(group.id),
+          "data-drag-handle": mode === "edit" ? "true" : void 0,
           style: {
-            background: "transparent",
-            border: "none",
-            color: "var(--text-dim)",
-            fontSize: 13,
-            cursor: "pointer",
-            padding: "2px 4px",
             display: "flex",
             alignItems: "center",
-            gap: 6
+            gap: 8,
+            padding: "8px 6px 8px 10px",
+            marginBottom: 4,
+            touchAction: mode === "edit" ? "none" : void 0,
+            cursor: mode === "edit" ? "grab" : "default",
+            borderRadius: 8,
+            background: mode === "edit" ? "rgba(126,224,192,0.06)" : "transparent"
           }
         },
-        /* @__PURE__ */ React.createElement("span", { style: { transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 0.15s", display: "inline-block" } }, "\u25BE"),
-        /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700, color: "var(--text)" } }, group.name),
-        /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 12 } }, "(", groupTags.length, ")")
-      ), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), mode === "edit" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { onClick: () => {
-        setEditingGroupId(group.id);
-        setEditingGroupName(group.name);
-      }, style: {
-        padding: "4px 8px",
-        borderRadius: 8,
-        background: "transparent",
-        color: "var(--text-dim)",
-        border: "1px solid var(--border)",
-        fontSize: 11,
-        cursor: "pointer"
-      } }, "\u6539\u540D"), /* @__PURE__ */ React.createElement("button", { onClick: () => askDeleteGroup(group), style: {
-        padding: "4px 8px",
-        borderRadius: 8,
-        background: "transparent",
-        color: "var(--pink-text)",
-        border: "1px solid var(--pink)",
-        fontSize: 11,
-        cursor: "pointer"
-      } }, "\u522A\u9664"))),
+        /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: (e) => {
+              e.stopPropagation();
+              onToggleGroupCollapsed && onToggleGroupCollapsed(group.id);
+            },
+            onTouchStart: (e) => e.stopPropagation(),
+            style: {
+              background: "transparent",
+              border: "none",
+              color: "var(--text-dim)",
+              fontSize: 13,
+              cursor: "pointer",
+              padding: "2px 4px",
+              display: "flex",
+              alignItems: "center",
+              gap: 6
+            }
+          },
+          /* @__PURE__ */ React.createElement("span", { style: { transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 0.15s", display: "inline-block" } }, "\u25BE"),
+          /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700, color: "var(--text)" } }, group.name),
+          /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 12 } }, "(", groupTags.length, ")")
+        ),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }),
+        mode === "edit" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: (e) => {
+              e.stopPropagation();
+              setEditingGroupId(group.id);
+              setEditingGroupName(group.name);
+            },
+            onTouchStart: (e) => e.stopPropagation(),
+            style: {
+              padding: "4px 8px",
+              borderRadius: 8,
+              background: "transparent",
+              color: "var(--text-dim)",
+              border: "1px solid var(--border)",
+              fontSize: 11,
+              cursor: "pointer"
+            }
+          },
+          "\u6539\u540D"
+        ), /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: (e) => {
+              e.stopPropagation();
+              askDeleteGroup(group);
+            },
+            onTouchStart: (e) => e.stopPropagation(),
+            style: {
+              padding: "4px 8px",
+              borderRadius: 8,
+              background: "transparent",
+              color: "var(--pink-text)",
+              border: "1px solid var(--pink)",
+              fontSize: 11,
+              cursor: "pointer"
+            }
+          },
+          "\u522A\u9664"
+        ))
+      ),
       !isCollapsed && /* @__PURE__ */ React.createElement("div", { "data-drag-zone": group.id, style: { paddingLeft: 8 } }, groupTags.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: {
         fontSize: 11,
         color: "var(--text-faint)",
@@ -18751,20 +18796,24 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
           cleanup();
           return;
         }
-        placeholder.parentNode.replaceChild(draggedEl, placeholder);
         draggedEl.style.removeProperty("display");
+        placeholder.parentNode.replaceChild(draggedEl, placeholder);
         placeholder = null;
         const newOrder = [];
         container.querySelectorAll('[data-drag-row="true"]').forEach((el) => {
           newOrder.push(el.getAttribute("data-drag-id"));
         });
-        onSetHoldingsOrder(account.id, newOrder);
         if (draggedClone) {
           draggedClone.remove();
           draggedClone = null;
         }
+        const targetEl = draggedEl;
         draggedEl = null;
         if (navigator.vibrate) navigator.vibrate(15);
+        if (targetEl && targetEl.parentNode) {
+          targetEl.parentNode.removeChild(targetEl);
+        }
+        onSetHoldingsOrder(account.id, newOrder);
       };
       const onDown = (e) => {
         const handle = e.target.closest && e.target.closest('[data-drag-handle="true"]');
@@ -18907,7 +18956,7 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
                 justifyContent: "center",
                 borderRadius: 8,
                 cursor: "pointer",
-                color: "var(--text-faint)"
+                color: account.investNote && account.investNote.trim() ? "var(--pink-text)" : "var(--text-faint)"
               },
               "aria-label": "\u7DE8\u8F2F\u5099\u8A3B"
             },
@@ -18949,7 +18998,7 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
         );
         const marketTotalCost = state.holdings.filter((h) => sameMarketAccountIds.has(h.accountId) && holdingShares(h, state.trades) > 0).reduce((sum, h) => sum + holdingCost(h, state.trades), 0);
         const marketLabel = (state.stockMarkets || DEFAULT_STOCK_MARKETS).find((m) => m.id === myMarketId)?.label || "\u672C\u5E02\u5834";
-        return /* @__PURE__ */ React.createElement(Block, { key: "holdings", ...blockProps, disableReorder: true }, /* @__PURE__ */ React.createElement("div", { style: {
+        return /* @__PURE__ */ React.createElement(Block, { key: "holdings", ...blockProps }, /* @__PURE__ */ React.createElement("div", { style: {
           fontSize: 13,
           color: "var(--text-dim)",
           fontWeight: 500,
@@ -18980,33 +19029,25 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
               {
                 key: h.id,
                 "data-drag-row": "true",
+                "data-drag-handle": editMode ? "true" : void 0,
                 "data-drag-id": h.id,
                 onClick: () => {
                   if (!editMode && onOpenHolding) onOpenHolding(h);
                 },
+                onTouchStart: editMode ? (e) => e.stopPropagation() : void 0,
                 style: {
                   padding: "14px 16px",
                   borderRadius: 14,
                   background: "var(--bg-card)",
                   border: "1px solid var(--border)",
-                  cursor: editMode ? "default" : "pointer",
+                  cursor: editMode ? "grab" : "pointer",
                   display: "flex",
                   alignItems: "center",
                   gap: 12,
-                  boxSizing: "border-box"
+                  boxSizing: "border-box",
+                  touchAction: editMode ? "none" : void 0
                 }
               },
-              editMode && /* @__PURE__ */ React.createElement("div", { "data-drag-handle": "true", style: {
-                width: 24,
-                height: 32,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "grab",
-                color: "var(--text-faint)",
-                flexShrink: 0,
-                touchAction: "none"
-              } }, /* @__PURE__ */ React.createElement("svg", { width: "14", height: "18", viewBox: "0 0 14 18", fill: "currentColor" }, /* @__PURE__ */ React.createElement("circle", { cx: "3", cy: "3", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "3", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "3", cy: "9", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "9", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "3", cy: "15", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "15", r: "1.5" }))),
               /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: {
                 fontSize: 18,
                 fontWeight: 800,
