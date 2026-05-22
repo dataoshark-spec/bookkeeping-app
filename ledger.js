@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520DU";
+const APP_VERSION = "1150520DV";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -7295,7 +7295,7 @@ function HoldingSubTagPickerSheet({
     setEditingGroupName("");
   };
   const askDeleteTag = (tag) => {
-    const usedCount = state.holdings.filter((h) => h.subTagId === tag.id).length;
+    const usedCount = state.holdings.filter((h) => h.subTagId === tag.id && holdingShares(h, state.trades) > 0).length;
     setConfirmDialog && setConfirmDialog({
       title: "\u522A\u9664\u5206\u985E",
       target: { label: "\u5206\u985E", name: tag.name },
@@ -7621,7 +7621,7 @@ function HoldingSubTagPickerSheet({
   const renderTagRow = (tag) => {
     const isSelected = tag.id === currentId;
     const isEditing = editingTagId === tag.id;
-    const usedCount = state.holdings.filter((h) => h.subTagId === tag.id).length;
+    const usedCount = state.holdings.filter((h) => h.subTagId === tag.id && holdingShares(h, state.trades) > 0).length;
     const isDragging = draggingId === tag.id;
     if (isEditing) {
       return /* @__PURE__ */ React.createElement("div", { key: `${tag.id}-${renderEpoch}`, style: {
@@ -8020,7 +8020,7 @@ function HoldingSubTagPickerSheet({
       mode === "edit" ? "\u5B8C\u6210" : "\u7DE8\u8F2F"
     )),
     /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: { padding: "4px 16px 0", fontSize: 12, color: "var(--text-faint)" } }, mode === "edit" ? "\u9577\u6309\u62D6\u66F3\u624B\u67C4\u53EF\u6392\u5E8F;\u7FA4\u7D44\u53EA\u80FD\u8DDF\u7FA4\u7D44\u6392\u5E8F\u3001\u5206\u985E\u53EA\u80FD\u5728\u540C\u7FA4\u7D44\u5167\u6392\u5E8F;\u8DE8\u7FA4\u7D44\u8ACB\u7528 \u79FB\u52D5 \u6309\u9215\u3002" : `\u7D66 ${holding.symbol} \u5206\u5230\u81EA\u8A02\u7684\u4E3B\u984C\u985E\u5225,\u5982 \u592A\u7A7A / AI / \u6A5F\u5668\u4EBA / \u7F8E\u50B5 \u7B49\u3002`), /* @__PURE__ */ React.createElement("div", { ref: containerRef, style: { padding: 12 } }, mode === "pick" && (() => {
-      const noTagCount = state.holdings.filter((h) => !h.subTagId).length;
+      const noTagCount = state.holdings.filter((h) => !h.subTagId && holdingShares(h, state.trades) > 0).length;
       return /* @__PURE__ */ React.createElement(
         "div",
         {
