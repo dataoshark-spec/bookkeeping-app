@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520DT";
+const APP_VERSION = "1150520DU";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -7381,17 +7381,21 @@ function HoldingSubTagPickerSheet({
     let moved = false;
     let offsetX = 0, offsetY = 0;
     const cleanup = () => {
-      if (draggedClone) {
-        draggedClone.remove();
-        draggedClone = null;
-      }
-      if (placeholder && placeholder.parentNode) {
-        if (draggedEl) {
-          placeholder.parentNode.replaceChild(draggedEl, placeholder);
-          draggedEl.style.removeProperty("display");
-        } else {
-          placeholder.remove();
+      try {
+        if (draggedClone) {
+          draggedClone.remove();
+          draggedClone = null;
         }
+      } catch {
+      }
+      try {
+        if (placeholder && placeholder.parentNode) {
+          if (draggedEl && draggedEl.style) {
+            draggedEl.style.removeProperty("display");
+          }
+          placeholder.parentNode.removeChild(placeholder);
+        }
+      } catch {
       }
       placeholder = null;
       draggedEl = null;
@@ -7534,11 +7538,17 @@ function HoldingSubTagPickerSheet({
         draggedClone = null;
       }
       if (placeholder && placeholder.parentNode) {
-        placeholder.parentNode.removeChild(placeholder);
+        try {
+          placeholder.parentNode.removeChild(placeholder);
+        } catch {
+        }
       }
       placeholder = null;
-      if (draggedEl && draggedEl.parentNode) {
-        draggedEl.parentNode.removeChild(draggedEl);
+      if (draggedEl) {
+        try {
+          draggedEl.style.removeProperty("display");
+        } catch {
+        }
       }
       draggedEl = null;
       draggedType = null;
@@ -18715,19 +18725,23 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
       let longPressTimer = null;
       let moved = false;
       const cleanup = () => {
-        if (draggedClone) {
-          draggedClone.remove();
-          draggedClone = null;
-        }
-        if (placeholder && placeholder.parentNode) {
-          if (draggedEl) {
-            placeholder.parentNode.replaceChild(draggedEl, placeholder);
-            draggedEl.style.removeProperty("display");
-          } else {
-            placeholder.remove();
+        try {
+          if (draggedClone) {
+            draggedClone.remove();
+            draggedClone = null;
           }
-          placeholder = null;
+        } catch {
         }
+        try {
+          if (placeholder && placeholder.parentNode) {
+            if (draggedEl && draggedEl.style) {
+              draggedEl.style.removeProperty("display");
+            }
+            placeholder.parentNode.removeChild(placeholder);
+          }
+        } catch {
+        }
+        placeholder = null;
         draggedEl = null;
       };
       const startDrag = (rowEl, x, y) => {
@@ -18833,11 +18847,17 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
           draggedClone = null;
         }
         if (placeholder && placeholder.parentNode) {
-          placeholder.parentNode.removeChild(placeholder);
+          try {
+            placeholder.parentNode.removeChild(placeholder);
+          } catch {
+          }
         }
         placeholder = null;
-        if (draggedEl && draggedEl.parentNode) {
-          draggedEl.parentNode.removeChild(draggedEl);
+        if (draggedEl) {
+          try {
+            draggedEl.style.removeProperty("display");
+          } catch {
+          }
         }
         draggedEl = null;
         if (navigator.vibrate) navigator.vibrate(15);
