@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520DW";
+const APP_VERSION = "1150520DX";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -40,6 +40,15 @@ const broadcastDriveLastSync = (ts) => {
   driveLastSyncListeners.forEach((cb) => {
     try {
       cb(ts);
+    } catch {
+    }
+  });
+};
+const driveStatusListeners = /* @__PURE__ */ new Set();
+const broadcastDriveStatus = (status) => {
+  driveStatusListeners.forEach((cb) => {
+    try {
+      cb(status);
     } catch {
     }
   });
@@ -1307,6 +1316,19 @@ function App() {
   const _autoBkTimerRef = React.useRef(null);
   const _autoBkMountRef = React.useRef(false);
   const _autoBkRunningRef = React.useRef(false);
+  const [driveStatus, setDriveStatus] = React.useState(() => {
+    try {
+      if (localStorage.getItem(GDRIVE_PENDING_KEY) === "1") return "pending";
+    } catch {
+    }
+    return "idle";
+  });
+  useEffect(() => {
+    driveStatusListeners.add(setDriveStatus);
+    return () => {
+      driveStatusListeners.delete(setDriveStatus);
+    };
+  }, []);
   const _autoBkRunRef = React.useRef(null);
   _autoBkRunRef.current = async () => {
     if (_autoBkRunningRef.current) return;
@@ -1317,6 +1339,7 @@ function App() {
     }
     if (!autoOn || !GDrive.isLinked()) return;
     _autoBkRunningRef.current = true;
+    broadcastDriveStatus("syncing");
     try {
       const token = await GDrive.ensureToken();
       const payload = buildExportPayload();
@@ -1332,11 +1355,13 @@ function App() {
       } catch {
       }
       broadcastDriveLastSync(ts);
+      broadcastDriveStatus("idle");
     } catch (e) {
       try {
         localStorage.setItem(GDRIVE_PENDING_KEY, "1");
       } catch {
       }
+      broadcastDriveStatus("pending");
     } finally {
       _autoBkRunningRef.current = false;
     }
@@ -3185,6 +3210,20 @@ function App() {
     ].map((p) => {
       const isActive = page === p.k;
       const color = isActive ? "var(--mint)" : "var(--text-faint)";
+      const showStatusDot = p.k === "settings" && GDrive.isLinked();
+      let dotColor = null;
+      let dotBlink = false;
+      if (showStatusDot) {
+        if (driveStatus === "syncing") {
+          dotColor = "#f5a623";
+          dotBlink = true;
+        } else if (driveStatus === "pending") {
+          dotColor = "var(--pink)";
+          dotBlink = true;
+        } else {
+          dotColor = "var(--mint)";
+        }
+      }
       return /* @__PURE__ */ React.createElement(
         "div",
         {
@@ -3193,7 +3232,19 @@ function App() {
           style: { ...styles.navItem, color },
           onClick: () => setPage(p.k)
         },
-        /* @__PURE__ */ React.createElement("div", { style: styles.navIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: p.icon, size: 22, color })),
+        /* @__PURE__ */ React.createElement("div", { style: { ...styles.navIcon, position: "relative" } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: p.icon, size: 22, color }), showStatusDot && dotColor && /* @__PURE__ */ React.createElement("span", { style: {
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: dotColor,
+          boxShadow: `0 0 0 1.5px var(--bg), 0 0 4px ${dotColor}`,
+          animation: dotBlink ? "ledgerStatusBlink 1s ease-in-out infinite" : void 0,
+          pointerEvents: "none"
+        } })),
         /* @__PURE__ */ React.createElement("div", null, p.label)
       );
     })
@@ -10852,6 +10903,7 @@ function SettingsPage({
     if (driveSyncing) return;
     setDriveSyncing(true);
     setDriveBackingUp(true);
+    broadcastDriveStatus("syncing");
     if (!silent) toast("\u958B\u59CB\u5099\u4EFD\u22EF");
     try {
       const token = await GDrive.ensureToken();
@@ -10868,6 +10920,8 @@ function SettingsPage({
       } catch {
       }
       setDriveLastSync(now);
+      setDrivePending(false);
+      broadcastDriveStatus("idle");
       if (!silent) {
         const t = /* @__PURE__ */ new Date();
         const hhmm = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
@@ -10875,6 +10929,12 @@ function SettingsPage({
       }
     } catch (e) {
       const msg = e && e.message || "\u672A\u77E5\u932F\u8AA4";
+      try {
+        localStorage.setItem(GDRIVE_PENDING_KEY, "1");
+      } catch {
+      }
+      setDrivePending(true);
+      broadcastDriveStatus("pending");
       if (!silent) {
         toastRich({ title: "\u5099\u4EFD\u5931\u6557", amount: "\u2713", amountColor: "var(--pink)", icon: "warn", lines: [cloudErrText(msg)] }, 2200);
       }
@@ -20981,6 +21041,10 @@ function Style({ theme = "dark", numFont = DEFAULT_NUM_FONT }) {
         0%, 20% { opacity: 0.2; }
         50% { opacity: 1; }
         80%, 100% { opacity: 0.2; }
+      }
+      @keyframes ledgerStatusBlink {
+        0%, 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        50% { opacity: 0.35; transform: translate(-50%, -50%) scale(0.7); }
       }
       @keyframes toastSlideIn {
         from { opacity: 0; transform: translate(-50%, -50%) scale(0.92); }
