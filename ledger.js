@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520DV";
+const APP_VERSION = "1150520DW";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -1382,6 +1382,70 @@ function App() {
       _autoBkRunRef.current && _autoBkRunRef.current();
     }, 3e3);
     return () => clearTimeout(t);
+  }, []);
+  useEffect(() => {
+    let autoOn = false;
+    let pending = false;
+    let lastSync = 0;
+    try {
+      autoOn = localStorage.getItem(GDRIVE_AUTO_KEY) === "1";
+      pending = localStorage.getItem(GDRIVE_PENDING_KEY) === "1";
+      lastSync = parseInt(localStorage.getItem(GDRIVE_LASTSYNC_KEY) || "0", 10);
+    } catch {
+    }
+    if (!autoOn || !GDrive.isLinked() || !pending) return;
+    const elapsed = Date.now() - lastSync;
+    const dayMs = 24 * 60 * 60 * 1e3;
+    if (lastSync > 0 && elapsed < dayMs) return;
+    const t = setTimeout(() => {
+      toastRich && toastRich({
+        titleSegments: [
+          { text: "\u81EA\u52D5\u5099\u4EFD\u5361\u4F4F\u4E86", color: "var(--pink-text)", weight: 800, size: 18 }
+        ],
+        lines: [
+          "\u8ACB\u6253\u958B\u300C\u8A2D\u5B9A > Google Drive\u300D\u6309\u4E00\u4E0B\u300C\u7ACB\u5373\u5099\u4EFD\u300D",
+          "\u53EF\u80FD\u539F\u56E0:Google \u6388\u6B0A\u904E\u671F\u3001\u7DB2\u8DEF\u554F\u984C,\u9700\u8981\u4F60\u624B\u52D5\u89F8\u767C\u4E00\u6B21"
+        ],
+        icon: "info"
+      }, 5500);
+    }, 5e3);
+    return () => clearTimeout(t);
+  }, []);
+  useEffect(() => {
+    const onVisible = async () => {
+      if (document.visibilityState !== "visible") return;
+      if (!GDrive.isLinked()) return;
+      let needRefresh = false;
+      try {
+        const raw = localStorage.getItem(GDRIVE_TOKEN_KEY);
+        if (!raw) {
+          needRefresh = true;
+        } else {
+          const t = JSON.parse(raw);
+          if (!t.expires_at || Date.now() >= t.expires_at - 10 * 60 * 1e3) {
+            needRefresh = true;
+          }
+        }
+      } catch {
+        needRefresh = true;
+      }
+      if (needRefresh) {
+        try {
+          await GDrive.refreshToken();
+        } catch {
+        }
+      }
+      let pending = false;
+      try {
+        pending = localStorage.getItem(GDRIVE_PENDING_KEY) === "1";
+      } catch {
+      }
+      if (pending) {
+        _autoBkRunRef.current && _autoBkRunRef.current();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
   useEffect(() => {
     let migrated = false;
@@ -10677,6 +10741,19 @@ function SettingsPage({
       return 0;
     }
   });
+  const [drivePending, setDrivePending] = useState(() => {
+    try {
+      return localStorage.getItem(GDRIVE_PENDING_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      setDrivePending(localStorage.getItem(GDRIVE_PENDING_KEY) === "1");
+    } catch {
+    }
+  }, [driveLastSync]);
   useEffect(() => {
     driveLastSyncListeners.add(setDriveLastSync);
     return () => {
@@ -11399,12 +11476,41 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
         /* @__PURE__ */ React.createElement("div", { style: styles.settingsIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud", size: 20, color: "#4285F4" })),
         /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: styles.settingsLabel }, "\u9023\u7D50 Google Drive"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginTop: 2 } }, "\u5099\u4EFD\u8CC7\u6599\u5230\u96F2\u7AEF,\u63DB\u624B\u6A5F / \u6E05\u9664\u700F\u89BD\u5668\u4E5F\u4E0D\u6015\u907A\u5931")),
         driveSyncing ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)" } }, "\u9023\u7D50\u4E2D\u2026") : /* @__PURE__ */ React.createElement("div", { style: styles.settingsArrow }, "\u203A")
-      ) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: {
-        padding: "12px 14px",
-        background: "var(--bg-card)",
-        borderRadius: 10,
-        marginBottom: 8
-      } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-check", size: 20, color: "#4285F4" }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, flexShrink: 0 } }, "Google Drive \u5DF2\u9023\u7D50"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginLeft: "auto", flexShrink: 0, whiteSpace: "nowrap" } }, "\u4E0A\u6B21\u5099\u4EFD ", lastSyncTxt)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, driveEmail || "(\u5E33\u865F)")))), /* @__PURE__ */ React.createElement("div", { style: {
+      ) : /* @__PURE__ */ React.createElement(React.Fragment, null, (() => {
+        const stuck = drivePending && (driveLastSync === 0 || Date.now() - driveLastSync > 24 * 60 * 60 * 1e3);
+        return /* @__PURE__ */ React.createElement("div", { style: {
+          padding: "12px 14px",
+          background: stuck ? "rgba(217, 104, 119, 0.08)" : "var(--bg-card)",
+          border: stuck ? "1.5px solid var(--pink)" : "none",
+          borderRadius: 10,
+          marginBottom: 8
+        } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "cloud-check", size: 20, color: "#4285F4" }), stuck && /* @__PURE__ */ React.createElement("span", { style: {
+          position: "absolute",
+          top: -2,
+          right: -2,
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: "var(--pink)",
+          border: "1.5px solid var(--bg-card)"
+        } })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, flexShrink: 0 } }, "Google Drive \u5DF2\u9023\u7D50"), /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 11,
+          color: stuck ? "var(--pink-text)" : "var(--text-faint)",
+          fontWeight: stuck ? 700 : 400,
+          marginLeft: "auto",
+          flexShrink: 0,
+          whiteSpace: "nowrap"
+        } }, "\u4E0A\u6B21\u5099\u4EFD ", lastSyncTxt)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, driveEmail || "(\u5E33\u865F)"), stuck && /* @__PURE__ */ React.createElement("div", { style: {
+          marginTop: 6,
+          padding: "6px 10px",
+          background: "rgba(217, 104, 119, 0.12)",
+          borderRadius: 6,
+          fontSize: 11,
+          color: "var(--pink-text)",
+          fontWeight: 600,
+          lineHeight: 1.5
+        } }, "\u81EA\u52D5\u5099\u4EFD \u5361\u4F4F\u4E86,\u8ACB\u6309\u4E0B\u65B9\u300C\u7ACB\u5373\u5099\u4EFD\u300D\u624B\u52D5\u89F8\u767C\u4E00\u6B21"))));
+      })(), /* @__PURE__ */ React.createElement("div", { style: {
         padding: "9px 12px",
         background: "var(--bg-card-alt)",
         borderRadius: 8,
