@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520DS";
+const APP_VERSION = "1150520DT";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -7196,6 +7196,7 @@ function HoldingSubTagPickerSheet({
   const groups = state.stockSubTagGroups || [];
   const currentId = holding ? holding.subTagId : null;
   const [mode, setMode] = React.useState("pick");
+  const [renderEpoch, setRenderEpoch] = React.useState(0);
   const [showAddTagInput, setShowAddTagInput] = React.useState(false);
   const [newTagName, setNewTagName] = React.useState("");
   const [showAddGroupInput, setShowAddGroupInput] = React.useState(false);
@@ -7424,6 +7425,7 @@ function HoldingSubTagPickerSheet({
       `;
       document.body.appendChild(draggedClone);
       placeholder = document.createElement("div");
+      placeholder.setAttribute("data-placeholder-for", rowEl.getAttribute("data-drag-id") || "");
       placeholder.style.cssText = `
         height: ${rect.height}px;
         margin: 0 0 ${computedStyle.marginBottom} 0;
@@ -7493,40 +7495,56 @@ function HoldingSubTagPickerSheet({
         cleanup();
         return;
       }
-      draggedEl.style.removeProperty("display");
-      placeholder.parentNode.replaceChild(draggedEl, placeholder);
-      placeholder = null;
       let newOrderPayload = null;
       if (draggedType === "group") {
         const newOrder = [];
-        container.querySelectorAll('[data-drag-type="group"]').forEach((el) => {
-          newOrder.push(el.getAttribute("data-drag-id"));
+        container.querySelectorAll('[data-drag-type="group"], [data-placeholder-for]').forEach((el) => {
+          if (el.getAttribute("data-placeholder-for")) {
+            newOrder.push(el.getAttribute("data-placeholder-for"));
+          } else if (el !== draggedEl) {
+            newOrder.push(el.getAttribute("data-drag-id"));
+          }
         });
+        const draggedId = draggedEl.getAttribute("data-drag-id");
+        if (draggedId && !newOrder.includes(draggedId)) {
+          newOrder.push(draggedId);
+        }
         newOrderPayload = { type: "group", newOrder };
       } else if (draggedType === "tag") {
         const newOrder = [];
+        const draggedId = draggedEl.getAttribute("data-drag-id");
         container.querySelectorAll("[data-drag-zone]").forEach((zone) => {
           const zg = zone.getAttribute("data-drag-zone");
           const gidVal = zg === "ungrouped" ? null : zg;
-          zone.querySelectorAll('[data-drag-type="tag"]').forEach((tEl) => {
-            newOrder.push({ id: tEl.getAttribute("data-drag-id"), groupId: gidVal });
+          Array.from(zone.children).forEach((tEl) => {
+            if (tEl.getAttribute && tEl.getAttribute("data-placeholder-for")) {
+              newOrder.push({ id: tEl.getAttribute("data-placeholder-for"), groupId: gidVal });
+            } else if (tEl !== draggedEl && tEl.getAttribute && tEl.getAttribute("data-drag-type") === "tag") {
+              newOrder.push({ id: tEl.getAttribute("data-drag-id"), groupId: gidVal });
+            }
           });
         });
+        if (draggedId && !newOrder.find((o) => o.id === draggedId)) {
+          newOrder.push({ id: draggedId, groupId: draggedGroupId });
+        }
         newOrderPayload = { type: "tag", newOrder };
       }
       if (draggedClone) {
         draggedClone.remove();
         draggedClone = null;
       }
-      const targetEl = draggedEl;
+      if (placeholder && placeholder.parentNode) {
+        placeholder.parentNode.removeChild(placeholder);
+      }
+      placeholder = null;
+      if (draggedEl && draggedEl.parentNode) {
+        draggedEl.parentNode.removeChild(draggedEl);
+      }
       draggedEl = null;
       draggedType = null;
       draggedGroupId = null;
       setDraggingId(null);
       if (navigator.vibrate) navigator.vibrate(15);
-      if (targetEl && targetEl.parentNode) {
-        targetEl.parentNode.removeChild(targetEl);
-      }
       if (newOrderPayload) {
         if (newOrderPayload.type === "group") {
           onSetGroupOrder && onSetGroupOrder(newOrderPayload.newOrder);
@@ -7534,6 +7552,7 @@ function HoldingSubTagPickerSheet({
           onSetTagsOrder && onSetTagsOrder(newOrderPayload.newOrder);
         }
       }
+      setRenderEpoch((e) => e + 1);
     };
     const onDown = (e) => {
       const handle = e.target.closest && e.target.closest('[data-drag-handle="true"]');
@@ -7595,7 +7614,7 @@ function HoldingSubTagPickerSheet({
     const usedCount = state.holdings.filter((h) => h.subTagId === tag.id).length;
     const isDragging = draggingId === tag.id;
     if (isEditing) {
-      return /* @__PURE__ */ React.createElement("div", { key: tag.id, style: {
+      return /* @__PURE__ */ React.createElement("div", { key: `${tag.id}-${renderEpoch}`, style: {
         display: "flex",
         alignItems: "center",
         gap: 8,
@@ -7654,7 +7673,7 @@ function HoldingSubTagPickerSheet({
       return /* @__PURE__ */ React.createElement(
         "div",
         {
-          key: tag.id,
+          key: `${tag.id}-${renderEpoch}`,
           "data-drag-row": "true",
           "data-drag-handle": "true",
           "data-drag-type": "tag",
@@ -7759,7 +7778,7 @@ function HoldingSubTagPickerSheet({
     return /* @__PURE__ */ React.createElement(
       "div",
       {
-        key: tag.id,
+        key: `${tag.id}-${renderEpoch}`,
         "data-drag-row": "true",
         "data-drag-type": "tag",
         "data-drag-id": tag.id,
@@ -7794,7 +7813,7 @@ function HoldingSubTagPickerSheet({
     return /* @__PURE__ */ React.createElement(
       "div",
       {
-        key: group.id,
+        key: `${group.id}-${renderEpoch}`,
         "data-drag-row": "true",
         "data-drag-type": "group",
         "data-drag-id": group.id,
@@ -18734,6 +18753,7 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
       `;
         document.body.appendChild(draggedClone);
         placeholder = document.createElement("div");
+        placeholder.setAttribute("data-placeholder-for", rowEl.getAttribute("data-drag-id") || "");
         placeholder.style.cssText = `
         height: ${rect.height}px;
         margin: 0 0 ${computedStyle.marginBottom} 0;
@@ -18796,23 +18816,31 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
           cleanup();
           return;
         }
-        draggedEl.style.removeProperty("display");
-        placeholder.parentNode.replaceChild(draggedEl, placeholder);
-        placeholder = null;
         const newOrder = [];
-        container.querySelectorAll('[data-drag-row="true"]').forEach((el) => {
-          newOrder.push(el.getAttribute("data-drag-id"));
+        const draggedId = draggedEl.getAttribute("data-drag-id");
+        Array.from(container.children).forEach((el) => {
+          if (el.getAttribute && el.getAttribute("data-placeholder-for")) {
+            newOrder.push(el.getAttribute("data-placeholder-for"));
+          } else if (el !== draggedEl && el.getAttribute && el.getAttribute("data-drag-row") === "true") {
+            newOrder.push(el.getAttribute("data-drag-id"));
+          }
         });
+        if (draggedId && !newOrder.includes(draggedId)) {
+          newOrder.push(draggedId);
+        }
         if (draggedClone) {
           draggedClone.remove();
           draggedClone = null;
         }
-        const targetEl = draggedEl;
+        if (placeholder && placeholder.parentNode) {
+          placeholder.parentNode.removeChild(placeholder);
+        }
+        placeholder = null;
+        if (draggedEl && draggedEl.parentNode) {
+          draggedEl.parentNode.removeChild(draggedEl);
+        }
         draggedEl = null;
         if (navigator.vibrate) navigator.vibrate(15);
-        if (targetEl && targetEl.parentNode) {
-          targetEl.parentNode.removeChild(targetEl);
-        }
         onSetHoldingsOrder(account.id, newOrder);
       };
       const onDown = (e) => {
