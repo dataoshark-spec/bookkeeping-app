@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520DO";
+const APP_VERSION = "1150520DP";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -1249,9 +1249,14 @@ function App() {
           // accountIds 決定 group 內帳戶的順序;collapsed 持久化跟著 group 走
           accountGroups: Array.isArray(d.accountGroups) ? d.accountGroups : [],
           // [v555DJ] 持股子標籤 — 給股票分類「主題」用,如 太空類 / AI / 機器人 / 美債
-          // 結構: [{ id, name }]
+          // 結構: [{ id, name, groupId? }]
           // 一檔 holding 掛 1 個(holding.subTagId);沒掛的在統計頁歸「未分類」
-          stockSubTags: Array.isArray(d.stockSubTags) ? d.stockSubTags : []
+          // [v555DP] 加 optional groupId,讓分類可分組(沒掛 = 無分組)
+          stockSubTags: Array.isArray(d.stockSubTags) ? d.stockSubTags : [],
+          // [v555DP] 持股子標籤群組 — 把太多分類分群,例如「成長股」/「防禦股」
+          // 結構: [{ id, name, collapsed?: boolean }]
+          // 順序由 array 自身決定;collapsed 持久化(展開/收合狀態跟著 group 走)
+          stockSubTagGroups: Array.isArray(d.stockSubTagGroups) ? d.stockSubTagGroups : []
         };
       }
     } catch {
@@ -1266,7 +1271,8 @@ function App() {
       stockMarkets: [...DEFAULT_STOCK_MARKETS],
       defaultStockMarketId: DEFAULT_STOCK_MARKET_ID,
       accountGroups: [],
-      stockSubTags: []
+      stockSubTags: [],
+      stockSubTagGroups: []
     };
   });
   const [page, setPage] = useState("home");
@@ -2524,6 +2530,72 @@ function App() {
       )
     }));
   };
+  const addStockSubTagGroup = (name) => {
+    const trimmed = String(name || "").trim();
+    if (!trimmed) return null;
+    let resultId = null;
+    setState((s) => {
+      const exists = (s.stockSubTagGroups || []).find((g) => g.name === trimmed);
+      if (exists) {
+        resultId = exists.id;
+        return s;
+      }
+      const newGroup = { id: "sstg_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: trimmed };
+      resultId = newGroup.id;
+      return { ...s, stockSubTagGroups: [...s.stockSubTagGroups || [], newGroup] };
+    });
+    return resultId;
+  };
+  const renameStockSubTagGroup = (groupId, newName) => {
+    const trimmed = String(newName || "").trim();
+    if (!trimmed) return;
+    setState((s) => ({
+      ...s,
+      stockSubTagGroups: (s.stockSubTagGroups || []).map(
+        (g) => g.id === groupId ? { ...g, name: trimmed } : g
+      )
+    }));
+  };
+  const deleteStockSubTagGroup = (groupId) => {
+    setState((s) => ({
+      ...s,
+      stockSubTagGroups: (s.stockSubTagGroups || []).filter((g) => g.id !== groupId),
+      stockSubTags: (s.stockSubTags || []).map(
+        (t) => t.groupId === groupId ? { ...t, groupId: void 0 } : t
+      )
+    }));
+  };
+  const toggleStockSubTagGroupCollapsed = (groupId) => {
+    setState((s) => ({
+      ...s,
+      stockSubTagGroups: (s.stockSubTagGroups || []).map(
+        (g) => g.id === groupId ? { ...g, collapsed: !g.collapsed } : g
+      )
+    }));
+  };
+  const setStockSubTagGroupOrder = (newOrderIds) => {
+    setState((s) => {
+      const map = new Map((s.stockSubTagGroups || []).map((g) => [g.id, g]));
+      const reordered = newOrderIds.map((id) => map.get(id)).filter(Boolean);
+      const seen = new Set(newOrderIds);
+      const leftover = (s.stockSubTagGroups || []).filter((g) => !seen.has(g.id));
+      return { ...s, stockSubTagGroups: [...reordered, ...leftover] };
+    });
+  };
+  const setStockSubTagsOrder = (newOrder) => {
+    setState((s) => {
+      const map = new Map((s.stockSubTags || []).map((t) => [t.id, t]));
+      const reordered = newOrder.map(({ id, groupId }) => {
+        const existing = map.get(id);
+        if (!existing) return null;
+        if (groupId === void 0) return existing;
+        return { ...existing, groupId: groupId || void 0 };
+      }).filter(Boolean);
+      const seen = new Set(newOrder.map((x) => x.id));
+      const leftover = (s.stockSubTags || []).filter((t) => !seen.has(t.id));
+      return { ...s, stockSubTags: [...reordered, ...leftover] };
+    });
+  };
   const updateBuyTrade = (tradeId, newData) => {
     setState((s) => {
       const trade = s.trades.find((t) => t.id === tradeId);
@@ -2810,7 +2882,8 @@ function App() {
           stockMarkets: [...DEFAULT_STOCK_MARKETS],
           defaultStockMarketId: DEFAULT_STOCK_MARKET_ID,
           accountGroups: [],
-          stockSubTags: []
+          stockSubTags: [],
+          stockSubTagGroups: []
         });
         toastRich({
           title: "\u5DF2\u6E05\u9664\u6240\u6709\u8CC7\u6599",
@@ -3382,6 +3455,12 @@ function App() {
       onAdd: addStockSubTag,
       onRename: renameStockSubTag,
       onDelete: deleteStockSubTag,
+      onAddGroup: addStockSubTagGroup,
+      onRenameGroup: renameStockSubTagGroup,
+      onDeleteGroup: deleteStockSubTagGroup,
+      onToggleGroupCollapsed: toggleStockSubTagGroupCollapsed,
+      onSetGroupOrder: setStockSubTagGroupOrder,
+      onSetTagsOrder: setStockSubTagsOrder,
       toast,
       toastRich,
       setConfirmDialog
@@ -6856,34 +6935,6 @@ function HoldingDetailSheet({ state, holding, onClose, onUpdateMarketValue, onBu
     ), /* @__PURE__ */ React.createElement(
       "button",
       {
-        onClick: () => onUpdateMarketValue && onUpdateMarketValue(holding),
-        style: {
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          padding: "14px 16px",
-          background: "transparent",
-          border: "none",
-          cursor: "pointer",
-          WebkitTapHighlightColor: "transparent",
-          textAlign: "left"
-        }
-      },
-      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-dim)", width: 56, flexShrink: 0 } }, "\u5E02\u503C"),
-      /* @__PURE__ */ React.createElement("div", { style: {
-        flex: 1,
-        fontSize: 15,
-        fontWeight: 600,
-        color: market > 0 ? "var(--text)" : "var(--mint-text)",
-        fontFamily: "var(--num-font)",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap"
-      } }, market > 0 ? fmt(market) : "\u9EDE\u6B64\u8A2D\u5B9A"),
-      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, color: "var(--text-faint)", marginLeft: 8 } }, "\u203A")
-    ), /* @__PURE__ */ React.createElement(
-      "button",
-      {
         onClick: () => onEditSubTag && onEditSubTag(holding),
         style: {
           width: "100%",
@@ -6892,7 +6943,7 @@ function HoldingDetailSheet({ state, holding, onClose, onUpdateMarketValue, onBu
           padding: "14px 16px",
           background: "transparent",
           border: "none",
-          borderTop: "1px solid var(--border)",
+          borderBottom: "1px solid var(--border)",
           cursor: "pointer",
           WebkitTapHighlightColor: "transparent",
           textAlign: "left"
@@ -6921,6 +6972,34 @@ function HoldingDetailSheet({ state, holding, onClose, onUpdateMarketValue, onBu
         }
         return /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "(\u672A\u5206\u985E)");
       })()),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, color: "var(--text-faint)", marginLeft: 8 } }, "\u203A")
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => onUpdateMarketValue && onUpdateMarketValue(holding),
+        style: {
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          padding: "14px 16px",
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent",
+          textAlign: "left"
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-dim)", width: 56, flexShrink: 0 } }, "\u5E02\u503C"),
+      /* @__PURE__ */ React.createElement("div", { style: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: 600,
+        color: market > 0 ? "var(--text)" : "var(--mint-text)",
+        fontFamily: "var(--num-font)",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      } }, market > 0 ? fmt(market) : "\u9EDE\u6B64\u8A2D\u5B9A"),
       /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, color: "var(--text-faint)", marginLeft: 8 } }, "\u203A")
     )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, margin: "0 16px 16px" } }, /* @__PURE__ */ React.createElement(
       "button",
@@ -7070,129 +7149,681 @@ function AccountPickerSheet({ state, currentId, excludeIds, onPick, onClose, tit
     })))
   );
 }
-function HoldingSubTagPickerSheet({ state, holding, onClose, onPick, onAdd, onRename, onDelete, toast, toastRich, setConfirmDialog }) {
+function HoldingSubTagPickerSheet({
+  state,
+  holding,
+  onClose,
+  onPick,
+  onAdd,
+  onRename,
+  onDelete,
+  onAddGroup,
+  onRenameGroup,
+  onDeleteGroup,
+  onToggleGroupCollapsed,
+  onSetGroupOrder,
+  onSetTagsOrder,
+  toast,
+  toastRich,
+  setConfirmDialog
+}) {
   const swipe = useSwipeBack(onClose);
   const tags = state.stockSubTags || [];
+  const groups = state.stockSubTagGroups || [];
   const currentId = holding ? holding.subTagId : null;
-  const [showInput, setShowInput] = React.useState(false);
-  const [newName, setNewName] = React.useState("");
+  const [mode, setMode] = React.useState("pick");
+  const [showAddTagInput, setShowAddTagInput] = React.useState(false);
+  const [newTagName, setNewTagName] = React.useState("");
+  const [showAddGroupInput, setShowAddGroupInput] = React.useState(false);
+  const [newGroupName, setNewGroupName] = React.useState("");
   const [editingTagId, setEditingTagId] = React.useState(null);
-  const [editingName, setEditingName] = React.useState("");
-  const longPressTimerRef = React.useRef(null);
-  const longPressTriggeredRef = React.useRef(false);
-  const inputRef = React.useRef(null);
-  const editInputRef = React.useRef(null);
+  const [editingTagName, setEditingTagName] = React.useState("");
+  const [editingGroupId, setEditingGroupId] = React.useState(null);
+  const [editingGroupName, setEditingGroupName] = React.useState("");
+  const [draggingId, setDraggingId] = React.useState(null);
+  const tagInputRef = React.useRef(null);
+  const groupInputRef = React.useRef(null);
+  const editTagInputRef = React.useRef(null);
+  const editGroupInputRef = React.useRef(null);
+  const containerRef = React.useRef(null);
   React.useEffect(() => {
-    if (showInput && inputRef.current) {
-      setTimeout(() => inputRef.current && inputRef.current.focus(), 50);
+    if (showAddTagInput && tagInputRef.current) {
+      setTimeout(() => tagInputRef.current && tagInputRef.current.focus(), 50);
     }
-  }, [showInput]);
+  }, [showAddTagInput]);
   React.useEffect(() => {
-    if (editingTagId && editInputRef.current) {
-      setTimeout(() => editInputRef.current && editInputRef.current.focus(), 50);
+    if (showAddGroupInput && groupInputRef.current) {
+      setTimeout(() => groupInputRef.current && groupInputRef.current.focus(), 50);
+    }
+  }, [showAddGroupInput]);
+  React.useEffect(() => {
+    if (editingTagId && editTagInputRef.current) {
+      setTimeout(() => editTagInputRef.current && editTagInputRef.current.focus(), 50);
     }
   }, [editingTagId]);
+  React.useEffect(() => {
+    if (editingGroupId && editGroupInputRef.current) {
+      setTimeout(() => editGroupInputRef.current && editGroupInputRef.current.focus(), 50);
+    }
+  }, [editingGroupId]);
   if (!holding) return null;
-  const handleAddSubmit = () => {
-    const t = newName.trim();
+  const handleAddTagSubmit = () => {
+    const t = newTagName.trim();
     if (!t) {
       toast && toast("\u8ACB\u8F38\u5165\u5206\u985E\u540D\u7A31");
       return;
     }
-    const existed = tags.find((x) => x.name === t);
-    if (existed) {
+    if (tags.find((x) => x.name === t)) {
       toast && toast("\u5DF2\u6709\u540C\u540D\u5206\u985E");
       return;
     }
     const newId = onAdd && onAdd(t);
-    if (newId) {
-      onPick && onPick(newId);
-      toastRich && toastRich({
-        title: "\u5DF2\u65B0\u589E\u5206\u985E",
-        amount: "\u2713",
-        amountColor: "var(--mint-text)",
-        lines: [t]
-      }, 1400);
-    }
-    setShowInput(false);
-    setNewName("");
+    if (newId && mode === "pick") onPick && onPick(newId);
+    toastRich && toastRich({ title: "\u5DF2\u65B0\u589E\u5206\u985E", amount: "\u2713", amountColor: "var(--mint-text)", lines: [t] }, 1200);
+    setShowAddTagInput(false);
+    setNewTagName("");
   };
-  const handleEditSubmit = () => {
-    const t = editingName.trim();
+  const handleAddGroupSubmit = () => {
+    const t = newGroupName.trim();
+    if (!t) {
+      toast && toast("\u8ACB\u8F38\u5165\u7FA4\u7D44\u540D\u7A31");
+      return;
+    }
+    if (groups.find((g) => g.name === t)) {
+      toast && toast("\u5DF2\u6709\u540C\u540D\u7FA4\u7D44");
+      return;
+    }
+    onAddGroup && onAddGroup(t);
+    toastRich && toastRich({ title: "\u5DF2\u65B0\u589E\u7FA4\u7D44", amount: "\u2713", amountColor: "var(--mint-text)", lines: [t] }, 1200);
+    setShowAddGroupInput(false);
+    setNewGroupName("");
+  };
+  const handleRenameTagSubmit = () => {
+    const t = editingTagName.trim();
     if (!t) {
       toast && toast("\u8ACB\u8F38\u5165\u5206\u985E\u540D\u7A31");
       return;
     }
-    const dup = tags.find((x) => x.id !== editingTagId && x.name === t);
-    if (dup) {
+    if (tags.find((x) => x.id !== editingTagId && x.name === t)) {
       toast && toast("\u5DF2\u6709\u540C\u540D\u5206\u985E");
       return;
     }
     onRename && onRename(editingTagId, t);
-    toastRich && toastRich({
-      title: "\u5DF2\u66F4\u65B0\u5206\u985E",
-      amount: "\u2713",
-      amountColor: "var(--mint-text)"
-    }, 1200);
+    toastRich && toastRich({ title: "\u5DF2\u66F4\u65B0\u5206\u985E", amount: "\u2713", amountColor: "var(--mint-text)" }, 1e3);
     setEditingTagId(null);
-    setEditingName("");
+    setEditingTagName("");
   };
-  const startLongPress = (tag) => {
-    longPressTriggeredRef.current = false;
-    longPressTimerRef.current = setTimeout(() => {
-      longPressTriggeredRef.current = true;
-      setConfirmDialog && setConfirmDialog({
-        title: tag.name,
-        messageList: {
-          before: "\u5C0D\u9019\u500B\u5206\u985E\u505A\u4EC0\u9EBC?",
-          items: [
-            "\u6539\u540D \u2014 \u4FEE\u6539\u5206\u985E\u540D\u7A31",
-            "\u522A\u9664 \u2014 \u6B64\u5206\u985E\u4E0B\u6301\u80A1\u5C07\u8B8A\u56DE \u672A\u5206\u985E "
-          ]
-        },
-        confirmText: "\u6539\u540D",
-        cancelText: "\u522A\u9664",
-        onConfirm: () => {
-          setEditingTagId(tag.id);
-          setEditingName(tag.name);
-        },
-        onCancel: () => {
-          const usedCount = state.holdings.filter((h) => h.subTagId === tag.id).length;
-          setConfirmDialog && setConfirmDialog({
-            title: "\u522A\u9664\u5206\u985E",
-            target: { label: "\u5206\u985E", name: tag.name },
-            messageList: usedCount > 0 ? {
-              before: "\u5C07\u522A\u9664\u9019\u500B\u5206\u985E:",
-              items: [
-                `\u76EE\u524D\u6709 ${usedCount} \u6A94\u6301\u80A1\u4F7F\u7528 \u6B64\u5206\u985E`,
-                "\u522A\u9664\u5F8C\u6301\u80A1\u6703\u8B8A\u56DE \u672A\u5206\u985E (\u6301\u80A1\u672C\u8EAB\u4E0D\u6703\u88AB\u522A\u9664)"
-              ]
-            } : {
-              before: "\u5C07\u522A\u9664\u9019\u500B\u5206\u985E:",
-              items: ["\u6C92\u6709\u6301\u80A1\u4F7F\u7528\u6B64\u5206\u985E,\u53EF\u653E\u5FC3\u522A\u9664"]
-            },
-            warning: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F",
-            confirmText: "\u522A\u9664",
-            danger: true,
-            onConfirm: () => {
-              onDelete && onDelete(tag.id);
-              toastRich && toastRich({
-                title: "\u5DF2\u522A\u9664\u5206\u985E",
-                amount: "\u2713",
-                amountColor: "var(--pink-text)"
-              }, 1200);
-            }
-          });
-        }
-      });
-    }, 500);
-  };
-  const cancelLongPress = () => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
+  const handleRenameGroupSubmit = () => {
+    const t = editingGroupName.trim();
+    if (!t) {
+      toast && toast("\u8ACB\u8F38\u5165\u7FA4\u7D44\u540D\u7A31");
+      return;
     }
+    if (groups.find((g) => g.id !== editingGroupId && g.name === t)) {
+      toast && toast("\u5DF2\u6709\u540C\u540D\u7FA4\u7D44");
+      return;
+    }
+    onRenameGroup && onRenameGroup(editingGroupId, t);
+    toastRich && toastRich({ title: "\u5DF2\u66F4\u65B0\u7FA4\u7D44", amount: "\u2713", amountColor: "var(--mint-text)" }, 1e3);
+    setEditingGroupId(null);
+    setEditingGroupName("");
   };
+  const askDeleteTag = (tag) => {
+    const usedCount = state.holdings.filter((h) => h.subTagId === tag.id).length;
+    setConfirmDialog && setConfirmDialog({
+      title: "\u522A\u9664\u5206\u985E",
+      target: { label: "\u5206\u985E", name: tag.name },
+      messageList: usedCount > 0 ? {
+        before: "\u5C07\u522A\u9664\u9019\u500B\u5206\u985E:",
+        items: [
+          `\u76EE\u524D\u6709 ${usedCount} \u6A94\u6301\u80A1\u4F7F\u7528 \u6B64\u5206\u985E`,
+          "\u522A\u9664\u5F8C\u6301\u80A1\u6703\u8B8A\u56DE \u672A\u5206\u985E (\u6301\u80A1\u672C\u8EAB\u4E0D\u6703\u88AB\u522A\u9664)"
+        ]
+      } : {
+        before: "\u5C07\u522A\u9664\u9019\u500B\u5206\u985E:",
+        items: ["\u6C92\u6709\u6301\u80A1\u4F7F\u7528\u6B64\u5206\u985E,\u53EF\u653E\u5FC3\u522A\u9664"]
+      },
+      warning: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F",
+      confirmText: "\u522A\u9664",
+      danger: true,
+      onConfirm: () => {
+        onDelete && onDelete(tag.id);
+        toastRich && toastRich({ title: "\u5DF2\u522A\u9664\u5206\u985E", amount: "\u2713", amountColor: "var(--pink-text)" }, 1100);
+      }
+    });
+  };
+  const askDeleteGroup = (group) => {
+    const tagsInGroup = tags.filter((t) => t.groupId === group.id);
+    setConfirmDialog && setConfirmDialog({
+      title: "\u522A\u9664\u7FA4\u7D44",
+      target: { label: "\u7FA4\u7D44", name: group.name },
+      messageList: tagsInGroup.length > 0 ? {
+        before: "\u5C07\u522A\u9664\u9019\u500B\u7FA4\u7D44:",
+        items: [
+          `\u7FA4\u7D44\u5167\u6709 ${tagsInGroup.length} \u500B\u5206\u985E`,
+          "\u522A\u9664\u5F8C\u5206\u985E\u6703\u8B8A\u56DE \u7121\u5206\u7D44 (\u5206\u985E\u672C\u8EAB\u4E0D\u6703\u88AB\u522A\u9664)"
+        ]
+      } : {
+        before: "\u5C07\u522A\u9664\u9019\u500B\u7FA4\u7D44:",
+        items: ["\u7FA4\u7D44\u662F\u7A7A\u7684,\u53EF\u653E\u5FC3\u522A\u9664"]
+      },
+      warning: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F",
+      confirmText: "\u522A\u9664",
+      danger: true,
+      onConfirm: () => {
+        onDeleteGroup && onDeleteGroup(group.id);
+        toastRich && toastRich({ title: "\u5DF2\u522A\u9664\u7FA4\u7D44", amount: "\u2713", amountColor: "var(--pink-text)" }, 1100);
+      }
+    });
+  };
+  const askMoveTagToGroup = (tag) => {
+    const opts = [
+      { label: "(\u7121\u5206\u7D44)", id: null },
+      ...groups.map((g) => ({ label: g.name, id: g.id }))
+    ];
+    setConfirmDialog && setConfirmDialog({
+      title: "\u79FB\u5230\u7FA4\u7D44",
+      target: { label: "\u5206\u985E", name: tag.name },
+      messageList: {
+        before: "\u9078\u64C7\u8981\u79FB\u5230\u7684\u7FA4\u7D44:",
+        items: opts.map((o) => o.label + (o.id === (tag.groupId || null) ? " \u2713" : ""))
+      },
+      hideButtons: true,
+      customActions: opts.map((o) => ({
+        label: o.label + (o.id === (tag.groupId || null) ? " (\u76EE\u524D)" : ""),
+        onClick: () => {
+          if (o.id === (tag.groupId || null)) return;
+          const newOrder = [];
+          tags.forEach((t) => {
+            if (t.id !== tag.id) newOrder.push({ id: t.id, groupId: t.groupId || null });
+          });
+          newOrder.push({ id: tag.id, groupId: o.id });
+          onSetTagsOrder && onSetTagsOrder(newOrder);
+          toastRich && toastRich({ title: "\u5DF2\u79FB\u52D5\u5206\u985E", amount: "\u2713", amountColor: "var(--mint-text)", lines: [`${tag.name} \u2192 ${o.label}`] }, 1200);
+        }
+      }))
+    });
+  };
+  React.useEffect(() => {
+    if (mode !== "edit") return;
+    const container = containerRef.current;
+    if (!container) return;
+    let draggedEl = null;
+    let draggedClone = null;
+    let placeholder = null;
+    let draggedType = null;
+    let draggedGroupId = null;
+    let startX = 0, startY = 0;
+    let longPressTimer = null;
+    let moved = false;
+    let offsetX = 0, offsetY = 0;
+    const cleanup = () => {
+      if (draggedClone) {
+        draggedClone.remove();
+        draggedClone = null;
+      }
+      if (placeholder && placeholder.parentNode) {
+        if (draggedEl) {
+          placeholder.parentNode.replaceChild(draggedEl, placeholder);
+          draggedEl.style.removeProperty("display");
+        } else {
+          placeholder.remove();
+        }
+      }
+      placeholder = null;
+      draggedEl = null;
+      draggedType = null;
+      draggedGroupId = null;
+      setDraggingId(null);
+    };
+    const startDrag = (rowEl, x, y) => {
+      draggedEl = rowEl;
+      draggedType = rowEl.getAttribute("data-drag-type");
+      draggedGroupId = rowEl.getAttribute("data-drag-group-id") || null;
+      if (draggedGroupId === "null") draggedGroupId = null;
+      const rect = rowEl.getBoundingClientRect();
+      offsetX = x - rect.left;
+      offsetY = y - rect.top;
+      draggedClone = rowEl.cloneNode(true);
+      draggedClone.style.cssText = `
+        position: fixed;
+        left: ${rect.left}px;
+        top: ${rect.top}px;
+        width: ${rect.width}px;
+        z-index: 9999;
+        pointer-events: none;
+        opacity: 0.9;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        transform: scale(1.02);
+        transition: transform 0.15s;
+      `;
+      document.body.appendChild(draggedClone);
+      placeholder = document.createElement("div");
+      placeholder.style.cssText = `
+        height: ${rect.height}px;
+        background: rgba(126, 224, 192, 0.15);
+        border: 2px dashed var(--mint);
+        border-radius: 12px;
+        margin-bottom: 6px;
+      `;
+      rowEl.parentNode.insertBefore(placeholder, rowEl);
+      rowEl.style.display = "none";
+      setDraggingId(rowEl.getAttribute("data-drag-id"));
+      if (navigator.vibrate) navigator.vibrate(20);
+    };
+    const moveDrag = (x, y) => {
+      if (!draggedClone) return;
+      draggedClone.style.left = x - offsetX + "px";
+      draggedClone.style.top = y - offsetY + "px";
+      const elsBelow = document.elementsFromPoint(x, y);
+      const targetRow = elsBelow.find((el) => {
+        if (!el.getAttribute) return false;
+        if (el === draggedClone || el === placeholder || el === draggedEl) return false;
+        const t = el.getAttribute("data-drag-type");
+        if (t !== draggedType) return false;
+        if (draggedType === "tag") {
+          const gid = el.getAttribute("data-drag-group-id") || null;
+          const gidNorm = gid === "null" ? null : gid;
+          if (gidNorm !== draggedGroupId) return false;
+        }
+        return true;
+      });
+      if (!targetRow) return;
+      const tRect = targetRow.getBoundingClientRect();
+      const insertBefore = y < tRect.top + tRect.height / 2;
+      const parent = targetRow.parentNode;
+      if (insertBefore) {
+        if (placeholder.nextSibling !== targetRow) {
+          parent.insertBefore(placeholder, targetRow);
+        }
+      } else {
+        if (targetRow.nextSibling !== placeholder) {
+          parent.insertBefore(placeholder, targetRow.nextSibling);
+        }
+      }
+    };
+    const commitDrop = () => {
+      if (!draggedEl || !placeholder) {
+        cleanup();
+        return;
+      }
+      placeholder.parentNode.replaceChild(draggedEl, placeholder);
+      draggedEl.style.removeProperty("display");
+      placeholder = null;
+      if (draggedType === "group") {
+        const newOrder = [];
+        container.querySelectorAll('[data-drag-type="group"]').forEach((el) => {
+          newOrder.push(el.getAttribute("data-drag-id"));
+        });
+        onSetGroupOrder && onSetGroupOrder(newOrder);
+      } else if (draggedType === "tag") {
+        const newOrder = [];
+        container.querySelectorAll("[data-drag-zone]").forEach((zone) => {
+          const zg = zone.getAttribute("data-drag-zone");
+          const gidVal = zg === "ungrouped" ? null : zg;
+          zone.querySelectorAll('[data-drag-type="tag"]').forEach((tEl) => {
+            newOrder.push({ id: tEl.getAttribute("data-drag-id"), groupId: gidVal });
+          });
+        });
+        onSetTagsOrder && onSetTagsOrder(newOrder);
+      }
+      if (draggedClone) {
+        draggedClone.remove();
+        draggedClone = null;
+      }
+      draggedEl = null;
+      draggedType = null;
+      draggedGroupId = null;
+      setDraggingId(null);
+      if (navigator.vibrate) navigator.vibrate(15);
+    };
+    const onDown = (e) => {
+      const handle = e.target.closest && e.target.closest('[data-drag-handle="true"]');
+      if (!handle) return;
+      const rowEl = handle.closest('[data-drag-row="true"]');
+      if (!rowEl) return;
+      const touch = e.touches ? e.touches[0] : e;
+      startX = touch.clientX;
+      startY = touch.clientY;
+      moved = false;
+      longPressTimer = setTimeout(() => {
+        if (!moved) startDrag(rowEl, startX, startY);
+      }, 350);
+    };
+    const onMove = (e) => {
+      const touch = e.touches ? e.touches[0] : e;
+      if (longPressTimer && !draggedEl) {
+        const dx = touch.clientX - startX;
+        const dy = touch.clientY - startY;
+        if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+          moved = true;
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+        return;
+      }
+      if (!draggedEl) return;
+      e.preventDefault();
+      moveDrag(touch.clientX, touch.clientY);
+    };
+    const onUp = () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+      if (draggedEl) commitDrop();
+    };
+    container.addEventListener("touchstart", onDown, { passive: true });
+    container.addEventListener("touchmove", onMove, { passive: false });
+    container.addEventListener("touchend", onUp);
+    container.addEventListener("touchcancel", onUp);
+    container.addEventListener("mousedown", onDown);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      cleanup();
+      container.removeEventListener("touchstart", onDown);
+      container.removeEventListener("touchmove", onMove);
+      container.removeEventListener("touchend", onUp);
+      container.removeEventListener("touchcancel", onUp);
+      container.removeEventListener("mousedown", onDown);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [mode, onSetGroupOrder, onSetTagsOrder]);
+  const renderTagRow = (tag) => {
+    const isSelected = tag.id === currentId;
+    const isEditing = editingTagId === tag.id;
+    const usedCount = state.holdings.filter((h) => h.subTagId === tag.id).length;
+    const isDragging = draggingId === tag.id;
+    if (isEditing) {
+      return /* @__PURE__ */ React.createElement("div", { key: tag.id, style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "10px 14px",
+        borderRadius: 12,
+        background: "var(--bg-card)",
+        border: "2px solid var(--mint)",
+        marginBottom: 6
+      } }, /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          ref: editTagInputRef,
+          value: editingTagName,
+          onChange: (e) => setEditingTagName(e.target.value),
+          onKeyDown: (e) => {
+            if (e.key === "Enter") handleRenameTagSubmit();
+            if (e.key === "Escape") {
+              setEditingTagId(null);
+              setEditingTagName("");
+            }
+          },
+          style: {
+            flex: 1,
+            fontSize: 14,
+            padding: "8px 10px",
+            borderRadius: 8,
+            border: "1px solid var(--border)",
+            background: "var(--bg)",
+            color: "var(--text)",
+            outline: "none"
+          }
+        }
+      ), /* @__PURE__ */ React.createElement("button", { onClick: handleRenameTagSubmit, style: {
+        padding: "8px 14px",
+        borderRadius: 8,
+        background: "var(--mint)",
+        color: "#fff",
+        border: "none",
+        fontSize: 13,
+        fontWeight: 600,
+        cursor: "pointer"
+      } }, "\u5132\u5B58"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+        setEditingTagId(null);
+        setEditingTagName("");
+      }, style: {
+        padding: "8px 10px",
+        borderRadius: 8,
+        background: "transparent",
+        color: "var(--text-dim)",
+        border: "1px solid var(--border)",
+        fontSize: 13,
+        cursor: "pointer"
+      } }, "\u53D6\u6D88"));
+    }
+    return /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        key: tag.id,
+        "data-drag-row": "true",
+        "data-drag-type": "tag",
+        "data-drag-id": tag.id,
+        "data-drag-group-id": tag.groupId || "null",
+        onClick: () => {
+          if (mode === "pick") onPick && onPick(tag.id);
+        },
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "14px 16px",
+          borderRadius: 12,
+          background: "var(--bg-card)",
+          border: isSelected && mode === "pick" ? "2px solid var(--mint)" : "1.5px solid var(--border)",
+          cursor: mode === "pick" ? "pointer" : "default",
+          WebkitTapHighlightColor: "transparent",
+          WebkitUserSelect: "none",
+          userSelect: "none",
+          marginBottom: 6,
+          opacity: isDragging ? 0.3 : 1
+        }
+      },
+      mode === "edit" && /* @__PURE__ */ React.createElement("div", { "data-drag-handle": "true", style: {
+        width: 22,
+        height: 28,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "grab",
+        color: "var(--text-faint)",
+        flexShrink: 0,
+        touchAction: "none"
+      } }, /* @__PURE__ */ React.createElement("svg", { width: "14", height: "18", viewBox: "0 0 14 18", fill: "currentColor" }, /* @__PURE__ */ React.createElement("circle", { cx: "3", cy: "3", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "3", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "3", cy: "9", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "9", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "3", cy: "15", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "15", r: "1.5" }))),
+      /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 500 } }, tag.name), usedCount > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2 } }, usedCount, " \u6A94\u6301\u80A1")),
+      mode === "pick" && isSelected && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--mint-text)", fontWeight: 700 } }, "\u2713"),
+      mode === "edit" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: (e) => {
+            e.stopPropagation();
+            askMoveTagToGroup(tag);
+          },
+          style: {
+            padding: "6px 8px",
+            borderRadius: 8,
+            background: "transparent",
+            color: "var(--text-dim)",
+            border: "1px solid var(--border)",
+            fontSize: 11,
+            cursor: "pointer"
+          }
+        },
+        "\u79FB\u52D5"
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: (e) => {
+            e.stopPropagation();
+            setEditingTagId(tag.id);
+            setEditingTagName(tag.name);
+          },
+          style: {
+            padding: "6px 8px",
+            borderRadius: 8,
+            background: "transparent",
+            color: "var(--text-dim)",
+            border: "1px solid var(--border)",
+            fontSize: 11,
+            cursor: "pointer"
+          }
+        },
+        "\u6539\u540D"
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: (e) => {
+            e.stopPropagation();
+            askDeleteTag(tag);
+          },
+          style: {
+            padding: "6px 8px",
+            borderRadius: 8,
+            background: "transparent",
+            color: "var(--pink-text)",
+            border: "1px solid var(--pink)",
+            fontSize: 11,
+            cursor: "pointer"
+          }
+        },
+        "\u522A\u9664"
+      ))
+    );
+  };
+  const renderGroupBlock = (group) => {
+    const groupTags = tags.filter((t) => t.groupId === group.id);
+    const isEditing = editingGroupId === group.id;
+    const isDragging = draggingId === group.id;
+    const isCollapsed = !!group.collapsed;
+    return /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        key: group.id,
+        "data-drag-row": "true",
+        "data-drag-type": "group",
+        "data-drag-id": group.id,
+        style: {
+          marginBottom: 12,
+          opacity: isDragging ? 0.3 : 1
+        }
+      },
+      isEditing ? /* @__PURE__ */ React.createElement("div", { style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "10px 14px",
+        borderRadius: 10,
+        background: "var(--bg-card)",
+        border: "2px solid var(--mint)",
+        marginBottom: 6
+      } }, /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          ref: editGroupInputRef,
+          value: editingGroupName,
+          onChange: (e) => setEditingGroupName(e.target.value),
+          onKeyDown: (e) => {
+            if (e.key === "Enter") handleRenameGroupSubmit();
+            if (e.key === "Escape") {
+              setEditingGroupId(null);
+              setEditingGroupName("");
+            }
+          },
+          style: {
+            flex: 1,
+            fontSize: 14,
+            padding: "8px 10px",
+            borderRadius: 8,
+            border: "1px solid var(--border)",
+            background: "var(--bg)",
+            color: "var(--text)",
+            outline: "none"
+          }
+        }
+      ), /* @__PURE__ */ React.createElement("button", { onClick: handleRenameGroupSubmit, style: {
+        padding: "8px 14px",
+        borderRadius: 8,
+        background: "var(--mint)",
+        color: "#fff",
+        border: "none",
+        fontSize: 13,
+        fontWeight: 600,
+        cursor: "pointer"
+      } }, "\u5132\u5B58"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+        setEditingGroupId(null);
+        setEditingGroupName("");
+      }, style: {
+        padding: "8px 10px",
+        borderRadius: 8,
+        background: "transparent",
+        color: "var(--text-dim)",
+        border: "1px solid var(--border)",
+        fontSize: 13,
+        cursor: "pointer"
+      } }, "\u53D6\u6D88")) : /* @__PURE__ */ React.createElement("div", { style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "8px 6px 8px 4px",
+        marginBottom: 4
+      } }, mode === "edit" && /* @__PURE__ */ React.createElement("div", { "data-drag-handle": "true", style: {
+        width: 22,
+        height: 28,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "grab",
+        color: "var(--text-faint)",
+        flexShrink: 0,
+        touchAction: "none"
+      } }, /* @__PURE__ */ React.createElement("svg", { width: "14", height: "18", viewBox: "0 0 14 18", fill: "currentColor" }, /* @__PURE__ */ React.createElement("circle", { cx: "3", cy: "3", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "3", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "3", cy: "9", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "9", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "3", cy: "15", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "15", r: "1.5" }))), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => onToggleGroupCollapsed && onToggleGroupCollapsed(group.id),
+          style: {
+            background: "transparent",
+            border: "none",
+            color: "var(--text-dim)",
+            fontSize: 13,
+            cursor: "pointer",
+            padding: "2px 4px",
+            display: "flex",
+            alignItems: "center",
+            gap: 6
+          }
+        },
+        /* @__PURE__ */ React.createElement("span", { style: { transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 0.15s", display: "inline-block" } }, "\u25BE"),
+        /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700, color: "var(--text)" } }, group.name),
+        /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 12 } }, "(", groupTags.length, ")")
+      ), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), mode === "edit" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { onClick: () => {
+        setEditingGroupId(group.id);
+        setEditingGroupName(group.name);
+      }, style: {
+        padding: "4px 8px",
+        borderRadius: 8,
+        background: "transparent",
+        color: "var(--text-dim)",
+        border: "1px solid var(--border)",
+        fontSize: 11,
+        cursor: "pointer"
+      } }, "\u6539\u540D"), /* @__PURE__ */ React.createElement("button", { onClick: () => askDeleteGroup(group), style: {
+        padding: "4px 8px",
+        borderRadius: 8,
+        background: "transparent",
+        color: "var(--pink-text)",
+        border: "1px solid var(--pink)",
+        fontSize: 11,
+        cursor: "pointer"
+      } }, "\u522A\u9664"))),
+      !isCollapsed && /* @__PURE__ */ React.createElement("div", { "data-drag-zone": group.id, style: { paddingLeft: 8 } }, groupTags.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: {
+        fontSize: 11,
+        color: "var(--text-faint)",
+        textAlign: "center",
+        padding: "8px 0"
+      } }, "(\u6B64\u7FA4\u7D44\u662F\u7A7A\u7684)") : groupTags.map((t) => renderTagRow(t)))
+    );
+  };
+  const ungroupedTags = tags.filter((t) => !t.groupId);
   return /* @__PURE__ */ React.createElement(
     "div",
     {
@@ -7218,8 +7849,25 @@ function HoldingSubTagPickerSheet({ state, holding, onClose, onPick, onAdd, onRe
         onClick: onClose
       },
       "\xD7"
-    ), /* @__PURE__ */ React.createElement("div", { style: { ...styles.sheetTitle, color: "var(--text)" } }, "\u9078\u64C7\u5206\u985E"), /* @__PURE__ */ React.createElement("div", { style: { width: 50 } })),
-    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: { padding: "4px 16px 0", fontSize: 12, color: "var(--text-faint)" } }, "\u7D66 ", holding.symbol, " \u5206\u5230\u81EA\u8A02\u7684\u4E3B\u984C\u985E\u5225,\u5982 \u592A\u7A7A / AI / \u6A5F\u5668\u4EBA / \u7F8E\u50B5 \u7B49\u3002"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, padding: 12 } }, /* @__PURE__ */ React.createElement(
+    ), /* @__PURE__ */ React.createElement("div", { style: { ...styles.sheetTitle, color: "var(--text)" } }, "\u9078\u64C7\u5206\u985E"), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setMode((m) => m === "pick" ? "edit" : "pick"),
+        style: {
+          background: mode === "edit" ? "var(--mint)" : "transparent",
+          color: mode === "edit" ? "#fff" : "var(--mint-text)",
+          border: mode === "edit" ? "none" : "1px solid var(--mint)",
+          borderRadius: 14,
+          padding: "5px 12px",
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: "pointer",
+          marginRight: 8
+        }
+      },
+      mode === "edit" ? "\u5B8C\u6210" : "\u7DE8\u8F2F"
+    )),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: { padding: "4px 16px 0", fontSize: 12, color: "var(--text-faint)" } }, mode === "edit" ? "\u9577\u6309\u62D6\u66F3\u624B\u67C4\u53EF\u6392\u5E8F;\u7FA4\u7D44\u53EA\u80FD\u8DDF\u7FA4\u7D44\u6392\u5E8F\u3001\u5206\u985E\u53EA\u80FD\u5728\u540C\u7FA4\u7D44\u5167\u6392\u5E8F;\u8DE8\u7FA4\u7D44\u8ACB\u7528 \u79FB\u52D5 \u6309\u9215\u3002" : `\u7D66 ${holding.symbol} \u5206\u5230\u81EA\u8A02\u7684\u4E3B\u984C\u985E\u5225,\u5982 \u592A\u7A7A / AI / \u6A5F\u5668\u4EBA / \u7F8E\u50B5 \u7B49\u3002`), /* @__PURE__ */ React.createElement("div", { ref: containerRef, style: { padding: 12 } }, mode === "pick" && /* @__PURE__ */ React.createElement(
       "div",
       {
         onClick: () => onPick && onPick(null),
@@ -7231,211 +7879,130 @@ function HoldingSubTagPickerSheet({ state, holding, onClose, onPick, onAdd, onRe
           borderRadius: 12,
           background: "var(--bg-card)",
           border: !currentId ? "2px solid var(--mint)" : "1.5px solid var(--border)",
-          cursor: "pointer"
+          cursor: "pointer",
+          marginBottom: 10
         }
       },
       /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 14, color: "var(--text-dim)" } }, "\u672A\u5206\u985E"),
       !currentId && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--mint-text)", fontWeight: 700 } }, "\u2713")
-    ), tags.map((tag) => {
-      const isSelected = tag.id === currentId;
-      const isEditing = editingTagId === tag.id;
-      const usedCount = state.holdings.filter((h) => h.subTagId === tag.id).length;
-      if (isEditing) {
-        return /* @__PURE__ */ React.createElement(
-          "div",
-          {
-            key: tag.id,
-            style: {
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "10px 14px",
-              borderRadius: 12,
-              background: "var(--bg-card)",
-              border: "2px solid var(--mint)"
-            }
-          },
-          /* @__PURE__ */ React.createElement(
-            "input",
-            {
-              ref: editInputRef,
-              value: editingName,
-              onChange: (e) => setEditingName(e.target.value),
-              onKeyDown: (e) => {
-                if (e.key === "Enter") handleEditSubmit();
-                if (e.key === "Escape") {
-                  setEditingTagId(null);
-                  setEditingName("");
-                }
-              },
-              placeholder: "\u5206\u985E\u540D\u7A31",
-              style: {
-                flex: 1,
-                fontSize: 14,
-                padding: "8px 10px",
-                borderRadius: 8,
-                border: "1px solid var(--border)",
-                background: "var(--bg)",
-                color: "var(--text)",
-                outline: "none"
-              }
-            }
-          ),
-          /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              onClick: handleEditSubmit,
-              style: {
-                padding: "8px 14px",
-                borderRadius: 8,
-                background: "var(--mint)",
-                color: "#fff",
-                border: "none",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer"
-              }
-            },
-            "\u5132\u5B58"
-          ),
-          /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              onClick: () => {
-                setEditingTagId(null);
-                setEditingName("");
-              },
-              style: {
-                padding: "8px 10px",
-                borderRadius: 8,
-                background: "transparent",
-                color: "var(--text-dim)",
-                border: "1px solid var(--border)",
-                fontSize: 13,
-                cursor: "pointer"
-              }
-            },
-            "\u53D6\u6D88"
-          )
-        );
-      }
-      return /* @__PURE__ */ React.createElement(
-        "div",
-        {
-          key: tag.id,
-          onClick: () => {
-            if (longPressTriggeredRef.current) {
-              longPressTriggeredRef.current = false;
-              return;
-            }
-            onPick && onPick(tag.id);
-          },
-          onTouchStart: () => startLongPress(tag),
-          onTouchEnd: cancelLongPress,
-          onTouchMove: cancelLongPress,
-          onTouchCancel: cancelLongPress,
-          onContextMenu: (e) => {
-            e.preventDefault();
-            longPressTriggeredRef.current = true;
-            startLongPress(tag);
-            cancelLongPress();
-          },
-          style: {
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "14px 16px",
-            borderRadius: 12,
-            background: "var(--bg-card)",
-            border: isSelected ? "2px solid var(--mint)" : "1.5px solid var(--border)",
-            cursor: "pointer",
-            WebkitTapHighlightColor: "transparent",
-            WebkitUserSelect: "none",
-            userSelect: "none"
-          }
-        },
-        /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 500 } }, tag.name), usedCount > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2 } }, usedCount, " \u6A94\u6301\u80A1")),
-        isSelected && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--mint-text)", fontWeight: 700 } }, "\u2713")
-      );
-    }), showInput ? /* @__PURE__ */ React.createElement(
-      "div",
+    ), groups.map((g) => renderGroupBlock(g)), groups.length > 0 ? /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: {
+      padding: "8px 6px 8px 4px",
+      fontSize: 12,
+      color: "var(--text-dim)",
+      fontWeight: 600,
+      marginBottom: 4
+    } }, "(\u7121\u5206\u7D44) ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "(", ungroupedTags.length, ")")), /* @__PURE__ */ React.createElement("div", { "data-drag-zone": "ungrouped", style: { paddingLeft: 8 } }, ungroupedTags.map((t) => renderTagRow(t)))) : /* @__PURE__ */ React.createElement("div", { "data-drag-zone": "ungrouped" }, ungroupedTags.map((t) => renderTagRow(t))), showAddTagInput && /* @__PURE__ */ React.createElement("div", { style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "10px 14px",
+      borderRadius: 12,
+      background: "var(--bg-card)",
+      border: "2px dashed var(--mint)",
+      marginBottom: 6
+    } }, /* @__PURE__ */ React.createElement(
+      "input",
       {
+        ref: tagInputRef,
+        value: newTagName,
+        onChange: (e) => setNewTagName(e.target.value),
+        onKeyDown: (e) => {
+          if (e.key === "Enter") handleAddTagSubmit();
+          if (e.key === "Escape") {
+            setShowAddTagInput(false);
+            setNewTagName("");
+          }
+        },
+        placeholder: "\u4F8B:\u592A\u7A7A\u985E / AI / \u6A5F\u5668\u4EBA",
         style: {
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "10px 14px",
-          borderRadius: 12,
-          background: "var(--bg-card)",
-          border: "2px dashed var(--mint)"
+          flex: 1,
+          fontSize: 14,
+          padding: "8px 10px",
+          borderRadius: 8,
+          border: "1px solid var(--border)",
+          background: "var(--bg)",
+          color: "var(--text)",
+          outline: "none"
         }
-      },
-      /* @__PURE__ */ React.createElement(
-        "input",
-        {
-          ref: inputRef,
-          value: newName,
-          onChange: (e) => setNewName(e.target.value),
-          onKeyDown: (e) => {
-            if (e.key === "Enter") handleAddSubmit();
-            if (e.key === "Escape") {
-              setShowInput(false);
-              setNewName("");
-            }
-          },
-          placeholder: "\u4F8B:\u592A\u7A7A\u985E / AI / \u6A5F\u5668\u4EBA",
-          style: {
-            flex: 1,
-            fontSize: 14,
-            padding: "8px 10px",
-            borderRadius: 8,
-            border: "1px solid var(--border)",
-            background: "var(--bg)",
-            color: "var(--text)",
-            outline: "none"
-          }
-        }
-      ),
-      /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          onClick: handleAddSubmit,
-          style: {
-            padding: "8px 14px",
-            borderRadius: 8,
-            background: "var(--mint)",
-            color: "#fff",
-            border: "none",
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: "pointer"
+      }
+    ), /* @__PURE__ */ React.createElement("button", { onClick: handleAddTagSubmit, style: {
+      padding: "8px 14px",
+      borderRadius: 8,
+      background: "var(--mint)",
+      color: "#fff",
+      border: "none",
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: "pointer"
+    } }, "\u65B0\u589E"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+      setShowAddTagInput(false);
+      setNewTagName("");
+    }, style: {
+      padding: "8px 10px",
+      borderRadius: 8,
+      background: "transparent",
+      color: "var(--text-dim)",
+      border: "1px solid var(--border)",
+      fontSize: 13,
+      cursor: "pointer"
+    } }, "\u53D6\u6D88")), showAddGroupInput && /* @__PURE__ */ React.createElement("div", { style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "10px 14px",
+      borderRadius: 12,
+      background: "var(--bg-card)",
+      border: "2px dashed var(--mint)",
+      marginBottom: 6
+    } }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        ref: groupInputRef,
+        value: newGroupName,
+        onChange: (e) => setNewGroupName(e.target.value),
+        onKeyDown: (e) => {
+          if (e.key === "Enter") handleAddGroupSubmit();
+          if (e.key === "Escape") {
+            setShowAddGroupInput(false);
+            setNewGroupName("");
           }
         },
-        "\u65B0\u589E"
-      ),
-      /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          onClick: () => {
-            setShowInput(false);
-            setNewName("");
-          },
-          style: {
-            padding: "8px 10px",
-            borderRadius: 8,
-            background: "transparent",
-            color: "var(--text-dim)",
-            border: "1px solid var(--border)",
-            fontSize: 13,
-            cursor: "pointer"
-          }
-        },
-        "\u53D6\u6D88"
-      )
-    ) : /* @__PURE__ */ React.createElement(
+        placeholder: "\u4F8B:\u6210\u9577\u80A1 / \u9632\u79A6",
+        style: {
+          flex: 1,
+          fontSize: 14,
+          padding: "8px 10px",
+          borderRadius: 8,
+          border: "1px solid var(--border)",
+          background: "var(--bg)",
+          color: "var(--text)",
+          outline: "none"
+        }
+      }
+    ), /* @__PURE__ */ React.createElement("button", { onClick: handleAddGroupSubmit, style: {
+      padding: "8px 14px",
+      borderRadius: 8,
+      background: "var(--mint)",
+      color: "#fff",
+      border: "none",
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: "pointer"
+    } }, "\u65B0\u589E"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+      setShowAddGroupInput(false);
+      setNewGroupName("");
+    }, style: {
+      padding: "8px 10px",
+      borderRadius: 8,
+      background: "transparent",
+      color: "var(--text-dim)",
+      border: "1px solid var(--border)",
+      fontSize: 13,
+      cursor: "pointer"
+    } }, "\u53D6\u6D88")), !showAddTagInput && /* @__PURE__ */ React.createElement(
       "button",
       {
-        onClick: () => setShowInput(true),
+        onClick: () => setShowAddTagInput(true),
         style: {
           display: "flex",
           alignItems: "center",
@@ -7449,11 +8016,35 @@ function HoldingSubTagPickerSheet({ state, holding, onClose, onPick, onAdd, onRe
           fontSize: 14,
           fontWeight: 600,
           cursor: "pointer",
+          width: "100%",
+          WebkitTapHighlightColor: "transparent",
+          marginBottom: 6
+        }
+      },
+      "+ \u65B0\u589E\u5206\u985E"
+    ), !showAddGroupInput && mode === "edit" && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setShowAddGroupInput(true),
+        style: {
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          padding: "12px 14px",
+          borderRadius: 12,
+          background: "transparent",
+          border: "1.5px dashed var(--border)",
+          color: "var(--text-dim)",
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: "pointer",
+          width: "100%",
           WebkitTapHighlightColor: "transparent"
         }
       },
-      /* @__PURE__ */ React.createElement("span", null, "+ \u65B0\u589E\u5206\u985E")
-    ), tags.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", textAlign: "center", marginTop: 6 } }, "\u9577\u6309\u5206\u985E\u53EF \u6539\u540D \u6216 \u522A\u9664")))
+      "+ \u65B0\u589E\u7FA4\u7D44"
+    )))
   );
 }
 function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, selectedDate, setSelectedDate, onAdd, onClickTxn, onViewAll, onOpenPeriod, onOpenAccount, onOpenDate, onOpenLend, onOpenInvestPicker, editMode, setEditMode, blockOrder, moveBlock, setPageOrder, setConfirmDialog, toastRich, toast, onSelectModeChange, isBlockHidden, toggleBlockHidden }) {
@@ -9480,7 +10071,8 @@ function SettingsPage({
       stockMarkets: state.stockMarkets,
       defaultStockMarketId: state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID,
       accountGroups: state.accountGroups || [],
-      stockSubTags: state.stockSubTags || []
+      stockSubTags: state.stockSubTags || [],
+      stockSubTagGroups: state.stockSubTagGroups || []
     });
     const snap = {
       id: "snap_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
@@ -9561,6 +10153,7 @@ function SettingsPage({
     const snapDefaultStockMarketId = snapData.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID;
     const snapAccountGroups = Array.isArray(snapData.accountGroups) ? snapData.accountGroups : [];
     const snapStockSubTags = Array.isArray(snapData.stockSubTags) ? snapData.stockSubTags : [];
+    const snapStockSubTagGroups = Array.isArray(snapData.stockSubTagGroups) ? snapData.stockSubTagGroups : [];
     const changes = [
       {
         icon: "list",
@@ -9609,7 +10202,8 @@ function SettingsPage({
           stockMarkets: snapStockMarkets,
           defaultStockMarketId: snapDefaultStockMarketId,
           accountGroups: snapAccountGroups,
-          stockSubTags: snapStockSubTags
+          stockSubTags: snapStockSubTags,
+          stockSubTagGroups: snapStockSubTagGroups
         };
         try {
           localStorage.setItem("ledger_v16", JSON.stringify(newState));
@@ -9785,6 +10379,7 @@ function SettingsPage({
     defaultStockMarketId: state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID,
     accountGroups: state.accountGroups || [],
     stockSubTags: state.stockSubTags || [],
+    stockSubTagGroups: state.stockSubTagGroups || [],
     preferences: collectPreferences(),
     exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
     exportVersion: 3
@@ -10379,7 +10974,8 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
             stockMarkets: Array.isArray(data.stockMarkets) && data.stockMarkets.length ? data.stockMarkets : [...DEFAULT_STOCK_MARKETS],
             defaultStockMarketId: data.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID,
             accountGroups: Array.isArray(data.accountGroups) ? data.accountGroups : [],
-            stockSubTags: Array.isArray(data.stockSubTags) ? data.stockSubTags : []
+            stockSubTags: Array.isArray(data.stockSubTags) ? data.stockSubTags : [],
+            stockSubTagGroups: Array.isArray(data.stockSubTagGroups) ? data.stockSubTagGroups : []
           };
           try {
             localStorage.setItem("ledger_v16", JSON.stringify(newState));
@@ -18057,23 +18653,31 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
             } }, "\u9EDE\u6B64\u8A2D\u5B9A\u5E02\u503C"), marketTotalCost > 0 && cost > 0 && (() => {
               const sharePct = cost / marketTotalCost * 100;
               return /* @__PURE__ */ React.createElement("div", { style: {
-                marginTop: 6,
-                paddingTop: 6,
+                marginTop: 8,
+                paddingTop: 8,
                 borderTop: "1px dashed var(--border)",
                 display: "flex",
-                alignItems: "baseline",
+                alignItems: "center",
                 justifyContent: "flex-end",
-                gap: 4,
+                gap: 6,
                 fontFamily: "var(--num-font)"
               } }, /* @__PURE__ */ React.createElement("span", { style: {
-                fontSize: 10,
-                color: "var(--text-faint)",
-                fontFamily: "inherit"
-              } }, "\u4F54", marketLabel, "\u6210\u672C"), /* @__PURE__ */ React.createElement("span", { style: {
-                fontSize: 15,
-                fontWeight: 800,
+                fontSize: 11,
                 color: "var(--text-dim)",
-                letterSpacing: 0.3
+                fontWeight: 600,
+                fontFamily: "inherit",
+                letterSpacing: 0.2
+              } }, "\u4F54", marketLabel, "\u6210\u672C"), /* @__PURE__ */ React.createElement("span", { style: {
+                fontSize: 13,
+                fontWeight: 800,
+                color: "var(--text)",
+                marginLeft: -2,
+                marginRight: -2
+              } }, ":"), /* @__PURE__ */ React.createElement("span", { style: {
+                fontSize: 18,
+                fontWeight: 900,
+                color: "var(--text)",
+                letterSpacing: 0.5
               } }, sharePct.toFixed(1), "%"));
             })())
           );
