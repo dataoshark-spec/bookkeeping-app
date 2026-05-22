@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520DY";
+const APP_VERSION = "1150520DZ";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -34,6 +34,8 @@ const GDRIVE_AUTO_KEY = "ledger_gdrive_auto_v1";
 const GDRIVE_LASTSYNC_KEY = "ledger_gdrive_lastsync_v1";
 const GDRIVE_REMIND_DAYS_KEY = "ledger_gdrive_remind_days_v1";
 const GDRIVE_PENDING_KEY = "ledger_gdrive_pending_v1";
+const GDRIVE_LASTERR_KEY = "ledger_gdrive_lasterr_v1";
+const GDRIVE_DIRTY_KEY = "ledger_gdrive_dirty_v1";
 const GDRIVE_MAX_BACKUPS = 100;
 const driveLastSyncListeners = /* @__PURE__ */ new Set();
 const broadcastDriveLastSync = (ts) => {
@@ -1319,6 +1321,7 @@ function App() {
   const [driveStatus, setDriveStatus] = React.useState(() => {
     try {
       if (localStorage.getItem(GDRIVE_PENDING_KEY) === "1") return "pending";
+      if (localStorage.getItem(GDRIVE_DIRTY_KEY) === "1") return "pending";
     } catch {
     }
     return "idle";
@@ -1340,11 +1343,22 @@ function App() {
     if (!autoOn || !GDrive.isLinked()) return;
     _autoBkRunningRef.current = true;
     broadcastDriveStatus("syncing");
-    try {
+    const tryBackup = async () => {
       const token = await GDrive.ensureToken();
       const payload = buildExportPayload();
       await GDrive.uploadBackup(token, payload);
       await GDrive.pruneOldBackups(token);
+    };
+    let lastErr = null;
+    try {
+      try {
+        await tryBackup();
+      } catch (e1) {
+        lastErr = e1;
+        await new Promise((r) => setTimeout(r, 2e3));
+        await tryBackup();
+        lastErr = null;
+      }
       const ts = Date.now();
       try {
         localStorage.setItem(GDRIVE_LASTSYNC_KEY, String(ts));
@@ -1354,11 +1368,25 @@ function App() {
         localStorage.removeItem(GDRIVE_PENDING_KEY);
       } catch {
       }
+      try {
+        localStorage.removeItem(GDRIVE_LASTERR_KEY);
+      } catch {
+      }
+      try {
+        localStorage.removeItem(GDRIVE_DIRTY_KEY);
+      } catch {
+      }
       broadcastDriveLastSync(ts);
       broadcastDriveStatus("idle");
     } catch (e) {
       try {
         localStorage.setItem(GDRIVE_PENDING_KEY, "1");
+      } catch {
+      }
+      try {
+        const msg = e && e.message || lastErr && lastErr.message || "\u672A\u77E5\u932F\u8AA4";
+        const ts = (/* @__PURE__ */ new Date()).toLocaleString("zh-TW", { hour12: false });
+        localStorage.setItem(GDRIVE_LASTERR_KEY, `${ts}|${msg}`);
       } catch {
       }
       broadcastDriveStatus("pending");
@@ -1371,12 +1399,17 @@ function App() {
       _autoBkMountRef.current = true;
       return;
     }
+    try {
+      localStorage.setItem(GDRIVE_DIRTY_KEY, "1");
+    } catch {
+    }
     let autoOn = false;
     try {
       autoOn = localStorage.getItem(GDRIVE_AUTO_KEY) === "1";
     } catch {
     }
     if (!autoOn || !GDrive.isLinked()) return;
+    broadcastDriveStatus("syncing");
     if (_autoBkTimerRef.current) return;
     _autoBkTimerRef.current = setTimeout(() => {
       _autoBkTimerRef.current = null;
@@ -10929,6 +10962,14 @@ function SettingsPage({
         localStorage.removeItem(GDRIVE_PENDING_KEY);
       } catch {
       }
+      try {
+        localStorage.removeItem(GDRIVE_DIRTY_KEY);
+      } catch {
+      }
+      try {
+        localStorage.removeItem(GDRIVE_LASTERR_KEY);
+      } catch {
+      }
       setDriveLastSync(now);
       setDrivePending(false);
       broadcastDriveStatus("idle");
@@ -10941,6 +10982,11 @@ function SettingsPage({
       const msg = e && e.message || "\u672A\u77E5\u932F\u8AA4";
       try {
         localStorage.setItem(GDRIVE_PENDING_KEY, "1");
+      } catch {
+      }
+      try {
+        const ts = (/* @__PURE__ */ new Date()).toLocaleString("zh-TW", { hour12: false });
+        localStorage.setItem(GDRIVE_LASTERR_KEY, `${ts}|${msg}`);
       } catch {
       }
       setDrivePending(true);
@@ -11579,7 +11625,25 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
           color: "var(--pink-text)",
           fontWeight: 600,
           lineHeight: 1.5
-        } }, "\u81EA\u52D5\u5099\u4EFD \u5361\u4F4F\u4E86,\u8ACB\u6309\u4E0B\u65B9\u300C\u7ACB\u5373\u5099\u4EFD\u300D\u624B\u52D5\u89F8\u767C\u4E00\u6B21"))));
+        } }, "\u81EA\u52D5\u5099\u4EFD \u5361\u4F4F\u4E86,\u8ACB\u6309\u4E0B\u65B9\u300C\u7ACB\u5373\u5099\u4EFD\u300D\u624B\u52D5\u89F8\u767C\u4E00\u6B21", (() => {
+          let lasterr = "";
+          try {
+            lasterr = localStorage.getItem(GDRIVE_LASTERR_KEY) || "";
+          } catch {
+          }
+          if (!lasterr) return null;
+          const sep = lasterr.indexOf("|");
+          const ts = sep > 0 ? lasterr.slice(0, sep) : "";
+          const msg = sep > 0 ? lasterr.slice(sep + 1) : lasterr;
+          return /* @__PURE__ */ React.createElement("div", { style: {
+            marginTop: 6,
+            paddingTop: 6,
+            borderTop: "1px dashed rgba(217, 104, 119, 0.3)",
+            fontSize: 10,
+            fontWeight: 400,
+            color: "var(--text-dim)"
+          } }, /* @__PURE__ */ React.createElement("div", null, "\u4E0A\u6B21\u5931\u6557 ", ts), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 2 } }, "\u539F\u56E0:", msg));
+        })()))));
       })(), /* @__PURE__ */ React.createElement("div", { style: {
         padding: "9px 12px",
         background: "var(--bg-card-alt)",
