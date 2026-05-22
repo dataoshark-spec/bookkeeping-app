@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520ED";
+const APP_VERSION = "1150520EE";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -19366,36 +19366,44 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
           {
             key: "holdings",
             ...blockProps,
-            disableReorder: holdingsSortMode,
-            headerRight: isInvest && activeHoldings.length >= 2 && !editMode ? /* @__PURE__ */ React.createElement(
-              "button",
-              {
-                onClick: (e) => {
-                  e.stopPropagation();
-                  setHoldingsSortMode((v) => !v);
-                },
-                onTouchStart: (e) => e.stopPropagation(),
-                style: {
-                  padding: "6px 14px",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  background: holdingsSortMode ? "var(--mint)" : "transparent",
-                  color: holdingsSortMode ? "#0a1410" : "var(--mint-text)",
-                  border: `1.5px solid var(--mint)`,
-                  borderRadius: 999,
-                  cursor: "pointer"
-                }
-              },
-              holdingsSortMode ? "\u5B8C\u6210" : "\u6392\u5E8F\u6301\u80A1"
-            ) : null
+            disableReorder: holdingsSortMode
           },
           /* @__PURE__ */ React.createElement("div", { style: {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 8,
+            paddingLeft: 4,
+            minHeight: 28
+          } }, /* @__PURE__ */ React.createElement("div", { style: {
             fontSize: 13,
             color: "var(--text-dim)",
             fontWeight: 500,
-            marginBottom: 8,
-            paddingLeft: 4
-          } }, "\u6301\u80A1", holdingsSortMode && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", marginLeft: 8, fontSize: 11 } }, "\u9577\u6309\u62D6\u66F3\u6392\u5E8F")),
+            display: "flex",
+            alignItems: "baseline",
+            gap: 8
+          } }, /* @__PURE__ */ React.createElement("span", null, "\u6301\u80A1"), holdingsSortMode && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)", fontSize: 11, fontWeight: 600 } }, "\u9577\u6309\u62D6\u66F3\u6392\u5E8F")), isInvest && activeHoldings.length >= 2 && !editMode && /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              onClick: (e) => {
+                e.stopPropagation();
+                setHoldingsSortMode((v) => !v);
+              },
+              onTouchStart: (e) => e.stopPropagation(),
+              style: {
+                padding: "4px 12px",
+                fontSize: 11,
+                fontWeight: 600,
+                background: holdingsSortMode ? "var(--mint)" : "transparent",
+                color: holdingsSortMode ? "#0a1410" : "var(--mint-text)",
+                border: "1.5px solid var(--mint)",
+                borderRadius: 999,
+                cursor: "pointer",
+                whiteSpace: "nowrap"
+              }
+            },
+            holdingsSortMode ? "\u5B8C\u6210" : "\u6392\u5E8F\u6301\u80A1"
+          )),
           activeHoldings.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: {
             padding: "24px 16px",
             textAlign: "center",
@@ -19431,7 +19439,10 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
                     padding: "14px 16px",
                     borderRadius: 14,
                     background: "var(--bg-card)",
-                    border: holdingsSortMode ? "1.5px dashed rgba(232, 185, 71, 0.55)" : "1px solid var(--border)",
+                    border: "1px solid var(--border)",
+                    // [v555EE] 用 outline 代替變更 border(避免 row 高度跳動);outline 不影響 layout
+                    outline: holdingsSortMode ? "1.5px dashed rgba(126, 224, 192, 0.55)" : void 0,
+                    outlineOffset: holdingsSortMode ? "-1.5px" : void 0,
                     cursor: holdingsSortMode ? "grab" : "pointer",
                     display: "flex",
                     alignItems: "center",
