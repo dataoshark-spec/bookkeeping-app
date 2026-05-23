@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FH";
+const APP_VERSION = "1150520FI";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -8904,46 +8904,39 @@ function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, sel
             background: "var(--bg-card)",
             border: "1px solid var(--border)",
             borderRadius: 14,
-            padding: "14px 16px",
+            padding: "10px 14px",
             cursor: editMode ? "default" : "pointer",
             boxSizing: "border-box"
           }
         },
-        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, minHeight: 60 } }, /* @__PURE__ */ React.createElement("div", { style: {
-          width: 36,
-          height: 36,
-          borderRadius: 10,
+        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, minHeight: 44 } }, /* @__PURE__ */ React.createElement("div", { style: {
+          width: 28,
+          height: 28,
+          borderRadius: 8,
           background: "#9ae0d4",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           flexShrink: 0
-        } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "chart", size: 18, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: "var(--text)" } }, hasMarket ? "\u7E3D\u5E02\u503C" : "\u6295\u8CC7\u5E33\u6236", /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, fontSize: 11, color: "var(--text-faint)", fontWeight: 400 } }, investAccounts.length, " \u500B\u5E33\u6236")), hasMarket ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 8, marginTop: 2 } }, /* @__PURE__ */ React.createElement("span", { style: {
-          fontSize: 17,
+        } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "chart", size: 15, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", minWidth: 0 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "var(--text)", lineHeight: 1.2 } }, hasMarket ? "\u7E3D\u5E02\u503C" : "\u6295\u8CC7\u5E33\u6236"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, color: "var(--text-faint)", lineHeight: 1.2, marginTop: 2 } }, investAccounts.length, " \u500B\u5E33\u6236")), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), hasMarket ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 6, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: {
+          fontSize: 16,
           fontWeight: 700,
           color: "var(--text)",
           fontFamily: "var(--num-font)"
         } }, fmt(totalMarket)), totalCost > 0 && /* @__PURE__ */ React.createElement("span", { style: {
-          fontSize: 12,
+          fontSize: 11,
           color: pnlColor,
           fontWeight: 600,
           fontFamily: "var(--num-font)"
-        } }, totalPnl >= 0 ? "+" : "", pnlPct.toFixed(2), "%")) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginTop: 2 } }, "\u9EDE\u6B64\u9032\u5165\u6295\u8CC7\u7BA1\u7406")), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 18, flexShrink: 0 } }, "\u203A")),
+        } }, totalPnl >= 0 ? "+" : "", pnlPct.toFixed(2), "%")) : /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--text-faint)", flexShrink: 0 } }, "\u9EDE\u6B64\u9032\u5165\u6295\u8CC7\u7BA1\u7406"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 16, flexShrink: 0, marginLeft: 4 } }, "\u203A")),
         showBreakdown && /* @__PURE__ */ React.createElement("div", { style: {
-          marginTop: 10,
-          paddingTop: 10,
+          marginTop: 8,
+          paddingTop: 8,
           borderTop: "1px dashed var(--border)",
           display: "flex",
           flexDirection: "column",
           gap: 4
-        } }, /* @__PURE__ */ React.createElement("div", { style: {
-          display: "grid",
-          gridTemplateColumns: "46px 1fr 64px 44px",
-          gap: 8,
-          fontSize: 10,
-          color: "var(--text-faint)",
-          marginBottom: 2
-        } }, /* @__PURE__ */ React.createElement("span", null), /* @__PURE__ */ React.createElement("span", { style: { textAlign: "right" } }, "\u5E02\u503C"), /* @__PURE__ */ React.createElement("span", { style: { textAlign: "right" } }, "\u6F32\u8DCC"), /* @__PURE__ */ React.createElement("span", { style: { textAlign: "right" } }, "\u6A94\u6578")), marketBreakdown.map((m) => {
+        } }, marketBreakdown.map((m) => {
           const color = m.pct >= 0 ? "var(--mint-text)" : "var(--pink-text)";
           return /* @__PURE__ */ React.createElement(
             "div",
