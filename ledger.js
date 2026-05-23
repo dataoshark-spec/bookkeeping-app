@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520ES";
+const APP_VERSION = "1150520EU";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -409,6 +409,37 @@ const collectPreferencesModule = () => {
   });
   return prefs;
 };
+const migrateLegacyKeys = (data) => {
+  if (!data || typeof data !== "object") return data;
+  if (data.accountGroups !== void 0 && data.accountGroupTags === void 0) {
+    data.accountGroupTags = data.accountGroups;
+  }
+  if (data.stockSubTags !== void 0 && data.stockCategoryTags === void 0) {
+    data.stockCategoryTags = data.stockSubTags;
+  }
+  if (data.stockSubTagGroups !== void 0 && data.stockCategoryTagGroups === void 0) {
+    data.stockCategoryTagGroups = data.stockSubTagGroups;
+  }
+  delete data.accountGroups;
+  delete data.stockSubTags;
+  delete data.stockSubTagGroups;
+  if (Array.isArray(data.holdings)) {
+    data.holdings = data.holdings.map((h) => {
+      if (h && h.subTagId !== void 0 && h.categoryTagId === void 0) {
+        const next = { ...h, categoryTagId: h.subTagId };
+        delete next.subTagId;
+        return next;
+      }
+      if (h && h.subTagId !== void 0) {
+        const next = { ...h };
+        delete next.subTagId;
+        return next;
+      }
+      return h;
+    });
+  }
+  return data;
+};
 const buildExportPayloadModule = (state) => JSON.stringify({
   transactions: state.transactions,
   accounts: state.accounts,
@@ -418,9 +449,9 @@ const buildExportPayloadModule = (state) => JSON.stringify({
   trades: state.trades,
   stockMarkets: state.stockMarkets,
   defaultStockMarketId: state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID,
-  accountGroups: state.accountGroups || [],
-  stockSubTags: state.stockSubTags || [],
-  stockSubTagGroups: state.stockSubTagGroups || [],
+  accountGroupTags: state.accountGroupTags || [],
+  stockCategoryTags: state.stockCategoryTags || [],
+  stockCategoryTagGroups: state.stockCategoryTagGroups || [],
   preferences: collectPreferencesModule(),
   exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
   exportVersion: 3
@@ -1305,6 +1336,7 @@ function App() {
       const raw = storageGet();
       if (raw) {
         const d = JSON.parse(raw);
+        migrateLegacyKeys(d);
         return {
           transactions: d.transactions || [],
           accounts: d.accounts?.length ? d.accounts : [...DEFAULT_ACCOUNTS],
@@ -1314,19 +1346,16 @@ function App() {
           trades: d.trades || [],
           stockMarkets: d.stockMarkets?.length ? d.stockMarkets : [...DEFAULT_STOCK_MARKETS],
           defaultStockMarketId: d.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID,
-          // [v555CI] 帳戶子標籤 — 把不常用帳戶半隱藏到收合的子標籤下
+          // [v555EU] 改名:accountGroups → accountGroupTags (UI: 帳戶群組標籤)
           // 結構: [{ id, name, accountIds: [string], collapsed: boolean }]
-          // accountIds 決定 group 內帳戶的順序;collapsed 持久化跟著 group 走
-          accountGroups: Array.isArray(d.accountGroups) ? d.accountGroups : [],
-          // [v555DJ] 持股子標籤 — 給股票分類「主題」用,如 太空類 / AI / 機器人 / 美債
+          accountGroupTags: Array.isArray(d.accountGroupTags) ? d.accountGroupTags : [],
+          // [v555EU] 改名:stockSubTags → stockCategoryTags (UI: 股票成份類別)
           // 結構: [{ id, name, groupId? }]
-          // 一檔 holding 掛 1 個(holding.subTagId);沒掛的在統計頁歸「未分類」
-          // [v555DP] 加 optional groupId,讓分類可分組(沒掛 = 無分組)
-          stockSubTags: Array.isArray(d.stockSubTags) ? d.stockSubTags : [],
-          // [v555DP] 持股子標籤群組 — 把太多分類分群,例如「成長股」/「防禦股」
+          // 一檔 holding 掛 1 個(holding.categoryTagId);沒掛的在統計頁歸「未分類」
+          stockCategoryTags: Array.isArray(d.stockCategoryTags) ? d.stockCategoryTags : [],
+          // [v555EU] 改名:stockSubTagGroups → stockCategoryTagGroups (UI: 股票類別群組)
           // 結構: [{ id, name, collapsed?: boolean }]
-          // 順序由 array 自身決定;collapsed 持久化(展開/收合狀態跟著 group 走)
-          stockSubTagGroups: Array.isArray(d.stockSubTagGroups) ? d.stockSubTagGroups : []
+          stockCategoryTagGroups: Array.isArray(d.stockCategoryTagGroups) ? d.stockCategoryTagGroups : []
         };
       }
     } catch {
@@ -1340,9 +1369,9 @@ function App() {
       trades: [],
       stockMarkets: [...DEFAULT_STOCK_MARKETS],
       defaultStockMarketId: DEFAULT_STOCK_MARKET_ID,
-      accountGroups: [],
-      stockSubTags: [],
-      stockSubTagGroups: []
+      accountGroupTags: [],
+      stockCategoryTags: [],
+      stockCategoryTagGroups: []
     };
   });
   const [page, setPage] = useState("home");
@@ -2658,104 +2687,104 @@ function App() {
     });
     return affectedCount;
   };
-  const updateHoldingSubTag = (holdingId, subTagId) => {
+  const updateHoldingCategoryTag = (holdingId, categoryTagId) => {
     setState((s) => ({
       ...s,
       holdings: s.holdings.map(
-        (x) => x.id === holdingId ? { ...x, subTagId: subTagId || void 0 } : x
+        (x) => x.id === holdingId ? { ...x, categoryTagId: categoryTagId || void 0 } : x
       )
     }));
   };
-  const addStockSubTag = (name) => {
+  const addStockCategoryTag = (name) => {
     const trimmed = String(name || "").trim();
     if (!trimmed) return null;
     let resultId = null;
     setState((s) => {
-      const exists = (s.stockSubTags || []).find((t) => t.name === trimmed);
+      const exists = (s.stockCategoryTags || []).find((t) => t.name === trimmed);
       if (exists) {
         resultId = exists.id;
         return s;
       }
       const newTag = { id: "sst_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: trimmed };
       resultId = newTag.id;
-      return { ...s, stockSubTags: [...s.stockSubTags || [], newTag] };
+      return { ...s, stockCategoryTags: [...s.stockCategoryTags || [], newTag] };
     });
     return resultId;
   };
-  const renameStockSubTag = (tagId, newName) => {
+  const renameStockCategoryTag = (tagId, newName) => {
     const trimmed = String(newName || "").trim();
     if (!trimmed) return;
     setState((s) => ({
       ...s,
-      stockSubTags: (s.stockSubTags || []).map(
+      stockCategoryTags: (s.stockCategoryTags || []).map(
         (t) => t.id === tagId ? { ...t, name: trimmed } : t
       )
     }));
   };
-  const deleteStockSubTag = (tagId) => {
+  const deleteStockCategoryTag = (tagId) => {
     setState((s) => ({
       ...s,
-      stockSubTags: (s.stockSubTags || []).filter((t) => t.id !== tagId),
+      stockCategoryTags: (s.stockCategoryTags || []).filter((t) => t.id !== tagId),
       holdings: s.holdings.map(
-        (h) => h.subTagId === tagId ? { ...h, subTagId: void 0 } : h
+        (h) => h.categoryTagId === tagId ? { ...h, categoryTagId: void 0 } : h
       )
     }));
   };
-  const addStockSubTagGroup = (name) => {
+  const addStockCategoryTagGroup = (name) => {
     const trimmed = String(name || "").trim();
     if (!trimmed) return null;
     let resultId = null;
     setState((s) => {
-      const exists = (s.stockSubTagGroups || []).find((g) => g.name === trimmed);
+      const exists = (s.stockCategoryTagGroups || []).find((g) => g.name === trimmed);
       if (exists) {
         resultId = exists.id;
         return s;
       }
       const newGroup = { id: "sstg_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: trimmed };
       resultId = newGroup.id;
-      return { ...s, stockSubTagGroups: [...s.stockSubTagGroups || [], newGroup] };
+      return { ...s, stockCategoryTagGroups: [...s.stockCategoryTagGroups || [], newGroup] };
     });
     return resultId;
   };
-  const renameStockSubTagGroup = (groupId, newName) => {
+  const renameStockCategoryTagGroup = (groupId, newName) => {
     const trimmed = String(newName || "").trim();
     if (!trimmed) return;
     setState((s) => ({
       ...s,
-      stockSubTagGroups: (s.stockSubTagGroups || []).map(
+      stockCategoryTagGroups: (s.stockCategoryTagGroups || []).map(
         (g) => g.id === groupId ? { ...g, name: trimmed } : g
       )
     }));
   };
-  const deleteStockSubTagGroup = (groupId) => {
+  const deleteStockCategoryTagGroup = (groupId) => {
     setState((s) => ({
       ...s,
-      stockSubTagGroups: (s.stockSubTagGroups || []).filter((g) => g.id !== groupId),
-      stockSubTags: (s.stockSubTags || []).map(
+      stockCategoryTagGroups: (s.stockCategoryTagGroups || []).filter((g) => g.id !== groupId),
+      stockCategoryTags: (s.stockCategoryTags || []).map(
         (t) => t.groupId === groupId ? { ...t, groupId: void 0 } : t
       )
     }));
   };
-  const toggleStockSubTagGroupCollapsed = (groupId) => {
+  const toggleStockCategoryTagGroupCollapsed = (groupId) => {
     setState((s) => ({
       ...s,
-      stockSubTagGroups: (s.stockSubTagGroups || []).map(
+      stockCategoryTagGroups: (s.stockCategoryTagGroups || []).map(
         (g) => g.id === groupId ? { ...g, collapsed: !g.collapsed } : g
       )
     }));
   };
-  const setStockSubTagGroupOrder = (newOrderIds) => {
+  const setStockCategoryTagGroupOrder = (newOrderIds) => {
     setState((s) => {
-      const map = new Map((s.stockSubTagGroups || []).map((g) => [g.id, g]));
+      const map = new Map((s.stockCategoryTagGroups || []).map((g) => [g.id, g]));
       const reordered = newOrderIds.map((id) => map.get(id)).filter(Boolean);
       const seen = new Set(newOrderIds);
-      const leftover = (s.stockSubTagGroups || []).filter((g) => !seen.has(g.id));
-      return { ...s, stockSubTagGroups: [...reordered, ...leftover] };
+      const leftover = (s.stockCategoryTagGroups || []).filter((g) => !seen.has(g.id));
+      return { ...s, stockCategoryTagGroups: [...reordered, ...leftover] };
     });
   };
-  const setStockSubTagsOrder = (newOrder) => {
+  const setStockCategoryTagsOrder = (newOrder) => {
     setState((s) => {
-      const map = new Map((s.stockSubTags || []).map((t) => [t.id, t]));
+      const map = new Map((s.stockCategoryTags || []).map((t) => [t.id, t]));
       const reordered = newOrder.map(({ id, groupId }) => {
         const existing = map.get(id);
         if (!existing) return null;
@@ -2763,8 +2792,8 @@ function App() {
         return { ...existing, groupId: groupId || void 0 };
       }).filter(Boolean);
       const seen = new Set(newOrder.map((x) => x.id));
-      const leftover = (s.stockSubTags || []).filter((t) => !seen.has(t.id));
-      return { ...s, stockSubTags: [...reordered, ...leftover] };
+      const leftover = (s.stockCategoryTags || []).filter((t) => !seen.has(t.id));
+      return { ...s, stockCategoryTags: [...reordered, ...leftover] };
     });
   };
   const setHoldingsOrder = (accountId, newOrderIds) => {
@@ -3067,9 +3096,9 @@ function App() {
           trades: [],
           stockMarkets: [...DEFAULT_STOCK_MARKETS],
           defaultStockMarketId: DEFAULT_STOCK_MARKET_ID,
-          accountGroups: [],
-          stockSubTags: [],
-          stockSubTagGroups: []
+          accountGroupTags: [],
+          stockCategoryTags: [],
+          stockCategoryTagGroups: []
         });
         toastRich({
           title: "\u5DF2\u6E05\u9664\u6240\u6709\u8CC7\u6599",
@@ -3666,24 +3695,24 @@ function App() {
       state,
       holding: state.holdings.find((h) => h.id === holdingSubTagPickerSheet.holding.id),
       onClose: () => setHoldingSubTagPickerSheet(null),
-      onPick: (subTagId) => {
-        updateHoldingSubTag(holdingSubTagPickerSheet.holding.id, subTagId);
+      onPick: (categoryTagId) => {
+        updateHoldingCategoryTag(holdingSubTagPickerSheet.holding.id, categoryTagId);
         setHoldingSubTagPickerSheet(null);
         toastRich && toastRich({
-          title: subTagId ? "\u5DF2\u8A2D\u5B9A\u5206\u985E" : "\u5DF2\u53D6\u6D88\u5206\u985E",
+          title: categoryTagId ? "\u5DF2\u8A2D\u5B9A\u5206\u985E" : "\u5DF2\u53D6\u6D88\u5206\u985E",
           amount: "\u2713",
           amountColor: "var(--mint-text)"
         }, 1e3);
       },
-      onAdd: addStockSubTag,
-      onRename: renameStockSubTag,
-      onDelete: deleteStockSubTag,
-      onAddGroup: addStockSubTagGroup,
-      onRenameGroup: renameStockSubTagGroup,
-      onDeleteGroup: deleteStockSubTagGroup,
-      onToggleGroupCollapsed: toggleStockSubTagGroupCollapsed,
-      onSetGroupOrder: setStockSubTagGroupOrder,
-      onSetTagsOrder: setStockSubTagsOrder,
+      onAdd: addStockCategoryTag,
+      onRename: renameStockCategoryTag,
+      onDelete: deleteStockCategoryTag,
+      onAddGroup: addStockCategoryTagGroup,
+      onRenameGroup: renameStockCategoryTagGroup,
+      onDeleteGroup: deleteStockCategoryTagGroup,
+      onToggleGroupCollapsed: toggleStockCategoryTagGroupCollapsed,
+      onSetGroupOrder: setStockCategoryTagGroupOrder,
+      onSetTagsOrder: setStockCategoryTagsOrder,
       toast,
       toastRich,
       setConfirmDialog
@@ -7209,7 +7238,7 @@ function HoldingDetailSheet({ state, holding, onClose, onUpdateMarketValue, onBu
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
       } }, (() => {
-        const tag = holding.subTagId ? (state.stockSubTags || []).find((t) => t.id === holding.subTagId) : null;
+        const tag = holding.categoryTagId ? (state.stockCategoryTags || []).find((t) => t.id === holding.categoryTagId) : null;
         if (tag) {
           return /* @__PURE__ */ React.createElement("span", { style: {
             display: "inline-block",
@@ -7419,9 +7448,9 @@ function HoldingSubTagPickerSheet({
   setConfirmDialog
 }) {
   const swipe = useSwipeBack(onClose);
-  const tags = state.stockSubTags || [];
-  const groups = state.stockSubTagGroups || [];
-  const currentId = holding ? holding.subTagId : null;
+  const tags = state.stockCategoryTags || [];
+  const groups = state.stockCategoryTagGroups || [];
+  const currentId = holding ? holding.categoryTagId : null;
   const [mode, setMode] = React.useState("pick");
   const [renderEpoch, setRenderEpoch] = React.useState(0);
   const [showAddTagInput, setShowAddTagInput] = React.useState(false);
@@ -7522,7 +7551,7 @@ function HoldingSubTagPickerSheet({
     setEditingGroupName("");
   };
   const askDeleteTag = (tag) => {
-    const usedCount = state.holdings.filter((h) => h.subTagId === tag.id && holdingShares(h, state.trades) > 0).length;
+    const usedCount = state.holdings.filter((h) => h.categoryTagId === tag.id && holdingShares(h, state.trades) > 0).length;
     setConfirmDialog && setConfirmDialog({
       title: "\u522A\u9664\u5206\u985E",
       target: { label: "\u5206\u985E", name: tag.name },
@@ -7856,7 +7885,7 @@ function HoldingSubTagPickerSheet({
   const renderTagRow = (tag) => {
     const isSelected = tag.id === currentId;
     const isEditing = editingTagId === tag.id;
-    const usedCount = state.holdings.filter((h) => h.subTagId === tag.id && holdingShares(h, state.trades) > 0).length;
+    const usedCount = state.holdings.filter((h) => h.categoryTagId === tag.id && holdingShares(h, state.trades) > 0).length;
     const isDragging = draggingId === tag.id;
     if (isEditing) {
       return /* @__PURE__ */ React.createElement("div", { key: `${tag.id}-${renderEpoch}`, style: {
@@ -8214,7 +8243,7 @@ function HoldingSubTagPickerSheet({
         onClick: onClose
       },
       "\xD7"
-    ), /* @__PURE__ */ React.createElement("div", { style: { ...styles.sheetTitle, color: "var(--text)" } }, "\u9078\u64C7\u5206\u985E"), /* @__PURE__ */ React.createElement(
+    ), /* @__PURE__ */ React.createElement("div", { style: { ...styles.sheetTitle, color: "var(--text)" } }, "\u9078\u64C7\u6210\u4EFD\u985E\u5225"), /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: () => setMode((m) => m === "pick" ? "edit" : "pick"),
@@ -8233,7 +8262,7 @@ function HoldingSubTagPickerSheet({
       mode === "edit" ? "\u5B8C\u6210" : "\u7DE8\u8F2F\u6392\u5E8F"
     )),
     /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: { padding: "4px 16px 0", fontSize: 12, color: "var(--text-faint)" } }, mode === "edit" ? "\u9577\u6309\u62D6\u66F3\u624B\u67C4\u53EF\u6392\u5E8F;\u7FA4\u7D44\u53EA\u80FD\u8DDF\u7FA4\u7D44\u6392\u5E8F\u3001\u5206\u985E\u53EA\u80FD\u5728\u540C\u7FA4\u7D44\u5167\u6392\u5E8F;\u8DE8\u7FA4\u7D44\u8ACB\u7528 \u79FB\u52D5 \u6309\u9215\u3002" : `\u7D66 ${holding.symbol} \u5206\u5230\u81EA\u8A02\u7684\u4E3B\u984C\u985E\u5225,\u5982 \u592A\u7A7A / AI / \u6A5F\u5668\u4EBA / \u7F8E\u50B5 \u7B49\u3002`), /* @__PURE__ */ React.createElement("div", { ref: containerRef, style: { padding: 12 } }, mode === "pick" && (() => {
-      const noTagCount = state.holdings.filter((h) => !h.subTagId && holdingShares(h, state.trades) > 0).length;
+      const noTagCount = state.holdings.filter((h) => !h.categoryTagId && holdingShares(h, state.trades) > 0).length;
       return /* @__PURE__ */ React.createElement(
         "div",
         {
@@ -8391,7 +8420,7 @@ function HoldingSubTagPickerSheet({
           marginBottom: 6
         }
       },
-      "+ \u65B0\u589E\u5206\u985E"
+      "+ \u65B0\u589E\u6210\u4EFD\u985E\u5225"
     ), !showAddGroupInput && mode === "edit" && /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -8413,7 +8442,7 @@ function HoldingSubTagPickerSheet({
           WebkitTapHighlightColor: "transparent"
         }
       },
-      "+ \u65B0\u589E\u7FA4\u7D44"
+      "+ \u65B0\u589E\u985E\u5225\u7FA4\u7D44"
     ))),
     moveTagDialog && (() => {
       const tag = moveTagDialog.tag;
@@ -8812,6 +8841,25 @@ function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, sel
       const pnlPct = totalCost > 0 ? totalPnl / totalCost * 100 : 0;
       const pnlColor = totalPnl >= 0 ? "var(--mint-text)" : "var(--pink-text)";
       const hasMarket = totalMarket > 0 || totalCost > 0;
+      const marketsList = state.stockMarkets || DEFAULT_STOCK_MARKETS;
+      const marketBreakdown = marketsList.map((mk) => {
+        const acctsInMk = investAccounts.filter((a) => (a.stockMarketId || DEFAULT_STOCK_MARKET_ID) === mk.id);
+        let mkMarket = 0, mkCost = 0, mkHoldingCount = 0;
+        acctsInMk.forEach((a) => {
+          const accountHoldings = state.holdings.filter((h) => h.accountId === a.id);
+          accountHoldings.forEach((h) => {
+            const shares = holdingShares(h, state.trades);
+            if (shares === 0) return;
+            mkMarket += h.marketValue || 0;
+            mkCost += holdingCost(h, state.trades);
+            mkHoldingCount += 1;
+          });
+        });
+        const mkPnl = mkMarket - mkCost;
+        const mkPct = mkCost > 0 ? mkPnl / mkCost * 100 : 0;
+        return { id: mk.id, label: mk.label, market: mkMarket, pct: mkPct, count: mkHoldingCount };
+      }).filter((m) => m.count > 0);
+      const showBreakdown = hasMarket && marketBreakdown.length >= 2;
       return /* @__PURE__ */ React.createElement(Block, { ...blockProps, title: "\u6295\u8CC7\u5FEB\u6377" }, /* @__PURE__ */ React.createElement(
         "div",
         {
@@ -8822,14 +8870,10 @@ function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, sel
             borderRadius: 14,
             padding: "14px 16px",
             cursor: editMode ? "default" : "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            minHeight: 60,
             boxSizing: "border-box"
           }
         },
-        /* @__PURE__ */ React.createElement("div", { style: {
+        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, minHeight: 60 } }, /* @__PURE__ */ React.createElement("div", { style: {
           width: 36,
           height: 36,
           borderRadius: 10,
@@ -8838,8 +8882,7 @@ function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, sel
           alignItems: "center",
           justifyContent: "center",
           flexShrink: 0
-        } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "chart", size: 18, color: "#fff" })),
-        /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: "var(--text)" } }, hasMarket ? "\u7E3D\u5E02\u503C" : "\u6295\u8CC7\u5E33\u6236", /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, fontSize: 11, color: "var(--text-faint)", fontWeight: 400 } }, investAccounts.length, " \u500B\u5E33\u6236")), hasMarket ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 8, marginTop: 2 } }, /* @__PURE__ */ React.createElement("span", { style: {
+        } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "chart", size: 18, color: "#fff" })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: "var(--text)" } }, hasMarket ? "\u7E3D\u5E02\u503C" : "\u6295\u8CC7\u5E33\u6236", /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, fontSize: 11, color: "var(--text-faint)", fontWeight: 400 } }, investAccounts.length, " \u500B\u5E33\u6236")), hasMarket ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 8, marginTop: 2 } }, /* @__PURE__ */ React.createElement("span", { style: {
           fontSize: 17,
           fontWeight: 700,
           color: "var(--text)",
@@ -8849,8 +8892,47 @@ function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, sel
           color: pnlColor,
           fontWeight: 600,
           fontFamily: "var(--num-font)"
-        } }, totalPnl >= 0 ? "+" : "", pnlPct.toFixed(2), "%")) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginTop: 2 } }, "\u9EDE\u6B64\u9032\u5165\u6295\u8CC7\u7BA1\u7406")),
-        /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 18, flexShrink: 0 } }, "\u203A")
+        } }, totalPnl >= 0 ? "+" : "", pnlPct.toFixed(2), "%")) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginTop: 2 } }, "\u9EDE\u6B64\u9032\u5165\u6295\u8CC7\u7BA1\u7406")), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 18, flexShrink: 0 } }, "\u203A")),
+        showBreakdown && /* @__PURE__ */ React.createElement("div", { style: {
+          marginTop: 10,
+          paddingTop: 10,
+          borderTop: "1px dashed var(--border)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 4
+        } }, marketBreakdown.map((m) => {
+          const color = m.pct >= 0 ? "var(--mint-text)" : "var(--pink-text)";
+          return /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              key: m.id,
+              style: {
+                display: "grid",
+                gridTemplateColumns: "46px 1fr 64px 44px",
+                alignItems: "baseline",
+                gap: 8,
+                fontSize: 12
+              }
+            },
+            /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)", fontWeight: 500 } }, m.label),
+            /* @__PURE__ */ React.createElement("span", { style: {
+              color: "var(--text)",
+              fontWeight: 600,
+              fontFamily: "var(--num-font)",
+              textAlign: "right"
+            } }, fmt(m.market)),
+            /* @__PURE__ */ React.createElement("span", { style: {
+              color,
+              fontWeight: 600,
+              fontFamily: "var(--num-font)",
+              textAlign: "right"
+            } }, m.pct >= 0 ? "+" : "", m.pct.toFixed(2), "%"),
+            /* @__PURE__ */ React.createElement("span", { style: {
+              color: "var(--text-faint)",
+              textAlign: "right"
+            } }, m.count, " \u6A94")
+          );
+        }))
       ));
     }
     if (blockKey === "lendReminder") {
@@ -10541,9 +10623,9 @@ function SettingsPage({
       trades: state.trades,
       stockMarkets: state.stockMarkets,
       defaultStockMarketId: state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID,
-      accountGroups: state.accountGroups || [],
-      stockSubTags: state.stockSubTags || [],
-      stockSubTagGroups: state.stockSubTagGroups || []
+      accountGroupTags: state.accountGroupTags || [],
+      stockCategoryTags: state.stockCategoryTags || [],
+      stockCategoryTagGroups: state.stockCategoryTagGroups || []
     });
     const snap = {
       id: "snap_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
@@ -10614,6 +10696,7 @@ function SettingsPage({
       }
       return;
     }
+    migrateLegacyKeys(snapData);
     const snapTxn = Array.isArray(snapData.transactions) ? snapData.transactions : [];
     const snapAcct = Array.isArray(snapData.accounts) ? snapData.accounts : [];
     const snapCat = snapData.categories || { expense: [], income: [] };
@@ -10622,9 +10705,9 @@ function SettingsPage({
     const snapTrades = Array.isArray(snapData.trades) ? snapData.trades : [];
     const snapStockMarkets = Array.isArray(snapData.stockMarkets) ? snapData.stockMarkets : [...DEFAULT_STOCK_MARKETS];
     const snapDefaultStockMarketId = snapData.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID;
-    const snapAccountGroups = Array.isArray(snapData.accountGroups) ? snapData.accountGroups : [];
-    const snapStockSubTags = Array.isArray(snapData.stockSubTags) ? snapData.stockSubTags : [];
-    const snapStockSubTagGroups = Array.isArray(snapData.stockSubTagGroups) ? snapData.stockSubTagGroups : [];
+    const snapAccountGroupTags = Array.isArray(snapData.accountGroupTags) ? snapData.accountGroupTags : [];
+    const snapStockCategoryTags = Array.isArray(snapData.stockCategoryTags) ? snapData.stockCategoryTags : [];
+    const snapStockCategoryTagGroups = Array.isArray(snapData.stockCategoryTagGroups) ? snapData.stockCategoryTagGroups : [];
     const changes = [
       {
         icon: "list",
@@ -10672,9 +10755,9 @@ function SettingsPage({
           trades: snapTrades,
           stockMarkets: snapStockMarkets,
           defaultStockMarketId: snapDefaultStockMarketId,
-          accountGroups: snapAccountGroups,
-          stockSubTags: snapStockSubTags,
-          stockSubTagGroups: snapStockSubTagGroups
+          accountGroupTags: snapAccountGroupTags,
+          stockCategoryTags: snapStockCategoryTags,
+          stockCategoryTagGroups: snapStockCategoryTagGroups
         };
         try {
           localStorage.setItem("ledger_v16", JSON.stringify(newState));
@@ -10848,9 +10931,9 @@ function SettingsPage({
     trades: state.trades,
     stockMarkets: state.stockMarkets,
     defaultStockMarketId: state.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID,
-    accountGroups: state.accountGroups || [],
-    stockSubTags: state.stockSubTags || [],
-    stockSubTagGroups: state.stockSubTagGroups || [],
+    accountGroupTags: state.accountGroupTags || [],
+    stockCategoryTags: state.stockCategoryTags || [],
+    stockCategoryTagGroups: state.stockCategoryTagGroups || [],
     preferences: collectPreferences(),
     exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
     exportVersion: 3
@@ -11418,6 +11501,7 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
   const applyImportFromText = (text) => {
     try {
       const data = JSON.parse(text);
+      migrateLegacyKeys(data);
       if (!data.transactions || !Array.isArray(data.transactions)) {
         if (toastRich) {
           toastRich({
@@ -11450,7 +11534,7 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
           }
         });
       }
-      const accountGroupCount = Array.isArray(data.accountGroups) ? data.accountGroups.length : 0;
+      const accountGroupCount = Array.isArray(data.accountGroupTags) ? data.accountGroupTags.length : 0;
       setShowPasteImport(false);
       setPasteImportText("");
       let exportedTimeText = "";
@@ -11474,7 +11558,7 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
       ];
       if (subCategoryCount > 0) summaryLines.push(`\u5B50\u5206\u985E ${subCategoryCount} \u500B`);
       if (holdingCount > 0) summaryLines.push(`\u6301\u80A1 ${holdingCount} \u6A94`);
-      if (accountGroupCount > 0) summaryLines.push(`\u5B50\u6A19\u7C64 ${accountGroupCount} \u500B`);
+      if (accountGroupCount > 0) summaryLines.push(`\u7FA4\u7D44\u6A19\u7C64 ${accountGroupCount} \u500B`);
       const items = [
         { card: true, lines: summaryLines, headerLabel: exportedTimeText ? `\u6A94\u6848\u6642\u9593  ${exportedTimeText}` : null }
       ];
@@ -11504,9 +11588,9 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
             trades: Array.isArray(data.trades) ? data.trades : [],
             stockMarkets: Array.isArray(data.stockMarkets) && data.stockMarkets.length ? data.stockMarkets : [...DEFAULT_STOCK_MARKETS],
             defaultStockMarketId: data.defaultStockMarketId || DEFAULT_STOCK_MARKET_ID,
-            accountGroups: Array.isArray(data.accountGroups) ? data.accountGroups : [],
-            stockSubTags: Array.isArray(data.stockSubTags) ? data.stockSubTags : [],
-            stockSubTagGroups: Array.isArray(data.stockSubTagGroups) ? data.stockSubTagGroups : []
+            accountGroupTags: Array.isArray(data.accountGroupTags) ? data.accountGroupTags : [],
+            stockCategoryTags: Array.isArray(data.stockCategoryTags) ? data.stockCategoryTags : [],
+            stockCategoryTagGroups: Array.isArray(data.stockCategoryTagGroups) ? data.stockCategoryTagGroups : []
           };
           try {
             localStorage.setItem("ledger_v16", JSON.stringify(newState));
@@ -17824,7 +17908,7 @@ function CategoryManageSheet({ state, setState, toast, toastRich, catType, initi
 }
 function AccountGroupManageSheet({ state, setState, toast, toastRich, initialGroupId, onClose, setConfirmDialog }) {
   const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
-  const groups = state.accountGroups || [];
+  const groups = state.accountGroupTags || [];
   const [editing, setEditing] = useState(initialGroupId ? { id: initialGroupId } : null);
   const [editMode, setEditMode] = useState(false);
   const editingGroup = editing && editing !== "new" ? groups.find((g) => g.id === editing.id) : null;
@@ -17834,25 +17918,25 @@ function AccountGroupManageSheet({ state, setState, toast, toastRich, initialGro
   );
   const reorderGroups = (newIdOrder) => {
     setState((s) => {
-      const arr = s.accountGroups || [];
+      const arr = s.accountGroupTags || [];
       const map = new Map(arr.map((g) => [g.id, g]));
       const reordered = newIdOrder.map((id) => map.get(id)).filter(Boolean);
       arr.forEach((g) => {
         if (!newIdOrder.includes(g.id)) reordered.push(g);
       });
-      return { ...s, accountGroups: reordered };
+      return { ...s, accountGroupTags: reordered };
     });
   };
   const moveGroup = (id, dir) => {
     setState((s) => {
-      const arr = s.accountGroups || [];
+      const arr = s.accountGroupTags || [];
       const i = arr.findIndex((g) => g.id === id);
       if (i < 0) return s;
       const j = i + dir;
       if (j < 0 || j >= arr.length) return s;
       const next = [...arr];
       [next[i], next[j]] = [next[j], next[i]];
-      return { ...s, accountGroups: next };
+      return { ...s, accountGroupTags: next };
     });
   };
   React.useEffect(() => {
@@ -17874,37 +17958,37 @@ function AccountGroupManageSheet({ state, setState, toast, toastRich, initialGro
   const save = () => {
     const t = name.trim();
     if (!t) {
-      toast && toast("\u8ACB\u8F38\u5165\u5B50\u6A19\u7C64\u540D\u7A31");
+      toast && toast("\u8ACB\u8F38\u5165\u7FA4\u7D44\u6A19\u7C64\u540D\u7A31");
       return;
     }
     const acctIds = Array.from(selectedAccountIds).filter((aid) => state.accounts.some((a) => a.id === aid));
     if (editing === "new") {
       const newId = "grp_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
       setState((s) => {
-        const others = (s.accountGroups || []).map((g) => ({
+        const others = (s.accountGroupTags || []).map((g) => ({
           ...g,
           accountIds: (g.accountIds || []).filter((aid) => !acctIds.includes(aid))
         }));
         return {
           ...s,
-          accountGroups: [
+          accountGroupTags: [
             ...others,
             { id: newId, name: t, accountIds: acctIds, collapsed: false }
           ]
         };
       });
-      toastRich && toastRich({ title: "\u5DF2\u65B0\u589E\u5B50\u6A19\u7C64", amount: "\u2713", amountColor: "var(--mint-text)", lines: [t] }, 1400);
+      toastRich && toastRich({ title: "\u5DF2\u65B0\u589E\u7FA4\u7D44\u6A19\u7C64", amount: "\u2713", amountColor: "var(--mint-text)", lines: [t] }, 1400);
     } else {
       setState((s) => {
-        const updated = (s.accountGroups || []).map((g) => {
+        const updated = (s.accountGroupTags || []).map((g) => {
           if (g.id === editing.id) {
             return { ...g, name: t, accountIds: acctIds };
           }
           return { ...g, accountIds: (g.accountIds || []).filter((aid) => !acctIds.includes(aid)) };
         });
-        return { ...s, accountGroups: updated };
+        return { ...s, accountGroupTags: updated };
       });
-      toastRich && toastRich({ title: "\u5DF2\u66F4\u65B0\u5B50\u6A19\u7C64", amount: "\u2713", amountColor: "var(--mint-text)" }, 1200);
+      toastRich && toastRich({ title: "\u5DF2\u66F4\u65B0\u7FA4\u7D44\u6A19\u7C64", amount: "\u2713", amountColor: "var(--mint-text)" }, 1200);
     }
     setEditing(null);
   };
@@ -17912,12 +17996,12 @@ function AccountGroupManageSheet({ state, setState, toast, toastRich, initialGro
     const g = groups.find((gg) => gg.id === gid);
     if (!g) return;
     setConfirmDialog && setConfirmDialog({
-      title: "\u522A\u9664\u5B50\u6A19\u7C64",
-      target: { label: "\u5B50\u6A19\u7C64", name: g.name },
+      title: "\u522A\u9664\u7FA4\u7D44\u6A19\u7C64",
+      target: { label: "\u7FA4\u7D44\u6A19\u7C64", name: g.name },
       messageList: {
         styled: true,
         items: [
-          "\u6B64\u5B50\u6A19\u7C64\u4E0B\u7684\u5E33\u6236\u4E0D\u6703\u88AB\u522A\u9664\u3002\n\u53EA\u662F\u812B\u96E2\u5206\u7D44\u8B8A\u6210\u6563\u6236\u3002"
+          "\u6B64\u7FA4\u7D44\u6A19\u7C64\u4E0B\u7684\u5E33\u6236\u4E0D\u6703\u88AB\u522A\u9664\u3002\n\u53EA\u662F\u812B\u96E2\u5206\u7D44\u8B8A\u6210\u6563\u6236\u3002"
         ]
       },
       warning: "\u6B64\u52D5\u4F5C\u7121\u6CD5\u5FA9\u539F",
@@ -17926,12 +18010,12 @@ function AccountGroupManageSheet({ state, setState, toast, toastRich, initialGro
       onConfirm: () => {
         setState((s) => ({
           ...s,
-          accountGroups: (s.accountGroups || []).filter((gg) => gg.id !== gid)
+          accountGroupTags: (s.accountGroupTags || []).filter((gg) => gg.id !== gid)
         }));
         toastRich && toastRich({
           titleSegments: [
             { text: "\u5DF2\u522A\u9664", color: "var(--pink-text)", weight: 800, size: 23 },
-            { text: " \u5B50\u6A19\u7C64" }
+            { text: " \u7FA4\u7D44\u6A19\u7C64" }
           ],
           amount: "\u2713",
           amountColor: "var(--text-faint)",
@@ -17960,7 +18044,7 @@ function AccountGroupManageSheet({ state, setState, toast, toastRich, initialGro
         },
         ref: swipe.ref
       },
-      /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: { width: 50 } }), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, editing === "new" ? "\u65B0\u589E\u5B50\u6A19\u7C64" : "\u7DE8\u8F2F\u5B50\u6A19\u7C64"), /* @__PURE__ */ React.createElement("div", { style: { width: 50 } })),
+      /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: { width: 50 } }), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, editing === "new" ? "\u65B0\u589E\u7FA4\u7D44\u6A19\u7C64" : "\u7DE8\u8F2F\u7FA4\u7D44\u6A19\u7C64"), /* @__PURE__ */ React.createElement("div", { style: { width: 50 } })),
       /* @__PURE__ */ React.createElement("div", { style: {
         flexShrink: 0,
         padding: "0 0 10px",
@@ -17978,7 +18062,7 @@ function AccountGroupManageSheet({ state, setState, toast, toastRich, initialGro
           maxLength: 16
         }
       ))),
-      /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.block, padding: "10px 12px", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, marginTop: 0 } }, "\u9078\u64C7\u6B64\u5B50\u6A19\u7C64\u5305\u542B\u7684\u5E33\u6236"), state.accounts.filter((a) => !a.isSystem).length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-faint)", padding: "16px 4px", textAlign: "center" } }, "\u5C1A\u7121\u5E33\u6236") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } }, state.accounts.filter((a) => !a.isSystem).map((a) => {
+      /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.block, padding: "10px 12px", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, marginTop: 0 } }, "\u9078\u64C7\u6B64\u7FA4\u7D44\u6A19\u7C64\u5305\u542B\u7684\u5E33\u6236"), state.accounts.filter((a) => !a.isSystem).length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-faint)", padding: "16px 4px", textAlign: "center" } }, "\u5C1A\u7121\u5E33\u6236") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } }, state.accounts.filter((a) => !a.isSystem).map((a) => {
         const checked = selectedAccountIds.has(a.id);
         const owner = acctOwnerOf(a.id);
         const typeMeta = state.accountTypes.find((t) => t.value === a.type) || { label: "\u5176\u4ED6", icon: "box", color: "#f5c29c" };
@@ -18021,7 +18105,7 @@ function AccountGroupManageSheet({ state, setState, toast, toastRich, initialGro
           /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "var(--text)" } }, a.name), owner && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)" } }, "\u76EE\u524D\u5728\u300C", owner, "\u300D\uFF08\u52FE\u9078\u5F8C\u6703\u79FB\u5165\u6B64\u6A19\u7C64\uFF09"))
         );
       })))),
-      /* @__PURE__ */ React.createElement("div", { style: styles.stickyFooterBar }, /* @__PURE__ */ React.createElement("button", { style: { ...styles.saveBtn, background: "var(--mint)", color: "var(--on-mint)", marginTop: 0 }, onClick: save }, editing === "new" ? "\u65B0\u589E" : "\u5132\u5B58"), editing !== "new" ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8 } }, /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, flex: 1, marginTop: 0 }, onClick: () => removeGroup(editing.id) }, "\u522A\u9664\u5B50\u6A19\u7C64"), /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, flex: 1, marginTop: 0, background: "transparent", border: "1px solid var(--border)", color: "var(--text-dim)" }, onClick: cancelEdit }, "\u53D6\u6D88")) : /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, marginTop: 8, background: "transparent", border: "1px solid var(--border)", color: "var(--text-dim)" }, onClick: cancelEdit }, "\u53D6\u6D88"))
+      /* @__PURE__ */ React.createElement("div", { style: styles.stickyFooterBar }, /* @__PURE__ */ React.createElement("button", { style: { ...styles.saveBtn, background: "var(--mint)", color: "var(--on-mint)", marginTop: 0 }, onClick: save }, editing === "new" ? "\u65B0\u589E" : "\u5132\u5B58"), editing !== "new" ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8 } }, /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, flex: 1, marginTop: 0 }, onClick: () => removeGroup(editing.id) }, "\u522A\u9664\u7FA4\u7D44\u6A19\u7C64"), /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, flex: 1, marginTop: 0, background: "transparent", border: "1px solid var(--border)", color: "var(--text-dim)" }, onClick: cancelEdit }, "\u53D6\u6D88")) : /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, marginTop: 8, background: "transparent", border: "1px solid var(--border)", color: "var(--text-dim)" }, onClick: cancelEdit }, "\u53D6\u6D88"))
     );
   }
   return /* @__PURE__ */ React.createElement(
@@ -18035,9 +18119,9 @@ function AccountGroupManageSheet({ state, setState, toast, toastRich, initialGro
       },
       ref: swipe.ref
     },
-    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: { width: 50 } }), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, "\u5B50\u6A19\u7C64\u7BA1\u7406"), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 50, display: "flex", justifyContent: "flex-end" } }, groups.length >= 2 && /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode }))),
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: { width: 50 } }), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, "\u7FA4\u7D44\u6A19\u7C64\u7BA1\u7406"), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 50, display: "flex", justifyContent: "flex-end" } }, groups.length >= 2 && /* @__PURE__ */ React.createElement(EditOrderButton, { editMode, setEditMode }))),
     /* @__PURE__ */ React.createElement(EditModeBanner, { editMode, setEditMode }),
-    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-dim)", padding: "4px 4px 12px", lineHeight: 1.5 } }, "\u5B50\u6A19\u7C64\u7528\u4F86\u628A\u4E0D\u5E38\u770B\u7684\u5E33\u6236\u534A\u96B1\u85CF\u8D77\u4F86\u3002\u5C55\u958B\u6642\u986F\u793A\u5B50\u6A19\u7C64\u4E0B\u7684\u5E33\u6236,\u6536\u5408\u6642\u53EA\u5269\u6A19\u7C64\u672C\u8EAB\u3002"), groups.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-faint)", padding: "20px 4px", textAlign: "center" } }, "\u9084\u6C92\u6709\u5B50\u6A19\u7C64") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, groups.map((g, i) => /* @__PURE__ */ React.createElement(
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-dim)", padding: "4px 4px 12px", lineHeight: 1.5 } }, "\u7FA4\u7D44\u6A19\u7C64\u7528\u4F86\u628A\u4E0D\u5E38\u770B\u7684\u5E33\u6236\u534A\u96B1\u85CF\u8D77\u4F86\u3002\u5C55\u958B\u6642\u986F\u793A\u7FA4\u7D44\u6A19\u7C64\u4E0B\u7684\u5E33\u6236,\u6536\u5408\u6642\u53EA\u5269\u6A19\u7C64\u672C\u8EAB\u3002"), groups.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--text-faint)", padding: "20px 4px", textAlign: "center" } }, "\u9084\u6C92\u6709\u7FA4\u7D44\u6A19\u7C64") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, groups.map((g, i) => /* @__PURE__ */ React.createElement(
       Block,
       {
         key: g.id,
@@ -18076,7 +18160,7 @@ function AccountGroupManageSheet({ state, setState, toast, toastRich, initialGro
         style: { ...styles.saveBtn, background: "var(--mint)", color: "var(--on-mint)", marginTop: 16 },
         onClick: startAdd
       },
-      "\uFF0B \u65B0\u589E\u5B50\u6A19\u7C64"
+      "\uFF0B \u65B0\u589E\u7FA4\u7D44\u6A19\u7C64"
     ), /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, marginTop: 8, background: "transparent", border: "1px solid var(--border)", color: "var(--text-dim)" }, onClick: onClose }, "\u8FD4\u56DE")))
   );
 }
@@ -19562,7 +19646,7 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap"
                 } }, h.name), (() => {
-                  const tag = h.subTagId ? (state.stockSubTags || []).find((t) => t.id === h.subTagId) : null;
+                  const tag = h.categoryTagId ? (state.stockCategoryTags || []).find((t) => t.id === h.categoryTagId) : null;
                   if (!tag) return null;
                   return /* @__PURE__ */ React.createElement("div", { style: { marginTop: 4 } }, /* @__PURE__ */ React.createElement("span", { style: {
                     display: "inline-block",
@@ -19778,7 +19862,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
   const toggleGroupCollapsed = (groupId) => {
     setState((s) => ({
       ...s,
-      accountGroups: (s.accountGroups || []).map(
+      accountGroupTags: (s.accountGroupTags || []).map(
         (g) => g.id === groupId ? { ...g, collapsed: !g.collapsed } : g
       )
     }));
@@ -19787,18 +19871,18 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
   const groupPickerSwipe = useSwipeToClose(() => setGroupPickerForAcct(null));
   const assignAccountToGroup = (acctId, targetGroupId) => {
     setState((s) => {
-      const updated = (s.accountGroups || []).map((g) => {
+      const updated = (s.accountGroupTags || []).map((g) => {
         const cleaned = (g.accountIds || []).filter((aid) => aid !== acctId);
         if (g.id === targetGroupId && !cleaned.includes(acctId)) {
           return { ...g, accountIds: [...cleaned, acctId] };
         }
         return { ...g, accountIds: cleaned };
       });
-      return { ...s, accountGroups: updated };
+      return { ...s, accountGroupTags: updated };
     });
   };
   const findGroupOfAcct = (acctId) => {
-    const groups = state.accountGroups || [];
+    const groups = state.accountGroupTags || [];
     return groups.find((g) => (g.accountIds || []).includes(acctId)) || null;
   };
   const renderAcctRow = (a, i, totalLen) => {
@@ -20153,7 +20237,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
         accounts: s.accounts.filter((a) => a.id !== id),
         transactions: s.transactions.filter((t) => !allRelatedTxnIds.has(t.id)),
         // [v555CQ] 同步從子標籤移除已刪帳戶的 stale id
-        accountGroups: (s.accountGroups || []).map((g) => ({
+        accountGroupTags: (s.accountGroupTags || []).map((g) => ({
           ...g,
           accountIds: (g.accountIds || []).filter((aid) => aid !== id)
         }))
@@ -20177,7 +20261,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
             ...s,
             accounts: s.accounts.filter((a) => a.id !== id),
             // [v555CQ] 同步從子標籤移除已刪帳戶的 stale id
-            accountGroups: (s.accountGroups || []).map((g) => ({
+            accountGroupTags: (s.accountGroupTags || []).map((g) => ({
               ...g,
               accountIds: (g.accountIds || []).filter((aid) => aid !== id)
             }))
@@ -20232,7 +20316,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
           holdings: s.holdings.filter((h) => h.accountId !== id),
           trades: s.trades.filter((t) => !accountHoldingIds.has(t.holdingId)),
           // [v555CQ] 同步從子標籤移除已刪帳戶的 stale id
-          accountGroups: (s.accountGroups || []).map((g) => ({
+          accountGroupTags: (s.accountGroupTags || []).map((g) => ({
             ...g,
             accountIds: (g.accountIds || []).filter((aid) => aid !== id)
           }))
@@ -20312,7 +20396,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
             return !h || h.accountId !== id;
           }),
           // [v555CQ] 同步從子標籤移除已刪帳戶的 stale id
-          accountGroups: (s.accountGroups || []).map((g) => ({
+          accountGroupTags: (s.accountGroupTags || []).map((g) => ({
             ...g,
             accountIds: (g.accountIds || []).filter((aid) => aid !== id)
           }))
@@ -20472,9 +20556,9 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
         return !isNaN(n) && initAmount.match(/^-?\d+(\.\d+)?$/) ? n.toLocaleString("en-US") : initAmount;
       })()) : /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "\u81EA\u884C\u8F38\u5165\u91D1\u984D(\u53EF\u7559\u7A7A)")
     )), editingId !== "new" && (() => {
-      const currentGroup = (state.accountGroups || []).find((g) => (g.accountIds || []).includes(editingId));
+      const currentGroup = (state.accountGroupTags || []).find((g) => (g.accountIds || []).includes(editingId));
       const acct = state.accounts.find((a) => a.id === editingId);
-      return /* @__PURE__ */ React.createElement("div", { style: { ...styles.block, padding: "10px 12px", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, marginTop: 0, marginBottom: 8 } }, "\u5B50\u6A19\u7C64"), /* @__PURE__ */ React.createElement(
+      return /* @__PURE__ */ React.createElement("div", { style: { ...styles.block, padding: "10px 12px", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { ...styles.fieldLabel, marginTop: 0, marginBottom: 8 } }, "\u7FA4\u7D44\u6A19\u7C64"), /* @__PURE__ */ React.createElement(
         "div",
         {
           onClick: () => {
@@ -20491,7 +20575,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
         /* @__PURE__ */ React.createElement(TypeIcon, { name: "folder", size: 16, color: "var(--text-dim)" }),
         /* @__PURE__ */ React.createElement("span", { style: { flex: 1, marginLeft: 8, color: currentGroup ? "var(--text)" : "var(--text-faint)" } }, currentGroup ? currentGroup.name : "\u672A\u6B78\u7D44"),
         /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 14 } }, "\u203A")
-      ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 6, lineHeight: 1.5 } }, "\u628A\u4E0D\u5E38\u7528\u7684\u5E33\u6236\u6B78\u5230\u5B50\u6A19\u7C64,\u5E73\u5E38\u6536\u5408\u8D77\u4F86\u4FDD\u6301\u5217\u8868\u6574\u9F4A\u3002"));
+      ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 6, lineHeight: 1.5 } }, "\u628A\u4E0D\u5E38\u7528\u7684\u5E33\u6236\u6B78\u5230\u7FA4\u7D44\u6A19\u7C64,\u5E73\u5E38\u6536\u5408\u8D77\u4F86\u4FDD\u6301\u5217\u8868\u6574\u9F4A\u3002"));
     })(), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement(
       "div",
       {
@@ -20613,7 +20697,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
       if (editMode) {
         return state.accounts.map((a, i) => renderAcctRow(a, i, state.accounts.length));
       }
-      const groups = state.accountGroups || [];
+      const groups = state.accountGroupTags || [];
       const groupedIds = new Set(groups.flatMap((g) => g.accountIds || []));
       const ungroupedAccounts = state.accounts.filter((a) => !groupedIds.has(a.id));
       const rendered = [];
@@ -20731,8 +20815,8 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
           whiteSpace: "nowrap"
         }
       },
-      "\u7BA1\u7406\u5B50\u6A19\u7C64",
-      state.accountGroups && state.accountGroups.length > 0 ? ` (${state.accountGroups.length})` : ""
+      "\u7BA1\u7406\u7FA4\u7D44\u6A19\u7C64",
+      state.accountGroupTags && state.accountGroupTags.length > 0 ? ` (${state.accountGroupTags.length})` : ""
     ), /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -20969,7 +21053,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
           }
         },
         /* @__PURE__ */ React.createElement("span", { style: styles.actionMenuIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "folder", size: 20, color: "var(--text-dim)" })),
-        /* @__PURE__ */ React.createElement("span", { style: { flex: 1 } }, "\u5B50\u6A19\u7C64"),
+        /* @__PURE__ */ React.createElement("span", { style: { flex: 1 } }, "\u7FA4\u7D44\u6A19\u7C64"),
         (() => {
           const g = findGroupOfAcct(actionMenu.id);
           return /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--text-faint)", marginRight: 4 } }, g ? g.name : "\u7121");
@@ -20990,20 +21074,20 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
     })(),
     groupPickerForAcct && (() => {
       const acct = groupPickerForAcct;
-      const groups = state.accountGroups || [];
+      const groups = state.accountGroupTags || [];
       const currentGroup = findGroupOfAcct(acct.id);
-      return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: () => setGroupPickerForAcct(null), ...groupPickerSwipe }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogHeader }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogHeaderName }, "\u8A2D\u5B9A\u5B50\u6A19\u7C64"), /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogHeaderMeta }, "\u5E33\u6236: ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text)", fontWeight: 500 } }, acct.name))), /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogDivider }), /* @__PURE__ */ React.createElement(
+      return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: () => setGroupPickerForAcct(null), ...groupPickerSwipe }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogHeader }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogHeaderName }, "\u8A2D\u5B9A\u7FA4\u7D44\u6A19\u7C64"), /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogHeaderMeta }, "\u5E33\u6236: ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text)", fontWeight: 500 } }, acct.name))), /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogDivider }), /* @__PURE__ */ React.createElement(
         "div",
         {
           style: styles.centerDialogItem,
           onClick: () => {
             assignAccountToGroup(acct.id, null);
             setGroupPickerForAcct(null);
-            toastRich && toastRich({ title: "\u5DF2\u79FB\u51FA\u5B50\u6A19\u7C64", amount: "\u2713", amountColor: "var(--text-faint)" }, 1200);
+            toastRich && toastRich({ title: "\u5DF2\u79FB\u51FA\u7FA4\u7D44\u6A19\u7C64", amount: "\u2713", amountColor: "var(--text-faint)" }, 1200);
           }
         },
         /* @__PURE__ */ React.createElement("span", { style: { ...styles.actionMenuIcon, fontSize: 18, color: "var(--text-dim)", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, "\u2014"),
-        /* @__PURE__ */ React.createElement("span", { style: { flex: 1 } }, "\u4E0D\u6B78\u5165\u4EFB\u4F55\u5B50\u6A19\u7C64"),
+        /* @__PURE__ */ React.createElement("span", { style: { flex: 1 } }, "\u4E0D\u6B78\u5165\u4EFB\u4F55\u7FA4\u7D44\u6A19\u7C64"),
         !currentGroup && /* @__PURE__ */ React.createElement(TypeIcon, { name: "check", size: 16, color: "var(--mint-text)" })
       ), groups.map((g) => /* @__PURE__ */ React.createElement(React.Fragment, { key: g.id }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogDivider }), /* @__PURE__ */ React.createElement(
         "div",
@@ -21035,7 +21119,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
           }
         },
         /* @__PURE__ */ React.createElement("span", { style: { ...styles.actionMenuIcon, fontSize: 20, color: "var(--accent-text)", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, "\uFF0B"),
-        /* @__PURE__ */ React.createElement("span", null, "\u65B0\u589E\u5B50\u6A19\u7C64\u2026")
+        /* @__PURE__ */ React.createElement("span", null, "\u65B0\u589E\u7FA4\u7D44\u6A19\u7C64\u2026")
       )));
     })(),
     showInitCalc && /* @__PURE__ */ React.createElement(
