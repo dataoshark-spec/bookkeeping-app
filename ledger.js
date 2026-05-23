@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FB";
+const APP_VERSION = "1150520FD";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -17077,7 +17077,7 @@ function PeriodDetailSheet({ state, setState, catIcon, periodKey, onClose, onCli
         return /* @__PURE__ */ React.createElement(Block, { key: "summary", ...blockProps }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryRow }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u6536\u5165"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: "var(--mint-text)", fontSize: autoFitFontSize(fmt(inc)) } }, fmt(inc))), /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u652F\u51FA"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: "var(--pink-text)", fontSize: autoFitFontSize(fmt(exp)) } }, fmt(exp))), /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u7D50\u9918"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: inc - exp < 0 ? "var(--pink)" : inc - exp > 0 ? "var(--mint)" : "var(--text)", fontSize: autoFitFontSize(fmtSigned(inc - exp)) } }, fmtSigned(inc - exp)))));
       }
       if (blockKey === "list") {
-        return /* @__PURE__ */ React.createElement(Block, { key: "list", ...blockProps }, !editMode && !selectMode && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 8 }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.recentFilterBar }, [
+        return /* @__PURE__ */ React.createElement(Block, { key: "list", ...blockProps }, !editMode && !selectMode && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 16, marginBottom: 2 }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.recentFilterBar }, [
           { key: "transfer", label: "\u8F49\u5E33" },
           { key: "income", label: "\u6536\u5165" },
           { key: "expense", label: "\u652F\u51FA" },
@@ -19762,7 +19762,7 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
           fontWeight: 500,
           marginBottom: 8,
           paddingLeft: 4
-        } }, "\u4EA4\u6613\u7D00\u9304"), !isInvest && !editMode && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 8 }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.recentFilterBar }, [
+        } }, "\u4EA4\u6613\u7D00\u9304"), !isInvest && !editMode && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 16, marginBottom: 2 }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.recentFilterBar }, [
           { key: "transfer", label: "\u8F49\u5E33" },
           { key: "income", label: "\u6536\u5165" },
           { key: "expense", label: "\u652F\u51FA" },
@@ -21091,10 +21091,10 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
       const acct = groupPickerForAcct;
       const groups = state.accountGroupTags || [];
       const currentGroup = findGroupOfAcct(acct.id);
-      return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: () => setGroupPickerForAcct(null), ...groupPickerSwipe }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogHeader }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogHeaderName }, "\u8A2D\u5B9A ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)" } }, "\u5E33\u6236\u7FA4\u7D44\u6A19\u7C64")), /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogHeaderMeta }, "\u5E33\u6236: ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text)", fontWeight: 500 } }, acct.name))), /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogDivider }), /* @__PURE__ */ React.createElement(
+      return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: () => setGroupPickerForAcct(null), ...groupPickerSwipe }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogHeader }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogHeaderName }, "\u8A2D\u5B9A ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--blue)" } }, "\u5E33\u6236\u7FA4\u7D44\u6A19\u7C64")), /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogHeaderMeta }, "\u5E33\u6236: ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text)", fontWeight: 500 } }, acct.name))), /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogDivider }), /* @__PURE__ */ React.createElement(
         "div",
         {
-          style: styles.centerDialogItem,
+          style: { ...styles.centerDialogItem, color: "var(--text-dim)" },
           onClick: () => {
             assignAccountToGroup(acct.id, null);
             setGroupPickerForAcct(null);
@@ -21102,7 +21102,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
           }
         },
         /* @__PURE__ */ React.createElement("span", { style: { ...styles.actionMenuIcon, fontSize: 18, color: "var(--text-dim)", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, "\u2014"),
-        /* @__PURE__ */ React.createElement("span", { style: { flex: 1 } }, "\u4E0D\u6B78\u5165\u4EFB\u4F55 \u5E33\u6236\u7FA4\u7D44\u6A19\u7C64 "),
+        /* @__PURE__ */ React.createElement("span", { style: { flex: 1, color: "var(--text-dim)" } }, "\u4E0D\u6B78\u5165\u4EFB\u4F55 \u5E33\u6236\u7FA4\u7D44\u6A19\u7C64 "),
         !currentGroup && /* @__PURE__ */ React.createElement(TypeIcon, { name: "check", size: 16, color: "var(--mint-text)" })
       ), groups.map((g) => /* @__PURE__ */ React.createElement(React.Fragment, { key: g.id }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogDivider }), /* @__PURE__ */ React.createElement(
         "div",
@@ -21134,7 +21134,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
           }
         },
         /* @__PURE__ */ React.createElement("span", { style: { ...styles.actionMenuIcon, fontSize: 20, color: "var(--text-dim)", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, "\uFF0B"),
-        /* @__PURE__ */ React.createElement("span", null, "\u65B0\u589E \u5E33\u6236\u7FA4\u7D44\u6A19\u7C64 \u2026")
+        /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-dim)" } }, "\u65B0\u589E \u5E33\u6236\u7FA4\u7D44\u6A19\u7C64 \u2026")
       )));
     })(),
     showInitCalc && /* @__PURE__ */ React.createElement(
