@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520EV";
+const APP_VERSION = "1150520EW";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -8271,12 +8271,12 @@ function HoldingSubTagPickerSheet({
             display: "flex",
             alignItems: "center",
             gap: 12,
-            padding: "14px 16px",
+            padding: "12px 14px",
             borderRadius: 12,
             background: "var(--bg-card)",
-            border: !currentId ? "2px solid var(--mint)" : "1.5px solid var(--border)",
+            border: !currentId ? "2px solid var(--mint)" : "1.5px dashed var(--border)",
             cursor: "pointer",
-            marginBottom: 10,
+            marginBottom: 8,
             minHeight: 56,
             boxSizing: "border-box"
           }
@@ -20817,9 +20817,8 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
           whiteSpace: "nowrap"
         }
       },
-      "\u7BA1\u7406 ",
-      /* @__PURE__ */ React.createElement("span", { style: { color: "var(--blue)" } }, "\u5E33\u6236\u7FA4\u7D44\u6A19\u7C64"),
-      state.accountGroupTags && state.accountGroupTags.length > 0 ? ` (${state.accountGroupTags.length})` : ""
+      "\u7BA1\u7406 \u5E33\u6236\u7FA4\u7D44\u6A19\u7C64 ",
+      state.accountGroupTags && state.accountGroupTags.length > 0 ? `(${state.accountGroupTags.length})` : ""
     ), /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -21056,7 +21055,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
           }
         },
         /* @__PURE__ */ React.createElement("span", { style: styles.actionMenuIcon }, /* @__PURE__ */ React.createElement(TypeIcon, { name: "folder", size: 20, color: "var(--text-dim)" })),
-        /* @__PURE__ */ React.createElement("span", { style: { flex: 1, color: "var(--blue)" } }, "\u5E33\u6236\u7FA4\u7D44\u6A19\u7C64"),
+        /* @__PURE__ */ React.createElement("span", { style: { flex: 1 } }, "\u5E33\u6236\u7FA4\u7D44\u6A19\u7C64"),
         (() => {
           const g = findGroupOfAcct(actionMenu.id);
           return /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--text-faint)", marginRight: 4 } }, g ? g.name : "\u7121");
@@ -21090,7 +21089,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
           }
         },
         /* @__PURE__ */ React.createElement("span", { style: { ...styles.actionMenuIcon, fontSize: 18, color: "var(--text-dim)", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, "\u2014"),
-        /* @__PURE__ */ React.createElement("span", { style: { flex: 1 } }, "\u4E0D\u6B78\u5165\u4EFB\u4F55 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--blue)" } }, "\u5E33\u6236\u7FA4\u7D44\u6A19\u7C64")),
+        /* @__PURE__ */ React.createElement("span", { style: { flex: 1 } }, "\u4E0D\u6B78\u5165\u4EFB\u4F55 \u5E33\u6236\u7FA4\u7D44\u6A19\u7C64 "),
         !currentGroup && /* @__PURE__ */ React.createElement(TypeIcon, { name: "check", size: 16, color: "var(--mint-text)" })
       ), groups.map((g) => /* @__PURE__ */ React.createElement(React.Fragment, { key: g.id }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogDivider }), /* @__PURE__ */ React.createElement(
         "div",
@@ -21122,7 +21121,7 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
           }
         },
         /* @__PURE__ */ React.createElement("span", { style: { ...styles.actionMenuIcon, fontSize: 20, color: "var(--accent-text)", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, "\uFF0B"),
-        /* @__PURE__ */ React.createElement("span", null, "\u65B0\u589E ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--blue)" } }, "\u5E33\u6236\u7FA4\u7D44\u6A19\u7C64"), " \u2026")
+        /* @__PURE__ */ React.createElement("span", null, "\u65B0\u589E \u5E33\u6236\u7FA4\u7D44\u6A19\u7C64 \u2026")
       )));
     })(),
     showInitCalc && /* @__PURE__ */ React.createElement(
