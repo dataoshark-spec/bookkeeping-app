@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FR";
+const APP_VERSION = "1150520FS";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -14667,19 +14667,23 @@ function CalcTriggerInput({
       if (scroller && scroller !== document.body) {
         scroller.scrollBy({ top: delta, behavior: "smooth" });
       } else {
-        const triggerBackdrops = document.querySelectorAll('[data-picker-backdrop="true"]');
-        let dialogBackdrop = null;
-        for (const bd of triggerBackdrops) {
-          if (bd.contains(el) && bd !== calcBackdrop) {
-            dialogBackdrop = bd;
+        let card = el.parentElement;
+        while (card && card !== document.body) {
+          const cs = window.getComputedStyle(card);
+          if (cs.borderRadius && parseInt(cs.borderRadius) >= 14) {
             break;
           }
+          card = card.parentElement;
         }
-        const card = dialogBackdrop ? dialogBackdrop.querySelector(":scope > div") : null;
-        if (card) {
-          card.style.transition = "transform 0.2s ease-out";
-          card.style.transform = `translateY(-${delta}px)`;
-          el._calcShiftedCard = card;
+        if (card && card !== document.body) {
+          const cardRect = card.getBoundingClientRect();
+          const maxPush = Math.max(0, cardRect.top - 12);
+          const safeDelta = Math.min(delta, maxPush);
+          if (safeDelta > 8) {
+            card.style.transition = "transform 0.2s ease-out";
+            card.style.transform = `translateY(-${safeDelta}px)`;
+            el._calcShiftedCard = card;
+          }
         }
       }
     }, 180);
