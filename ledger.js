@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FQ";
+const APP_VERSION = "1150520FR";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -14642,6 +14642,9 @@ function CalcTriggerInput({
     if (document.activeElement && typeof document.activeElement.blur === "function") {
       document.activeElement.blur();
     }
+    if (clearOnOpen) {
+      onChange("");
+    }
     setShow(true);
     setTimeout(() => {
       const el = triggerRef.current;
@@ -14664,15 +14667,16 @@ function CalcTriggerInput({
       if (scroller && scroller !== document.body) {
         scroller.scrollBy({ top: delta, behavior: "smooth" });
       } else {
-        let card = el.parentElement;
-        while (card && card !== document.body) {
-          const cs = window.getComputedStyle(card);
-          if (cs.borderRadius && parseInt(cs.borderRadius) >= 14 && card.querySelector("[data-picker-backdrop]") === null) {
+        const triggerBackdrops = document.querySelectorAll('[data-picker-backdrop="true"]');
+        let dialogBackdrop = null;
+        for (const bd of triggerBackdrops) {
+          if (bd.contains(el) && bd !== calcBackdrop) {
+            dialogBackdrop = bd;
             break;
           }
-          card = card.parentElement;
         }
-        if (card && card !== document.body) {
+        const card = dialogBackdrop ? dialogBackdrop.querySelector(":scope > div") : null;
+        if (card) {
           card.style.transition = "transform 0.2s ease-out";
           card.style.transform = `translateY(-${delta}px)`;
           el._calcShiftedCard = card;
@@ -14726,7 +14730,7 @@ function CalcTriggerInput({
   ), show && /* @__PURE__ */ React.createElement(
     CalculatorSheet,
     {
-      expr: clearOnOpen ? "" : value === "0" ? "" : String(value || ""),
+      expr: value === "0" ? "" : String(value || ""),
       onChange: (v) => onChange(v),
       mainColor: "var(--mint)",
       onMainColor: "#1a1a1a",
