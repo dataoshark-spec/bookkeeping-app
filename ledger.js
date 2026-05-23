@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520EO";
+const APP_VERSION = "1150520ER";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -8623,8 +8623,8 @@ function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, sel
     const filtered = state.transactions.filter((t) => {
       if (recentFilter === "all") return true;
       if (recentFilter === "transfer") return isTrueTransfer(t);
-      if (recentFilter === "expense") return t.type === "expense" && !isTrueTransfer(t);
-      if (recentFilter === "income") return t.type === "income" && !isTrueTransfer(t);
+      if (recentFilter === "expense") return t.type === "expense" && isRealFlow(t) && !isTrueTransfer(t);
+      if (recentFilter === "income") return t.type === "income" && isRealFlow(t) && !isTrueTransfer(t);
       return true;
     });
     let result;
@@ -9226,7 +9226,7 @@ function TxnListPage({ state, setState, setConfirmDialog, toastRich, toast, catI
       if (listFilter === "all") return true;
       const isTrueTransfer = t.transferRole === "out" || t.transferRole === "in" || t.transferRole === "fee";
       if (listFilter === "transfer") return isTrueTransfer;
-      return t.type === listFilter && !isTrueTransfer;
+      return t.type === listFilter && isRealFlow(t) && !isTrueTransfer;
     });
     const _groups = {};
     _sorted.forEach((t) => {
@@ -11476,7 +11476,7 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
       if (holdingCount > 0) summaryLines.push(`\u6301\u80A1 ${holdingCount} \u6A94`);
       if (accountGroupCount > 0) summaryLines.push(`\u5B50\u6A19\u7C64 ${accountGroupCount} \u500B`);
       const items = [
-        { card: true, lines: summaryLines, headerLabel: exportedTimeText ? `\u5099\u4EFD\u6642\u9593  ${exportedTimeText}` : null }
+        { card: true, lines: summaryLines, headerLabel: exportedTimeText ? `\u6A94\u6848\u6642\u9593  ${exportedTimeText}` : null }
       ];
       if (hasPrefs) {
         items.push("\u4E00\u4F75\u9084\u539F \u504F\u597D\u8A2D\u5B9A");
@@ -11789,10 +11789,9 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
     if (blockKey === "dataStat") {
       const catCount = (state.categories.expense?.length || 0) + (state.categories.income?.length || 0);
       const subCount = (state.categories.expense || []).reduce((sum, c) => sum + (c.subs?.length || 0), 0) + (state.categories.income || []).reduce((sum, c) => sum + (c.subs?.length || 0), 0);
-      const _isRealTransfer = (t) => t.transferRole === "out" || t.transferRole === "in" || t.transferRole === "fee";
       const txnByType = {
-        income: state.transactions.filter((t) => t.type === "income" && !_isRealTransfer(t)).length,
-        expense: state.transactions.filter((t) => t.type === "expense" && !_isRealTransfer(t)).length,
+        income: state.transactions.filter((t) => t.type === "income" && isRealFlow(t)).length,
+        expense: state.transactions.filter((t) => t.type === "expense" && isRealFlow(t)).length,
         transfer: state.transactions.filter((t) => t.transferRole === "out").length
         // 一對轉出/轉入算一筆
       };
@@ -20094,8 +20093,8 @@ function AccountsSheet({ state, setState, toast, toastRich, onClose, initialEdit
         allRelatedTxnIds.add(t.id);
       }
     });
-    const expenseCount = directTxns.filter((t) => t.type === "expense" && !t.transferId).length;
-    const incomeCount = directTxns.filter((t) => t.type === "income" && !t.transferId).length;
+    const expenseCount = directTxns.filter((t) => t.type === "expense" && !t.transferId && isRealFlow(t)).length;
+    const incomeCount = directTxns.filter((t) => t.type === "income" && !t.transferId && isRealFlow(t)).length;
     const transferGroups = transferIds.size;
     if (!setConfirmDialog) {
       setState((s) => ({
