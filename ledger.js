@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FK";
+const APP_VERSION = "1150520FL";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -19683,7 +19683,9 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
                     outlineOffset: holdingsSortMode ? "-1.5px" : void 0,
                     cursor: holdingsSortMode ? "grab" : "pointer",
                     display: "flex",
-                    alignItems: "center",
+                    // [v555FL] center → stretch:讓左右兩側等高,代號永遠對齊市值,佔比永遠在底
+                    //          原本 center 會讓較短一側垂直置中,導致左右錯位
+                    alignItems: "stretch",
                     gap: 12,
                     boxSizing: "border-box",
                     touchAction: holdingsSortMode ? "none" : void 0
@@ -19720,7 +19722,13 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
                   marginTop: 6,
                   fontFamily: "var(--num-font)"
                 } }, shares.toLocaleString(), " \u80A1 \xB7 \u5747\u50F9 ", avgPrice >= 100 ? fmt(Math.round(avgPrice)) : avgPrice.toFixed(2))),
-                /* @__PURE__ */ React.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, hasMarket ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: {
+                /* @__PURE__ */ React.createElement("div", { style: {
+                  textAlign: "right",
+                  flexShrink: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between"
+                } }, /* @__PURE__ */ React.createElement("div", null, hasMarket ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: {
                   fontSize: 17,
                   fontWeight: 700,
                   fontFamily: "var(--num-font)",
@@ -19735,7 +19743,7 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
                   fontSize: 12,
                   color: "var(--mint-text)",
                   fontWeight: 600
-                } }, "\u9EDE\u6B64\u8A2D\u5B9A\u5E02\u503C"), marketTotalCost > 0 && cost > 0 && (() => {
+                } }, "\u9EDE\u6B64\u8A2D\u5B9A\u5E02\u503C")), marketTotalCost > 0 && cost > 0 && (() => {
                   const sharePct = cost / marketTotalCost * 100;
                   return /* @__PURE__ */ React.createElement("div", { style: {
                     marginTop: 8,
