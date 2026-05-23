@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FO";
+const APP_VERSION = "1150520FP";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -8058,8 +8058,7 @@ function HoldingSubTagPickerSheet({
           }
         },
         /* @__PURE__ */ React.createElement("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "3 6 5 6 21 6" }), /* @__PURE__ */ React.createElement("path", { d: "M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" }), /* @__PURE__ */ React.createElement("path", { d: "M10 11v6" }), /* @__PURE__ */ React.createElement("path", { d: "M14 11v6" }))
-      )),
-      !isEdit && isSelected && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "var(--mint-text)", fontWeight: 700, flexShrink: 0 } }, "\u2713")
+      ))
     );
   };
   const renderGroupBlock = (group) => {
@@ -8223,10 +8222,10 @@ function HoldingSubTagPickerSheet({
         {
           "data-drag-zone": group.id,
           style: {
-            // [v555FM] 左側細條 + 縮排,做出「群組包覆」的視覺層級
-            paddingLeft: 14,
+            // [v555FM→FP] 細條 2px→1px,顏色透明度 0.35→0.22,降低視覺權重
+            paddingLeft: 12,
             marginLeft: 4,
-            borderLeft: "2px solid rgba(126, 224, 192, 0.35)"
+            borderLeft: "1px solid rgba(126, 224, 192, 0.22)"
           }
         },
         groupTags.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: {
@@ -8330,9 +8329,9 @@ function HoldingSubTagPickerSheet({
       {
         "data-drag-zone": "ungrouped",
         style: {
-          paddingLeft: 14,
+          paddingLeft: 12,
           marginLeft: 4,
-          borderLeft: "2px solid var(--border)"
+          borderLeft: "1px solid var(--border)"
         }
       },
       ungroupedTags.map((t) => renderTagRow(t))
@@ -8499,6 +8498,9 @@ function HoldingSubTagPickerSheet({
         ...groups.map((g) => ({ id: g.id, name: g.name }))
       ];
       const currentGroupId = tag.groupId || null;
+      const selectedGroupId = moveTagDialog.selectedGroupId !== void 0 ? moveTagDialog.selectedGroupId : currentGroupId;
+      const setSelected = (gid) => setMoveTagDialog({ tag, selectedGroupId: gid });
+      const isDirty = selectedGroupId !== currentGroupId;
       return /* @__PURE__ */ React.createElement(
         "div",
         {
@@ -8549,14 +8551,15 @@ function HoldingSubTagPickerSheet({
             padding: "2px 8px",
             borderRadius: 6,
             background: "rgba(126, 224, 192, 0.22)"
-          } }, "\u5206\u985E"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: "var(--text)" } }, tag.name)),
+          } }, "\u6210\u4EFD\u5206\u985E"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: "var(--text)" } }, tag.name)),
           /* @__PURE__ */ React.createElement("div", { style: { padding: "0 12px 8px", maxHeight: "50vh", overflowY: "auto" } }, opts.map((o) => {
-            const isCurrent = o.id === currentGroupId;
+            const isSelected = o.id === selectedGroupId;
+            const isNone = o.id === null;
             return /* @__PURE__ */ React.createElement(
               "div",
               {
                 key: o.id || "null",
-                onClick: () => doMoveTag(tag.id, o.id),
+                onClick: () => setSelected(o.id),
                 style: {
                   display: "flex",
                   alignItems: "center",
@@ -8564,26 +8567,26 @@ function HoldingSubTagPickerSheet({
                   padding: "14px 14px",
                   borderRadius: 10,
                   cursor: "pointer",
-                  background: isCurrent ? "rgba(126, 224, 192, 0.08)" : "transparent",
-                  border: isCurrent ? "1.5px solid var(--mint)" : "1.5px solid var(--border)",
+                  background: isSelected ? "rgba(126, 224, 192, 0.08)" : "transparent",
+                  border: isSelected ? "1.5px solid var(--mint)" : "1.5px solid var(--border)",
                   marginBottom: 6,
                   WebkitTapHighlightColor: "transparent"
                 }
               },
               /* @__PURE__ */ React.createElement("span", { style: {
                 fontSize: 15,
-                fontWeight: isCurrent ? 700 : 500,
-                color: isCurrent ? "var(--mint-text)" : "var(--text)"
-              } }, o.name),
-              isCurrent && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "var(--mint-text)", fontWeight: 700 } }, "\u2713 \u76EE\u524D")
+                // [v555FP] (無分組) 用更灰、更細的字
+                fontWeight: isNone ? 400 : isSelected ? 700 : 500,
+                color: isNone ? "var(--text-faint)" : isSelected ? "var(--mint-text)" : "var(--text)"
+              } }, isNone ? "(\u7121\u5206\u7D44)" : o.name)
             );
           })),
-          /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 16px" } }, /* @__PURE__ */ React.createElement(
+          /* @__PURE__ */ React.createElement("div", { style: { padding: "4px 16px 16px", display: "flex", gap: 10 } }, /* @__PURE__ */ React.createElement(
             "button",
             {
               onClick: () => setMoveTagDialog(null),
               style: {
-                width: "100%",
+                flex: 1,
                 padding: "12px",
                 background: "transparent",
                 color: "var(--pink-text)",
@@ -8595,6 +8598,28 @@ function HoldingSubTagPickerSheet({
               }
             },
             "\u53D6\u6D88"
+          ), /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              onClick: () => {
+                if (isDirty) doMoveTag(tag.id, selectedGroupId);
+                else setMoveTagDialog(null);
+              },
+              disabled: !isDirty,
+              style: {
+                flex: 1,
+                padding: "12px",
+                background: isDirty ? "var(--mint)" : "var(--bg-card)",
+                color: isDirty ? "#fff" : "var(--text-faint)",
+                border: "none",
+                borderRadius: 12,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: isDirty ? "pointer" : "not-allowed",
+                opacity: isDirty ? 1 : 0.6
+              }
+            },
+            "\u78BA\u8A8D"
           ))
         )
       );
