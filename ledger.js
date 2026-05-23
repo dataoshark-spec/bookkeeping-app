@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FL3";
+const APP_VERSION = "1150520FL4";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -19268,12 +19268,14 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
         } catch {
         }
         try {
-          const prevOX = document.body.dataset.prevOverflowX;
-          const prevTA = document.documentElement.dataset.prevTouchAction;
-          document.body.style.overflowX = prevOX || "";
-          document.documentElement.style.touchAction = prevTA || "";
-          delete document.body.dataset.prevOverflowX;
-          delete document.documentElement.dataset.prevTouchAction;
+          const prevTA = document.body.dataset.prevTouchAction;
+          const prevUS = document.body.dataset.prevUserSelect;
+          document.body.style.touchAction = prevTA || "";
+          document.body.style.userSelect = prevUS || "";
+          document.body.style.webkitUserSelect = prevUS || "";
+          document.body.removeAttribute("data-drag-active");
+          delete document.body.dataset.prevTouchAction;
+          delete document.body.dataset.prevUserSelect;
         } catch {
         }
         placeholder = null;
@@ -19287,10 +19289,12 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
         offsetX = x - rect.left;
         offsetY = y - rect.top;
         try {
-          document.body.dataset.prevOverflowX = document.body.style.overflowX || "";
-          document.documentElement.dataset.prevTouchAction = document.documentElement.style.touchAction || "";
-          document.body.style.overflowX = "hidden";
-          document.documentElement.style.touchAction = "pan-y";
+          document.body.dataset.prevTouchAction = document.body.style.touchAction || "";
+          document.body.dataset.prevUserSelect = document.body.style.userSelect || "";
+          document.body.style.touchAction = "none";
+          document.body.style.userSelect = "none";
+          document.body.style.webkitUserSelect = "none";
+          document.body.setAttribute("data-drag-active", "true");
         } catch {
         }
         draggedClone = rowEl.cloneNode(true);
