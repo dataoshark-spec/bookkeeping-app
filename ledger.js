@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520EN";
+const APP_VERSION = "1150520EO";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -8569,12 +8569,6 @@ function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, sel
     const d = new Date(y, m - 1 + delta, 1);
     setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
   };
-  React.useLayoutEffect(() => {
-    if (recentFilter === "all" && recentContentRef.current) {
-      const h = recentContentRef.current.offsetHeight;
-      if (h > 0 && h !== recentMinHeight) setRecentMinHeight(h);
-    }
-  }, [recentFilter, state.transactions]);
   let monthInc = 0, monthExp = 0;
   for (const t of state.transactions) {
     if (!t.date.startsWith(currentMonth)) continue;
@@ -8942,7 +8936,7 @@ function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, sel
         { key: "expense", label: "\u652F\u51FA" },
         { key: "all", label: "\u5168\u90E8" }
       ];
-      const contentStyle = recentFilter !== "all" && recentMinHeight > 0 ? { minHeight: recentMinHeight } : {};
+      const contentStyle = {};
       return /* @__PURE__ */ React.createElement(Block, { key: blockKey, ...blockProps, title: "\u6700\u8FD1\u7D00\u9304", headerRight: !editMode ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 6 } }, /* @__PURE__ */ React.createElement("div", { style: styles.recentFilterBar }, filterOpts.map((opt) => /* @__PURE__ */ React.createElement(
         "span",
         {
