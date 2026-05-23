@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FI";
+const APP_VERSION = "1150520FJ";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -5665,17 +5665,6 @@ function SellSheet({ state, account, onClose, onConfirm, toast }) {
 function UpdateMarketValueDialog({ holding, shares, cost, onClose, onConfirm }) {
   const [value, setValue] = useState(String(holding.marketValue || ""));
   const [locked, setLocked] = useState(true);
-  const inputRef = React.useRef(null);
-  React.useEffect(() => {
-    if (!locked && inputRef.current) {
-      setTimeout(() => {
-        if (inputRef.current) {
-          inputRef.current.focus();
-          inputRef.current.select();
-        }
-      }, 50);
-    }
-  }, [locked]);
   const handleSubmit = () => {
     const trimmed = String(value || "").trim();
     if (trimmed === "") {
@@ -5705,34 +5694,15 @@ function UpdateMarketValueDialog({ holding, shares, cost, onClose, onConfirm }) 
     },
     /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: locked ? "translateX(0)" : "translateX(18px)" } })
   ))), /* @__PURE__ */ React.createElement("div", { style: { padding: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 8 } }, "\u6301\u6709 ", shares.toLocaleString(), " \u80A1 \xB7 \u76EE\u524D\u5E02\u503C\u7E3D\u984D(NT$)"), /* @__PURE__ */ React.createElement(
-    "input",
+    CalcTriggerInput,
     {
-      ref: inputRef,
-      type: "number",
-      inputMode: "decimal",
       value,
-      onChange: (e) => setValue(e.target.value),
-      onFocus: (e) => e.target.select(),
-      onClick: (e) => e.target.select(),
-      disabled: locked,
+      onChange: setValue,
       placeholder: cost ? String(cost) : "0",
-      style: {
-        width: "100%",
-        padding: "12px 14px",
-        fontSize: 18,
-        fontWeight: 600,
-        background: "var(--bg-card)",
-        color: locked ? "var(--text-dim)" : "var(--text)",
-        border: "1.5px solid var(--border)",
-        borderRadius: 12,
-        outline: "none",
-        boxSizing: "border-box",
-        opacity: locked ? 0.6 : 1,
-        fontFamily: "var(--num-font)"
-      },
-      onKeyDown: (e) => {
-        if (e.key === "Enter" && !locked) handleSubmit();
-      }
+      fontSize: 18,
+      fontWeight: 600,
+      disabled: locked,
+      style: { padding: "12px 14px", borderRadius: 12 }
     }
   ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 6, lineHeight: 1.6 } }, cost ? `\u7559\u7A7A \u2192 \u7528\u6210\u672C ${cost.toLocaleString()} \u7576\u5E02\u503C` : "\u7CFB\u7D71\u6703\u6839\u64DA\u6B64\u91D1\u984D\u986F\u793A\u6D6E\u52D5\u640D\u76CA,\u4E26\u5F71\u97FF\u5E33\u6236\u7E3D\u5E02\u503C")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "0 14px 14px" } }, /* @__PURE__ */ React.createElement(
     "button",
@@ -5991,52 +5961,26 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
       }
     }
   ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u80A1\u6578 ", consumed > 0 && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 11 } }, "(\u5DF2\u8CE3 ", consumed.toLocaleString(), " \u80A1)")), /* @__PURE__ */ React.createElement(
-    "input",
+    CalcTriggerInput,
     {
-      type: "number",
-      inputMode: "decimal",
       value: shares,
-      onChange: (e) => setShares(e.target.value),
-      disabled: locked,
+      onChange: setShares,
       placeholder: "0",
-      style: {
-        width: "100%",
-        padding: "12px 14px",
-        fontSize: 15,
-        background: "var(--bg-card)",
-        color: locked ? "var(--text-dim)" : "var(--text)",
-        border: "1.5px solid var(--border)",
-        borderRadius: 12,
-        outline: "none",
-        boxSizing: "border-box",
-        marginBottom: 14,
-        opacity: locked ? 0.6 : 1,
-        fontFamily: "var(--num-font)"
-      }
+      fontSize: 15,
+      fontWeight: 500,
+      disabled: locked,
+      style: { padding: "12px 14px", borderRadius: 12, marginBottom: 14 }
     }
   ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u7E3D\u6210\u672C ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 11 } }, "(\u542B\u624B\u7E8C\u8CBB)")), /* @__PURE__ */ React.createElement(
-    "input",
+    CalcTriggerInput,
     {
-      type: "number",
-      inputMode: "decimal",
       value: totalCost,
-      onChange: (e) => setTotalCost(e.target.value),
-      disabled: locked,
+      onChange: setTotalCost,
       placeholder: "0",
-      style: {
-        width: "100%",
-        padding: "12px 14px",
-        fontSize: 16,
-        fontWeight: 600,
-        background: "var(--bg-card)",
-        color: locked ? "var(--text-dim)" : "var(--text)",
-        border: "1.5px solid var(--border)",
-        borderRadius: 12,
-        outline: "none",
-        boxSizing: "border-box",
-        opacity: locked ? 0.6 : 1,
-        fontFamily: "var(--num-font)"
-      }
+      fontSize: 16,
+      fontWeight: 600,
+      disabled: locked,
+      style: { padding: "12px 14px", borderRadius: 12 }
     }
   )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "0 14px 14px" } }, /* @__PURE__ */ React.createElement(
     "button",
