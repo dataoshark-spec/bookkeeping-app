@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FJ";
+const APP_VERSION = "1150520FK";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -14526,27 +14526,58 @@ function CalcTriggerInput({
   const triggerRef = React.useRef(null);
   const openCalc = () => {
     if (disabled) return;
+    if (document.activeElement && typeof document.activeElement.blur === "function") {
+      document.activeElement.blur();
+    }
     setShow(true);
     setTimeout(() => {
       const el = triggerRef.current;
       if (!el) return;
+      const allBackdrops = document.querySelectorAll('[data-picker-backdrop="true"]');
+      const calcBackdrop = allBackdrops[allBackdrops.length - 1];
+      const calcSheet = calcBackdrop ? calcBackdrop.querySelector(":scope > div") : null;
+      const calcHeight = calcSheet ? calcSheet.offsetHeight : 420;
       let scroller = el.parentElement;
       while (scroller && scroller !== document.body) {
         const overflowY = window.getComputedStyle(scroller).overflowY;
         if (overflowY === "auto" || overflowY === "scroll") break;
         scroller = scroller.parentElement;
       }
-      if (!scroller || scroller === document.body) return;
-      const calcSheet = document.querySelector('[data-picker-backdrop="true"] > div');
-      const calcHeight = calcSheet ? calcSheet.offsetHeight : 420;
       const triggerRect = el.getBoundingClientRect();
       const triggerBottomInViewport = triggerRect.bottom;
-      const targetBottom = window.innerHeight - calcHeight - 12;
+      const targetBottom = window.innerHeight - calcHeight - 24;
       const delta = triggerBottomInViewport - targetBottom;
-      if (delta > 0) {
+      if (delta <= 0) return;
+      if (scroller && scroller !== document.body) {
         scroller.scrollBy({ top: delta, behavior: "smooth" });
+      } else {
+        let card = el.parentElement;
+        while (card && card !== document.body) {
+          const cs = window.getComputedStyle(card);
+          if (cs.borderRadius && parseInt(cs.borderRadius) >= 14 && card.querySelector("[data-picker-backdrop]") === null) {
+            break;
+          }
+          card = card.parentElement;
+        }
+        if (card && card !== document.body) {
+          card.style.transition = "transform 0.2s ease-out";
+          card.style.transform = `translateY(-${delta}px)`;
+          el._calcShiftedCard = card;
+        }
       }
-    }, 80);
+    }, 180);
+  };
+  const handleCalcClose = () => {
+    const el = triggerRef.current;
+    if (el && el._calcShiftedCard) {
+      const card = el._calcShiftedCard;
+      card.style.transform = "";
+      setTimeout(() => {
+        card.style.transition = "";
+      }, 250);
+      el._calcShiftedCard = null;
+    }
+    setShow(false);
   };
   const displayValue = (() => {
     if (value === "" || value === null || value === void 0) return "";
@@ -14586,7 +14617,7 @@ function CalcTriggerInput({
       onChange: (v) => onChange(v),
       mainColor: "var(--mint)",
       onMainColor: "#1a1a1a",
-      onClose: () => setShow(false)
+      onClose: handleCalcClose
     }
   ));
 }
