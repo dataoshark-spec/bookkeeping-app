@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FN";
+const APP_VERSION = "1150520FO";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -7851,6 +7851,18 @@ function HoldingSubTagPickerSheet({
       }
       if (draggedEl) commitDrop();
     };
+    const onAbort = () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+      if (draggedEl) {
+        cleanup();
+      }
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") onAbort();
+    };
     container.addEventListener("touchstart", onDown, { passive: true });
     container.addEventListener("touchmove", onMove, { passive: false });
     container.addEventListener("touchend", onUp);
@@ -7858,6 +7870,9 @@ function HoldingSubTagPickerSheet({
     container.addEventListener("mousedown", onDown);
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchcancel", onAbort, { passive: true });
+    window.addEventListener("blur", onAbort);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       cleanup();
       container.removeEventListener("touchstart", onDown);
@@ -7867,6 +7882,9 @@ function HoldingSubTagPickerSheet({
       container.removeEventListener("mousedown", onDown);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchcancel", onAbort);
+      window.removeEventListener("blur", onAbort);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [mode, onSetGroupOrder, onSetTagsOrder]);
   const renderTagRow = (tag) => {
@@ -7954,8 +7972,8 @@ function HoldingSubTagPickerSheet({
           WebkitTapHighlightColor: "transparent",
           WebkitUserSelect: "none",
           userSelect: "none",
-          // [v555FN] tag row 之間距離微縮 8→6,讓「同群組成員」更緊湊
-          marginBottom: 6,
+          // [v555FN→FO] tag row 之間距離 6→3,讓「同群組成員」最緊湊
+          marginBottom: 3,
           opacity: isDragging ? 0.3 : 1,
           boxSizing: "border-box",
           minHeight: 56,
@@ -8124,8 +8142,9 @@ function HoldingSubTagPickerSheet({
             alignItems: "center",
             gap: 8,
             padding: "8px 6px 8px 10px",
-            // [v555FN] 標題與第一個 tag 拉近(原本 4 → 0),營造「屬於這個群組」的視覺從屬感
-            marginBottom: 0,
+            // [v555FN→FO] header → 第一個 tag 距離:0 → 6(稍鬆,讓標題有「權威感」)
+            //   配合 tag→tag = 3(更緊),做出「機器人 太空 是同類緊密成員」的視覺
+            marginBottom: 6,
             touchAction: mode === "edit" ? "none" : void 0,
             cursor: mode === "edit" ? "grab" : "default",
             borderRadius: 8,
