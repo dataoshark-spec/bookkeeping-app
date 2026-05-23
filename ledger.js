@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FG";
+const APP_VERSION = "1150520FH";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -8936,7 +8936,14 @@ function HomePage({ state, setState, catIcon, currentMonth, setCurrentMonth, sel
           display: "flex",
           flexDirection: "column",
           gap: 4
-        } }, marketBreakdown.map((m) => {
+        } }, /* @__PURE__ */ React.createElement("div", { style: {
+          display: "grid",
+          gridTemplateColumns: "46px 1fr 64px 44px",
+          gap: 8,
+          fontSize: 10,
+          color: "var(--text-faint)",
+          marginBottom: 2
+        } }, /* @__PURE__ */ React.createElement("span", null), /* @__PURE__ */ React.createElement("span", { style: { textAlign: "right" } }, "\u5E02\u503C"), /* @__PURE__ */ React.createElement("span", { style: { textAlign: "right" } }, "\u6F32\u8DCC"), /* @__PURE__ */ React.createElement("span", { style: { textAlign: "right" } }, "\u6A94\u6578")), marketBreakdown.map((m) => {
           const color = m.pct >= 0 ? "var(--mint-text)" : "var(--pink-text)";
           return /* @__PURE__ */ React.createElement(
             "div",
