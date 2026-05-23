@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520ER";
+const APP_VERSION = "1150520ES";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -16773,9 +16773,18 @@ function PeriodDetailSheet({ state, setState, catIcon, periodKey, onClose, onCli
     range = `${y}/01/01 ~ ${y}/12/31`;
     predicate = (d) => d.startsWith(y);
   }
-  const txns = state.transactions.filter((t) => predicate(t.date)).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+  const [listFilter, setListFilter] = React.useState("all");
+  const [sortMode, setSortMode] = useListSort();
+  const txnsBeforeFilter = state.transactions.filter((t) => predicate(t.date));
+  const filteredTxns = txnsBeforeFilter.filter((t) => {
+    if (listFilter === "all") return true;
+    const isTrueTransfer = t.transferRole === "out" || t.transferRole === "in" || t.transferRole === "fee";
+    if (listFilter === "transfer") return isTrueTransfer;
+    return t.type === listFilter && isRealFlow(t) && !isTrueTransfer;
+  });
+  const txns = sortTxnList(filteredTxns, sortMode);
   let inc = 0, exp = 0;
-  for (const t of txns) {
+  for (const t of txnsBeforeFilter) {
     if (!isRealFlow(t)) continue;
     if (t.type === "income") inc += t.amount;
     else if (t.type === "expense") exp += t.amount;
@@ -16785,7 +16794,8 @@ function PeriodDetailSheet({ state, setState, catIcon, periodKey, onClose, onCli
     var _a;
     (groups[_a = t.date] || (groups[_a] = [])).push(t);
   });
-  const groupKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+  const isAmountSortMode = isAmountSort(sortMode);
+  const groupKeys = isAmountSortMode ? [] : Object.keys(groups).sort((a, b) => sortMode === "date_asc" ? a.localeCompare(b) : b.localeCompare(a));
   const [editMode, setEditMode] = React.useState(false);
   const [selectMode, setSelectMode] = React.useState(false);
   const [selectedIds, setSelectedIds] = React.useState(() => /* @__PURE__ */ new Set());
@@ -16793,7 +16803,7 @@ function PeriodDetailSheet({ state, setState, catIcon, periodKey, onClose, onCli
   const [visibleCount, setVisibleCount] = React.useState(PAGE_SIZE);
   React.useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [periodKey]);
+  }, [periodKey, listFilter, sortMode]);
   const exitSelectMode = () => {
     setSelectMode(false);
     setSelectedIds(/* @__PURE__ */ new Set());
@@ -16968,7 +16978,48 @@ function PeriodDetailSheet({ state, setState, catIcon, periodKey, onClose, onCli
         return /* @__PURE__ */ React.createElement(Block, { key: "summary", ...blockProps }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryRow }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u6536\u5165"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: "var(--mint-text)", fontSize: autoFitFontSize(fmt(inc)) } }, fmt(inc))), /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u652F\u51FA"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: "var(--pink-text)", fontSize: autoFitFontSize(fmt(exp)) } }, fmt(exp))), /* @__PURE__ */ React.createElement("div", { style: styles.summaryBox }, /* @__PURE__ */ React.createElement("div", { style: styles.summaryLabel }, "\u7D50\u9918"), /* @__PURE__ */ React.createElement("div", { style: { ...styles.summaryValue, color: inc - exp < 0 ? "var(--pink)" : inc - exp > 0 ? "var(--mint)" : "var(--text)", fontSize: autoFitFontSize(fmtSigned(inc - exp)) } }, fmtSigned(inc - exp)))));
       }
       if (blockKey === "list") {
-        return /* @__PURE__ */ React.createElement(Block, { key: "list", ...blockProps }, txns.length ? /* @__PURE__ */ React.createElement("div", { style: styles.txnList }, (() => {
+        return /* @__PURE__ */ React.createElement(Block, { key: "list", ...blockProps }, !editMode && !selectMode && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 8 }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.recentFilterBar }, [
+          { key: "transfer", label: "\u8F49\u5E33" },
+          { key: "income", label: "\u6536\u5165" },
+          { key: "expense", label: "\u652F\u51FA" },
+          { key: "all", label: "\u5168\u90E8" }
+        ].map((opt) => /* @__PURE__ */ React.createElement(
+          "span",
+          {
+            key: opt.key,
+            style: {
+              ...styles.recentFilterChip,
+              ...listFilter === opt.key ? styles.recentFilterChipActive : {}
+            },
+            onClick: () => setListFilter(opt.key)
+          },
+          opt.label
+        )), /* @__PURE__ */ React.createElement(ListSortControl, { sortMode, setSortMode }))), txns.length ? /* @__PURE__ */ React.createElement("div", { style: styles.txnList }, isAmountSortMode ? (
+          // 金額排序模式:不分組,扁平列表
+          (() => {
+            const visibleTxns = txns.slice(0, visibleCount);
+            return visibleTxns.map((t) => /* @__PURE__ */ React.createElement(
+              TxnRow,
+              {
+                key: t.id,
+                txn: t,
+                state,
+                catIcon,
+                selectMode,
+                selected: selectedIds.has(t.id),
+                onClick: () => {
+                  if (editMode) return;
+                  if (selectMode) toggleSelect(t.id);
+                  else onClickTxn(t);
+                },
+                onLongPress: () => {
+                  if (editMode || selectMode) return;
+                  enterSelectModeWith(t.id);
+                }
+              }
+            ));
+          })()
+        ) : (() => {
           let counted = 0;
           const visibleGroups = [];
           for (const date of groupKeys) {
