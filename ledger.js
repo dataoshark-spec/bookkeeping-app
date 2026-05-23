@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FL4";
+const APP_VERSION = "1150520FM";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -7617,6 +7617,17 @@ function HoldingSubTagPickerSheet({
         }
       } catch {
       }
+      try {
+        const prevTA = document.body.dataset.prevTouchAction;
+        const prevUS = document.body.dataset.prevUserSelect;
+        document.body.style.touchAction = prevTA || "";
+        document.body.style.userSelect = prevUS || "";
+        document.body.style.webkitUserSelect = prevUS || "";
+        document.body.removeAttribute("data-drag-active");
+        delete document.body.dataset.prevTouchAction;
+        delete document.body.dataset.prevUserSelect;
+      } catch {
+      }
       placeholder = null;
       draggedEl = null;
       draggedType = null;
@@ -7628,6 +7639,15 @@ function HoldingSubTagPickerSheet({
       draggedType = rowEl.getAttribute("data-drag-type");
       draggedGroupId = rowEl.getAttribute("data-drag-group-id") || null;
       if (draggedGroupId === "null") draggedGroupId = null;
+      try {
+        document.body.dataset.prevTouchAction = document.body.style.touchAction || "";
+        document.body.dataset.prevUserSelect = document.body.style.userSelect || "";
+        document.body.style.touchAction = "none";
+        document.body.style.userSelect = "none";
+        document.body.style.webkitUserSelect = "none";
+        document.body.setAttribute("data-drag-active", "true");
+      } catch {
+      }
       const rect = rowEl.getBoundingClientRect();
       const computedStyle = window.getComputedStyle(rowEl);
       const elRadius = computedStyle.borderRadius || "12px";
@@ -8033,7 +8053,8 @@ function HoldingSubTagPickerSheet({
         "data-drag-type": "group",
         "data-drag-id": group.id,
         style: {
-          marginBottom: 12,
+          // [v555FM] 群組之間留更大空白(12→20),讓「兩個群組」視覺上更分離
+          marginBottom: 20,
           opacity: isDragging ? 0.3 : 1
         }
       },
@@ -8173,12 +8194,24 @@ function HoldingSubTagPickerSheet({
           "\u522A\u9664"
         ))
       ),
-      !isCollapsed && /* @__PURE__ */ React.createElement("div", { "data-drag-zone": group.id, style: { paddingLeft: 8 } }, groupTags.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: {
-        fontSize: 11,
-        color: "var(--text-faint)",
-        textAlign: "center",
-        padding: "8px 0"
-      } }, "(\u6B64\u7FA4\u7D44\u662F\u7A7A\u7684)") : groupTags.map((t) => renderTagRow(t)))
+      !isCollapsed && /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          "data-drag-zone": group.id,
+          style: {
+            // [v555FM] 左側細條 + 縮排,做出「群組包覆」的視覺層級
+            paddingLeft: 14,
+            marginLeft: 4,
+            borderLeft: "2px solid rgba(126, 224, 192, 0.35)"
+          }
+        },
+        groupTags.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: {
+          fontSize: 11,
+          color: "var(--text-faint)",
+          textAlign: "center",
+          padding: "8px 0"
+        } }, "(\u6B64\u7FA4\u7D44\u662F\u7A7A\u7684)") : groupTags.map((t) => renderTagRow(t))
+      )
     );
   };
   const ungroupedTags = tags.filter((t) => !t.groupId);
@@ -8248,11 +8281,11 @@ function HoldingSubTagPickerSheet({
         /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "var(--text-faint)" } }, "(", noTagCount, " \u6A94)"),
         isSelected && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--mint-text)", fontWeight: 700 } }, "\u2713")
       ));
-    })(), groups.map((g) => renderGroupBlock(g)), groups.length > 0 ? /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12 } }, ungroupedTags.length > 0 && /* @__PURE__ */ React.createElement(
+    })(), groups.map((g) => renderGroupBlock(g)), groups.length > 0 ? /* @__PURE__ */ React.createElement("div", { style: { marginTop: 12, marginBottom: 12 } }, ungroupedTags.length > 0 && /* @__PURE__ */ React.createElement(
       "div",
       {
         style: {
-          margin: "14px 6px 10px",
+          margin: "14px 6px 14px",
           borderTop: "1px dashed var(--border)",
           position: "relative",
           display: "flex",
@@ -8268,7 +8301,18 @@ function HoldingSubTagPickerSheet({
         color: "var(--text-faint)",
         letterSpacing: 0.5
       } }, "\u672A\u5206\u7D44")
-    ), /* @__PURE__ */ React.createElement("div", { "data-drag-zone": "ungrouped", style: { paddingLeft: 8 } }, ungroupedTags.map((t) => renderTagRow(t)))) : /* @__PURE__ */ React.createElement("div", { "data-drag-zone": "ungrouped" }, ungroupedTags.map((t) => renderTagRow(t))), showAddTagInput && /* @__PURE__ */ React.createElement("div", { style: {
+    ), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        "data-drag-zone": "ungrouped",
+        style: {
+          paddingLeft: 14,
+          marginLeft: 4,
+          borderLeft: "2px solid var(--border)"
+        }
+      },
+      ungroupedTags.map((t) => renderTagRow(t))
+    )) : /* @__PURE__ */ React.createElement("div", { "data-drag-zone": "ungrouped" }, ungroupedTags.map((t) => renderTagRow(t))), showAddTagInput && /* @__PURE__ */ React.createElement("div", { style: {
       display: "flex",
       alignItems: "center",
       gap: 8,
