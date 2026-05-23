@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FP";
+const APP_VERSION = "1150520FQ";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -5860,6 +5860,7 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
   const [shares, setShares] = useState(String(trade.shares || ""));
   const [totalCost, setTotalCost] = useState(String(trade.totalCost || ""));
   const [locked, setLocked] = useState(true);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const handleSubmit = () => {
     const newShares = Number(shares) || 0;
     const newCost = Number(totalCost) || 0;
@@ -5919,7 +5920,7 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
       }
     });
   };
-  return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: onClose }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: {
+  return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: onClose }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: {
     padding: "14px 18px",
     borderBottom: "1px solid var(--border)",
     display: "flex",
@@ -5939,12 +5940,11 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
     },
     /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: locked ? "translateX(0)" : "translateX(18px)" } })
   ))), /* @__PURE__ */ React.createElement("div", { style: { padding: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u65E5\u671F"), /* @__PURE__ */ React.createElement(
-    "input",
+    "div",
     {
-      type: "date",
-      value: date,
-      onChange: (e) => setDate(e.target.value),
-      disabled: locked,
+      onClick: () => {
+        if (!locked) setShowDatePicker(true);
+      },
       style: {
         width: "100%",
         padding: "12px 14px",
@@ -5953,13 +5953,20 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
         color: locked ? "var(--text-dim)" : "var(--text)",
         border: "1.5px solid var(--border)",
         borderRadius: 12,
-        outline: "none",
         boxSizing: "border-box",
         marginBottom: 14,
         opacity: locked ? 0.6 : 1,
-        fontFamily: "var(--num-font)"
+        fontFamily: "var(--num-font)",
+        cursor: locked ? "not-allowed" : "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        WebkitTapHighlightColor: "transparent",
+        userSelect: "none"
       }
-    }
+    },
+    /* @__PURE__ */ React.createElement("span", null, date ? date.replace(/-/g, "/") : "\u9078\u64C7\u65E5\u671F"),
+    /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 13 } }, "\u203A")
   ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u80A1\u6578 ", consumed > 0 && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 11 } }, "(\u5DF2\u8CE3 ", consumed.toLocaleString(), " \u80A1)")), /* @__PURE__ */ React.createElement(
     CalcTriggerInput,
     {
@@ -5969,6 +5976,7 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
       fontSize: 15,
       fontWeight: 500,
       disabled: locked,
+      clearOnOpen: true,
       style: { padding: "12px 14px", borderRadius: 12, marginBottom: 14 }
     }
   ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u7E3D\u6210\u672C ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 11 } }, "(\u542B\u624B\u7E8C\u8CBB)")), /* @__PURE__ */ React.createElement(
@@ -5980,6 +5988,7 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
       fontSize: 16,
       fontWeight: 600,
       disabled: locked,
+      clearOnOpen: true,
       style: { padding: "12px 14px", borderRadius: 12 }
     }
   )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "0 14px 14px" } }, /* @__PURE__ */ React.createElement(
@@ -6018,7 +6027,14 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
       }
     },
     "\u78BA\u8A8D"
-  ))));
+  )))), showDatePicker && /* @__PURE__ */ React.createElement(
+    DatePicker,
+    {
+      value: date,
+      onChange: (d) => setDate(d),
+      onClose: () => setShowDatePicker(false)
+    }
+  ));
 }
 function BuyHoldingSheet({ state, account, prefillSymbol, onClose, onConfirm, toast, toastRich, onRequestCreateAccount }) {
   const swipe = useSwipeBack(onClose);
@@ -14613,6 +14629,10 @@ function CalcTriggerInput({
   align = "left",
   // 'left' | 'right' | 'center'
   disabled = false,
+  // [v555FQ] clearOnOpen:點欄位打開計算機時,顯示空白(讓使用者重新輸入)
+  //   而不是預填原值。預設 false(保留歷史行為);
+  //   編輯既有紀錄場景(EditBuyTradeDialog 等)應設 true。
+  clearOnOpen = false,
   style = {}
 }) {
   const [show, setShow] = React.useState(false);
@@ -14706,7 +14726,7 @@ function CalcTriggerInput({
   ), show && /* @__PURE__ */ React.createElement(
     CalculatorSheet,
     {
-      expr: value === "0" ? "" : String(value || ""),
+      expr: clearOnOpen ? "" : value === "0" ? "" : String(value || ""),
       onChange: (v) => onChange(v),
       mainColor: "var(--mint)",
       onMainColor: "#1a1a1a",
