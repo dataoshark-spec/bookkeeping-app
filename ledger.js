@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520EH";
+const APP_VERSION = "1150520EK";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -1532,26 +1532,6 @@ function App() {
     const onVisible = async () => {
       if (document.visibilityState !== "visible") return;
       if (!GDrive.isLinked()) return;
-      let needRefresh = false;
-      try {
-        const raw = localStorage.getItem(GDRIVE_TOKEN_KEY);
-        if (!raw) {
-          needRefresh = true;
-        } else {
-          const t = JSON.parse(raw);
-          if (!t.expires_at || Date.now() >= t.expires_at - 10 * 60 * 1e3) {
-            needRefresh = true;
-          }
-        }
-      } catch {
-        needRefresh = true;
-      }
-      if (needRefresh) {
-        try {
-          await GDrive.refreshToken();
-        } catch {
-        }
-      }
       let pending = false;
       try {
         pending = localStorage.getItem(GDRIVE_PENDING_KEY) === "1";
@@ -7648,12 +7628,19 @@ function HoldingSubTagPickerSheet({
       const elRadius = computedStyle.borderRadius || "12px";
       offsetX = x - rect.left;
       offsetY = y - rect.top;
+      try {
+        document.querySelectorAll(".ledger-drag-clone-orphan").forEach((el) => el.remove());
+      } catch {
+      }
       draggedClone = rowEl.cloneNode(true);
+      draggedClone.className = (rowEl.className || "") + " ledger-drag-clone-orphan";
       draggedClone.style.cssText = `
         position: fixed;
         top: ${rect.top}px;
         left: ${rect.left}px;
         width: ${rect.width}px;
+        height: ${rect.height}px;
+        box-sizing: border-box;
         z-index: 9998;
         opacity: 0.55;
         transform: scale(1.03) rotate(-0.5deg);
@@ -7661,6 +7648,7 @@ function HoldingSubTagPickerSheet({
         pointer-events: none;
         margin: 0;
         border-radius: ${elRadius};
+        overflow: hidden;
       `;
       document.body.appendChild(draggedClone);
       placeholder = document.createElement("div");
@@ -7914,140 +7902,117 @@ function HoldingSubTagPickerSheet({
         cursor: "pointer"
       } }, "\u53D6\u6D88"));
     }
-    if (mode === "edit") {
-      return /* @__PURE__ */ React.createElement(
-        "div",
-        {
-          key: `${tag.id}-${renderEpoch}`,
-          "data-drag-row": "true",
-          "data-drag-handle": "true",
-          "data-drag-type": "tag",
-          "data-drag-id": tag.id,
-          "data-drag-group-id": tag.groupId || "null",
-          style: {
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "12px 14px",
-            borderRadius: 12,
-            background: "var(--bg-card)",
-            border: "1.5px solid var(--border)",
-            WebkitTapHighlightColor: "transparent",
-            WebkitUserSelect: "none",
-            userSelect: "none",
-            marginBottom: 8,
-            opacity: isDragging ? 0.3 : 1,
-            boxSizing: "border-box",
-            minHeight: 56,
-            touchAction: "none",
-            cursor: "grab"
-          }
-        },
-        /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: "var(--text)", lineHeight: 1.2 } }, tag.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 3 } }, usedCount, " \u6A94\u6301\u80A1")),
-        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, flexShrink: 0 } }, /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            onClick: (e) => {
-              e.stopPropagation();
-              askMoveTagToGroup(tag);
-            },
-            title: "\u79FB\u52D5\u5230\u7FA4\u7D44",
-            style: {
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              background: "transparent",
-              color: "var(--text-dim)",
-              border: "1px solid var(--border)",
-              fontSize: 14,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 0
-            }
-          },
-          /* @__PURE__ */ React.createElement("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "5 9 2 12 5 15" }), /* @__PURE__ */ React.createElement("polyline", { points: "9 5 12 2 15 5" }), /* @__PURE__ */ React.createElement("polyline", { points: "15 19 12 22 9 19" }), /* @__PURE__ */ React.createElement("polyline", { points: "19 9 22 12 19 15" }), /* @__PURE__ */ React.createElement("line", { x1: "2", y1: "12", x2: "22", y2: "12" }), /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "2", x2: "12", y2: "22" }))
-        ), /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            onClick: (e) => {
-              e.stopPropagation();
-              setEditingTagId(tag.id);
-              setEditingTagName(tag.name);
-            },
-            title: "\u6539\u540D",
-            style: {
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              background: "transparent",
-              color: "var(--text-dim)",
-              border: "1px solid var(--border)",
-              fontSize: 14,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 0
-            }
-          },
-          /* @__PURE__ */ React.createElement("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M12 20h9" }), /* @__PURE__ */ React.createElement("path", { d: "M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" }))
-        ), /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            onClick: (e) => {
-              e.stopPropagation();
-              askDeleteTag(tag);
-            },
-            title: "\u522A\u9664",
-            style: {
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              background: "transparent",
-              color: "var(--pink-text)",
-              border: "1px solid var(--pink)",
-              fontSize: 14,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 0
-            }
-          },
-          /* @__PURE__ */ React.createElement("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "3 6 5 6 21 6" }), /* @__PURE__ */ React.createElement("path", { d: "M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" }), /* @__PURE__ */ React.createElement("path", { d: "M10 11v6" }), /* @__PURE__ */ React.createElement("path", { d: "M14 11v6" }))
-        ))
-      );
-    }
+    const isEdit = mode === "edit";
     return /* @__PURE__ */ React.createElement(
       "div",
       {
         key: `${tag.id}-${renderEpoch}`,
         "data-drag-row": "true",
+        "data-drag-handle": isEdit ? "true" : void 0,
         "data-drag-type": "tag",
         "data-drag-id": tag.id,
         "data-drag-group-id": tag.groupId || "null",
-        onClick: () => onPick && onPick(tag.id),
+        onClick: () => {
+          if (!isEdit) onPick && onPick(tag.id);
+        },
         style: {
           display: "flex",
           alignItems: "center",
-          gap: 10,
-          padding: "14px 16px",
+          gap: 12,
+          padding: "12px 14px",
           borderRadius: 12,
           background: "var(--bg-card)",
-          border: isSelected ? "2px solid var(--mint)" : "1.5px solid var(--border)",
-          cursor: "pointer",
+          border: isEdit ? "1.5px dashed rgba(232, 185, 71, 0.55)" : isSelected ? "2px solid var(--mint)" : "1.5px solid var(--border)",
           WebkitTapHighlightColor: "transparent",
           WebkitUserSelect: "none",
           userSelect: "none",
           marginBottom: 8,
+          opacity: isDragging ? 0.3 : 1,
           boxSizing: "border-box",
-          minHeight: 56
+          minHeight: 56,
+          touchAction: isEdit ? "none" : void 0,
+          cursor: isEdit ? "grab" : "pointer"
         }
       },
       /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: "var(--text)", lineHeight: 1.2 } }, tag.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 3 } }, usedCount, " \u6A94\u6301\u80A1")),
-      isSelected && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "var(--mint-text)", fontWeight: 700, flexShrink: 0 } }, "\u2713")
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, flexShrink: 0, opacity: isEdit ? 0.3 : 1, pointerEvents: isEdit ? "none" : "auto" } }, /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: (e) => {
+            e.stopPropagation();
+            askMoveTagToGroup(tag);
+          },
+          onTouchStart: (e) => e.stopPropagation(),
+          title: "\u79FB\u52D5\u5230\u7FA4\u7D44",
+          style: {
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            background: "transparent",
+            color: "var(--text-dim)",
+            border: "1px solid var(--border)",
+            fontSize: 14,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 0
+          }
+        },
+        /* @__PURE__ */ React.createElement("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "5 9 2 12 5 15" }), /* @__PURE__ */ React.createElement("polyline", { points: "9 5 12 2 15 5" }), /* @__PURE__ */ React.createElement("polyline", { points: "15 19 12 22 9 19" }), /* @__PURE__ */ React.createElement("polyline", { points: "19 9 22 12 19 15" }), /* @__PURE__ */ React.createElement("line", { x1: "2", y1: "12", x2: "22", y2: "12" }), /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "2", x2: "12", y2: "22" }))
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: (e) => {
+            e.stopPropagation();
+            setEditingTagId(tag.id);
+            setEditingTagName(tag.name);
+          },
+          onTouchStart: (e) => e.stopPropagation(),
+          title: "\u6539\u540D",
+          style: {
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            background: "transparent",
+            color: "var(--text-dim)",
+            border: "1px solid var(--border)",
+            fontSize: 14,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 0
+          }
+        },
+        /* @__PURE__ */ React.createElement("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M12 20h9" }), /* @__PURE__ */ React.createElement("path", { d: "M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" }))
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: (e) => {
+            e.stopPropagation();
+            askDeleteTag(tag);
+          },
+          onTouchStart: (e) => e.stopPropagation(),
+          title: "\u522A\u9664",
+          style: {
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            background: "transparent",
+            color: "var(--pink-text)",
+            border: "1px solid var(--pink)",
+            fontSize: 14,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 0
+          }
+        },
+        /* @__PURE__ */ React.createElement("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "3 6 5 6 21 6" }), /* @__PURE__ */ React.createElement("path", { d: "M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" }), /* @__PURE__ */ React.createElement("path", { d: "M10 11v6" }), /* @__PURE__ */ React.createElement("path", { d: "M14 11v6" }))
+      )),
+      !isEdit && isSelected && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "var(--mint-text)", fontWeight: 700, flexShrink: 0 } }, "\u2713")
     );
   };
   const renderGroupBlock = (group) => {
@@ -8133,6 +8098,7 @@ function HoldingSubTagPickerSheet({
             touchAction: mode === "edit" ? "none" : void 0,
             cursor: mode === "edit" ? "grab" : "default",
             borderRadius: 8,
+            border: mode === "edit" ? "1.5px dashed rgba(232, 185, 71, 0.55)" : "1.5px solid transparent",
             background: mode === "edit" ? "rgba(126,224,192,0.06)" : "transparent"
           }
         },
@@ -8161,7 +8127,7 @@ function HoldingSubTagPickerSheet({
           /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 12 } }, "(", groupTags.length, ")")
         ),
         /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }),
-        mode === "edit" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, opacity: mode === "edit" ? 0.3 : 1, pointerEvents: mode === "edit" ? "none" : "auto" } }, /* @__PURE__ */ React.createElement(
           "button",
           {
             onClick: (e) => {
@@ -8252,7 +8218,7 @@ function HoldingSubTagPickerSheet({
           marginRight: 8
         }
       },
-      mode === "edit" ? "\u5B8C\u6210" : "\u7DE8\u8F2F"
+      mode === "edit" ? "\u5B8C\u6210" : "\u7DE8\u8F2F\u6392\u5E8F"
     )),
     /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: { padding: "4px 16px 0", fontSize: 12, color: "var(--text-faint)" } }, mode === "edit" ? "\u9577\u6309\u62D6\u66F3\u624B\u67C4\u53EF\u6392\u5E8F;\u7FA4\u7D44\u53EA\u80FD\u8DDF\u7FA4\u7D44\u6392\u5E8F\u3001\u5206\u985E\u53EA\u80FD\u5728\u540C\u7FA4\u7D44\u5167\u6392\u5E8F;\u8DE8\u7FA4\u7D44\u8ACB\u7528 \u79FB\u52D5 \u6309\u9215\u3002" : `\u7D66 ${holding.symbol} \u5206\u5230\u81EA\u8A02\u7684\u4E3B\u984C\u985E\u5225,\u5982 \u592A\u7A7A / AI / \u6A5F\u5668\u4EBA / \u7F8E\u50B5 \u7B49\u3002`), /* @__PURE__ */ React.createElement("div", { ref: containerRef, style: { padding: 12 } }, mode === "pick" && (() => {
       const noTagCount = state.holdings.filter((h) => !h.subTagId && holdingShares(h, state.trades) > 0).length;
@@ -18937,11 +18903,13 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
   const [fEnd, setFEnd] = useState(todayStr());
   const [fType, setFType] = useState("all");
   const [fKeyword, setFKeyword] = useState("");
+  const [listFilter, setListFilter] = useState("all");
+  const [sortMode, setSortMode] = useListSort();
   const PAGE_SIZE = 150;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   React.useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [filterMode, fStart, fEnd, fType, fKeyword, currentMonth, account?.id]);
+  }, [filterMode, fStart, fEnd, fType, fKeyword, currentMonth, account?.id, listFilter, sortMode]);
   const shiftMonth = (delta) => {
     const [y, m] = currentMonth.split("-").map(Number);
     let ny = y, nm = m + delta;
@@ -18973,6 +18941,15 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
     }).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
   } else {
     txns = txnsInMonth(account, state.transactions, currentMonth);
+  }
+  if (!isInvest) {
+    txns = txns.filter((t) => {
+      if (listFilter === "all") return true;
+      const isTrueTransfer = !!t.transferRole;
+      if (listFilter === "transfer") return isTrueTransfer;
+      return t.type === listFilter && !isTrueTransfer;
+    });
+    txns = sortTxnList(txns, sortMode);
   }
   const sumIncome = txns.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
   const sumExpense = txns.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
@@ -19331,30 +19308,32 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
             padding: "20px 18px 18px",
             textAlign: "center",
             position: "relative"
-          } }, /* @__PURE__ */ React.createElement(
-            "div",
-            {
-              onClick: (e) => {
-                e.stopPropagation();
-                if (onEditInvestNote) onEditInvestNote(account);
+          } }, (() => {
+            const noteColor = account.investNote && account.investNote.trim() ? "var(--pink-text)" : "var(--text-faint)";
+            return /* @__PURE__ */ React.createElement(
+              "div",
+              {
+                onClick: (e) => {
+                  e.stopPropagation();
+                  if (onEditInvestNote) onEditInvestNote(account);
+                },
+                style: {
+                  position: "absolute",
+                  top: 12,
+                  right: 12,
+                  width: 32,
+                  height: 32,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 8,
+                  cursor: "pointer"
+                },
+                "aria-label": "\u7DE8\u8F2F\u5099\u8A3B"
               },
-              style: {
-                position: "absolute",
-                top: 12,
-                right: 12,
-                width: 32,
-                height: 32,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: 8,
-                cursor: "pointer",
-                color: account.investNote && account.investNote.trim() ? "var(--pink-text)" : "var(--text-faint)"
-              },
-              "aria-label": "\u7DE8\u8F2F\u5099\u8A3B"
-            },
-            /* @__PURE__ */ React.createElement(TypeIcon, { name: "note", size: 18, color: "currentColor" })
-          ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", letterSpacing: 1, marginBottom: 6 } }, "\u7E3D\u5E02\u503C"), /* @__PURE__ */ React.createElement("div", { style: {
+              /* @__PURE__ */ React.createElement(TypeIcon, { name: "note", size: 18, color: noteColor })
+            );
+          })(), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", letterSpacing: 1, marginBottom: 6 } }, "\u7E3D\u5E02\u503C"), /* @__PURE__ */ React.createElement("div", { style: {
             fontSize: 34,
             fontWeight: 800,
             letterSpacing: 0.5,
@@ -19612,7 +19591,23 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
           fontWeight: 500,
           marginBottom: 8,
           paddingLeft: 4
-        } }, "\u4EA4\u6613\u7D00\u9304"), txns.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: styles.emptyAccountHint }, emptyText) : /* @__PURE__ */ React.createElement("div", { style: styles.txnList }, txns.slice(0, visibleCount).map((t) => /* @__PURE__ */ React.createElement(
+        } }, "\u4EA4\u6613\u7D00\u9304"), !isInvest && !editMode && /* @__PURE__ */ React.createElement("div", { style: { ...styles.recentFilterBar, marginBottom: 8 }, onClick: (e) => e.stopPropagation() }, [
+          { key: "transfer", label: "\u8F49\u5E33" },
+          { key: "income", label: "\u6536\u5165" },
+          { key: "expense", label: "\u652F\u51FA" },
+          { key: "all", label: "\u5168\u90E8" }
+        ].map((opt) => /* @__PURE__ */ React.createElement(
+          "span",
+          {
+            key: opt.key,
+            style: {
+              ...styles.recentFilterChip,
+              ...listFilter === opt.key ? styles.recentFilterChipActive : {}
+            },
+            onClick: () => setListFilter(opt.key)
+          },
+          opt.label
+        )), /* @__PURE__ */ React.createElement(ListSortControl, { sortMode, setSortMode })), txns.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: styles.emptyAccountHint }, emptyText) : /* @__PURE__ */ React.createElement("div", { style: styles.txnList }, txns.slice(0, visibleCount).map((t) => /* @__PURE__ */ React.createElement(
           TxnRow,
           {
             key: t.id,
