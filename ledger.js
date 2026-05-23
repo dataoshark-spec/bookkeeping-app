@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FD";
+const APP_VERSION = "1150520FE";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -14560,6 +14560,32 @@ function CalcTriggerInput({
   style = {}
 }) {
   const [show, setShow] = React.useState(false);
+  const triggerRef = React.useRef(null);
+  const openCalc = () => {
+    if (disabled) return;
+    setShow(true);
+    setTimeout(() => {
+      const el = triggerRef.current;
+      if (!el) return;
+      let scroller = el.parentElement;
+      while (scroller && scroller !== document.body) {
+        const overflowY = window.getComputedStyle(scroller).overflowY;
+        if (overflowY === "auto" || overflowY === "scroll") break;
+        scroller = scroller.parentElement;
+      }
+      if (!scroller || scroller === document.body) return;
+      const calcSheet = document.querySelector('[data-picker-backdrop="true"] > div');
+      const calcHeight = calcSheet ? calcSheet.offsetHeight : 420;
+      const triggerRect = el.getBoundingClientRect();
+      const scrollerRect = scroller.getBoundingClientRect();
+      const triggerBottomInViewport = triggerRect.bottom;
+      const targetBottom = window.innerHeight - calcHeight - 12;
+      const delta = triggerBottomInViewport - targetBottom;
+      if (delta > 0) {
+        scroller.scrollBy({ top: delta, behavior: "smooth" });
+      }
+    }, 80);
+  };
   const displayValue = (() => {
     if (value === "" || value === null || value === void 0) return "";
     const n = Number(value);
@@ -14568,9 +14594,8 @@ function CalcTriggerInput({
   return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
     "div",
     {
-      onClick: () => {
-        if (!disabled) setShow(true);
-      },
+      ref: triggerRef,
+      onClick: openCalc,
       style: {
         width: "100%",
         padding: "10px 12px",
@@ -14597,6 +14622,8 @@ function CalcTriggerInput({
     {
       expr: value === "0" ? "" : String(value || ""),
       onChange: (v) => onChange(v),
+      mainColor: "var(--mint)",
+      onMainColor: "#1a1a1a",
       onClose: () => setShow(false)
     }
   ));
