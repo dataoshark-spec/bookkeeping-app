@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FM";
+const APP_VERSION = "1150520FN";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -7650,7 +7650,10 @@ function HoldingSubTagPickerSheet({
       }
       const rect = rowEl.getBoundingClientRect();
       const computedStyle = window.getComputedStyle(rowEl);
-      const elRadius = computedStyle.borderRadius || "12px";
+      let elRadius = computedStyle.borderRadius || "12px";
+      if (draggedType === "group" && (elRadius === "0px" || elRadius === "0" || !elRadius)) {
+        elRadius = "14px";
+      }
       offsetX = x - rect.left;
       offsetY = y - rect.top;
       try {
@@ -7951,7 +7954,8 @@ function HoldingSubTagPickerSheet({
           WebkitTapHighlightColor: "transparent",
           WebkitUserSelect: "none",
           userSelect: "none",
-          marginBottom: 8,
+          // [v555FN] tag row 之間距離微縮 8→6,讓「同群組成員」更緊湊
+          marginBottom: 6,
           opacity: isDragging ? 0.3 : 1,
           boxSizing: "border-box",
           minHeight: 56,
@@ -8120,7 +8124,8 @@ function HoldingSubTagPickerSheet({
             alignItems: "center",
             gap: 8,
             padding: "8px 6px 8px 10px",
-            marginBottom: 4,
+            // [v555FN] 標題與第一個 tag 拉近(原本 4 → 0),營造「屬於這個群組」的視覺從屬感
+            marginBottom: 0,
             touchAction: mode === "edit" ? "none" : void 0,
             cursor: mode === "edit" ? "grab" : "default",
             borderRadius: 8,
