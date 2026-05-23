@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520EW";
+const APP_VERSION = "1150520EZ";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -7583,7 +7583,7 @@ function HoldingSubTagPickerSheet({
         before: "\u5C07\u522A\u9664\u9019\u500B\u7FA4\u7D44:",
         items: [
           `\u7FA4\u7D44\u5167\u6709 ${tagsInGroup.length} \u500B\u5206\u985E`,
-          "\u522A\u9664\u5F8C\u5206\u985E\u6703\u8B8A\u56DE \u7121\u5206\u7D44 (\u5206\u985E\u672C\u8EAB\u4E0D\u6703\u88AB\u522A\u9664)"
+          "\u522A\u9664\u5F8C\u5206\u985E\u6703\u8B8A\u56DE \u672A\u5206\u7D44 (\u5206\u985E\u672C\u8EAB\u4E0D\u6703\u88AB\u522A\u9664)"
         ]
       } : {
         before: "\u5C07\u522A\u9664\u9019\u500B\u7FA4\u7D44:",
@@ -7614,7 +7614,7 @@ function HoldingSubTagPickerSheet({
     });
     newOrder.push({ id: tagId, groupId: targetGroupId });
     onSetTagsOrder && onSetTagsOrder(newOrder);
-    const targetLabel = targetGroupId === null ? "(\u7121\u5206\u7D44)" : groups.find((g) => g.id === targetGroupId)?.name || "\u7FA4\u7D44";
+    const targetLabel = targetGroupId === null ? "\u672A\u5206\u7D44" : groups.find((g) => g.id === targetGroupId)?.name || "\u7FA4\u7D44";
     toastRich && toastRich({
       title: "\u5DF2\u79FB\u52D5\u5206\u985E",
       amount: "\u2713",
@@ -8261,7 +8261,7 @@ function HoldingSubTagPickerSheet({
       },
       mode === "edit" ? "\u5B8C\u6210" : "\u7DE8\u8F2F\u6392\u5E8F"
     )),
-    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: { padding: "4px 16px 0", fontSize: 12, color: "var(--text-faint)" } }, mode === "edit" ? /* @__PURE__ */ React.createElement(React.Fragment, null, "\u9577\u6309\u62D6\u66F3\u624B\u67C4\u53EF\u6392\u5E8F; ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--blue)" } }, "\u80A1\u7968\u985E\u5225\u7FA4\u7D44"), " \u53EA\u80FD\u8DDF ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--blue)" } }, "\u80A1\u7968\u985E\u5225\u7FA4\u7D44"), " \u6392\u5E8F\u3001 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)" } }, "\u80A1\u7968\u6210\u4EFD\u985E\u5225"), " \u53EA\u80FD\u5728\u540C\u7FA4\u7D44\u5167\u6392\u5E8F;\u8DE8\u7FA4\u7D44\u8ACB\u7528 \u79FB\u52D5 \u6309\u9215\u3002") : `\u7D66 ${holding.symbol} \u5206\u5230\u81EA\u8A02\u7684\u4E3B\u984C\u985E\u5225,\u5982 \u592A\u7A7A / AI / \u6A5F\u5668\u4EBA / \u7F8E\u50B5 \u7B49\u3002`), /* @__PURE__ */ React.createElement("div", { ref: containerRef, style: { padding: 12 } }, mode === "pick" && (() => {
+    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: { padding: "4px 16px 0", fontSize: 12, color: "var(--text-faint)" } }, mode === "edit" ? /* @__PURE__ */ React.createElement(React.Fragment, null, "\u9577\u6309\u62D6\u66F3\u624B\u67C4\u53EF\u6392\u5E8F; ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--blue)" } }, "\u80A1\u7968\u985E\u5225\u7FA4\u7D44"), " \u53EA\u80FD\u8DDF ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--blue)" } }, "\u80A1\u7968\u985E\u5225\u7FA4\u7D44"), " \u6392\u5E8F\u3001 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)" } }, "\u80A1\u7968\u6210\u4EFD\u985E\u5225"), " \u53EA\u80FD\u5728\u540C\u7FA4\u7D44\u5167\u6392\u5E8F;\u8DE8\u7FA4\u7D44\u8ACB\u7528 \u79FB\u52D5 \u6309\u9215\u3002") : /* @__PURE__ */ React.createElement(React.Fragment, null, "\u7D66\u67D0\u6A94\u80A1\u7968\u5206\u5230\u81EA\u8A02\u7684\u4E3B\u984C ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)" } }, "\u80A1\u7968\u6210\u4EFD\u985E\u5225"), " \u3002", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)" } }, "\u80A1\u7968\u6210\u4EFD\u985E\u5225"), " = \u55AE\u4E00\u4E3B\u984C\u6A19\u7C64(\u53EF\u639B\u5728\u6BCF\u6A94\u80A1\u7968\u4E0A);", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--blue)" } }, "\u80A1\u7968\u985E\u5225\u7FA4\u7D44"), " = \u628A\u591A\u500B ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--mint-text)" } }, "\u80A1\u7968\u6210\u4EFD\u985E\u5225"), " \u6574\u7406\u5728\u4E00\u8D77\u7684\u5BB9\u5668\u3002")), /* @__PURE__ */ React.createElement("div", { ref: containerRef, style: { padding: 12 } }, mode === "pick" && (() => {
       const noTagCount = state.holdings.filter((h) => !h.categoryTagId && holdingShares(h, state.trades) > 0).length;
       return /* @__PURE__ */ React.createElement(
         "div",
@@ -8271,17 +8271,17 @@ function HoldingSubTagPickerSheet({
             display: "flex",
             alignItems: "center",
             gap: 12,
-            padding: "12px 14px",
+            padding: "10px 14px",
             borderRadius: 12,
             background: "var(--bg-card)",
             border: !currentId ? "2px solid var(--mint)" : "1.5px dashed var(--border)",
             cursor: "pointer",
             marginBottom: 8,
-            minHeight: 56,
+            minHeight: 48,
             boxSizing: "border-box"
           }
         },
-        /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: "var(--text-dim)", lineHeight: 1.2 } }, "\u672A\u5206\u985E"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 3 } }, noTagCount, " \u6A94\u6301\u80A1")),
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: "var(--text-dim)", lineHeight: 1.2 } }, "\u672A\u5206\u985E"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)" } }, noTagCount, " \u6A94\u6301\u80A1")),
         !currentId && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "var(--mint-text)", fontWeight: 700, flexShrink: 0 } }, "\u2713")
       );
     })(), groups.map((g) => renderGroupBlock(g)), groups.length > 0 ? /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: {
@@ -8290,7 +8290,7 @@ function HoldingSubTagPickerSheet({
       color: "var(--text-dim)",
       fontWeight: 600,
       marginBottom: 4
-    } }, "(\u7121\u5206\u7D44) ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "(", ungroupedTags.length, ")")), /* @__PURE__ */ React.createElement("div", { "data-drag-zone": "ungrouped", style: { paddingLeft: 8 } }, ungroupedTags.map((t) => renderTagRow(t)))) : /* @__PURE__ */ React.createElement("div", { "data-drag-zone": "ungrouped" }, ungroupedTags.map((t) => renderTagRow(t))), showAddTagInput && /* @__PURE__ */ React.createElement("div", { style: {
+    } }, "\u672A\u5206\u7D44 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)" } }, "(", ungroupedTags.length, ")")), /* @__PURE__ */ React.createElement("div", { "data-drag-zone": "ungrouped", style: { paddingLeft: 8 } }, ungroupedTags.map((t) => renderTagRow(t)))) : /* @__PURE__ */ React.createElement("div", { "data-drag-zone": "ungrouped" }, ungroupedTags.map((t) => renderTagRow(t))), showAddTagInput && /* @__PURE__ */ React.createElement("div", { style: {
       display: "flex",
       alignItems: "center",
       gap: 8,
@@ -8411,7 +8411,7 @@ function HoldingSubTagPickerSheet({
           borderRadius: 12,
           background: "transparent",
           border: "1.5px dashed var(--border)",
-          color: "var(--mint-text)",
+          color: "var(--text)",
           fontSize: 14,
           fontWeight: 600,
           cursor: "pointer",
@@ -8435,7 +8435,7 @@ function HoldingSubTagPickerSheet({
           borderRadius: 12,
           background: "transparent",
           border: "1.5px dashed var(--border)",
-          color: "var(--text-dim)",
+          color: "var(--text)",
           fontSize: 14,
           fontWeight: 600,
           cursor: "pointer",
