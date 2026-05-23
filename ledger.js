@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520EK";
+const APP_VERSION = "1150520EN";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -4403,7 +4403,7 @@ function ConfirmDialogRenderer({ dialog, onClose }) {
       });
     };
     return /* @__PURE__ */ React.createElement("div", { style: {
-      padding: "12px 20px 14px",
+      padding: "12px 20px 6px",
       fontSize: 14,
       color: "var(--text-dim)",
       lineHeight: 1.6,
@@ -4413,10 +4413,12 @@ function ConfirmDialogRenderer({ dialog, onClose }) {
       fontSize: 13,
       color: "var(--text-faint)",
       fontWeight: 500
-    } }, renderHL(ml.before)), Array.isArray(ml.items) && ml.items.length > 0 && (styled ? /* @__PURE__ */ React.createElement("div", { style: { margin: "0 0 12px", display: "flex", flexDirection: "column", gap: 6 } }, ml.items.map((it, i) => {
+    } }, renderHL(ml.before)), Array.isArray(ml.items) && ml.items.length > 0 && (styled ? /* @__PURE__ */ React.createElement("div", { style: { margin: "0 0 8px", display: "flex", flexDirection: "column", gap: 6 } }, ml.items.map((it, i) => {
       const itemText = it && typeof it === "object" ? it.text : it;
       const itemCard = !!(it && typeof it === "object" && it.card);
       const itemLines = it && typeof it === "object" && Array.isArray(it.lines) ? it.lines : null;
+      const prevWasCard = i > 0 && ml.items[i - 1] && typeof ml.items[i - 1] === "object" && ml.items[i - 1].card;
+      const needSpacingAfterCard = prevWasCard && !itemCard;
       const renderItemContent = (text) => {
         if (!itemCard) return renderHL(text);
         const m = text && text.match(/^(.+?)\s+(\d[\d,]*)\s+(.+)$/);
@@ -4434,8 +4436,18 @@ function ConfirmDialogRenderer({ dialog, onClose }) {
           border: "1px solid var(--border)",
           borderRadius: 10,
           padding: itemLines ? "10px 14px" : "8px 14px"
-        } : { padding: "4px 2px" }
-      } }, itemLines ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, itemLines.map((ln, j) => /* @__PURE__ */ React.createElement("div", { key: j, style: { display: "flex", alignItems: "baseline", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: {
+        } : { padding: "4px 2px" },
+        // [v555EL] 緊接 card 後面的 plain text 上方加空白,讓視覺平衡
+        ...needSpacingAfterCard ? { marginTop: 4 } : {}
+      } }, itemLines ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, it.headerLabel && /* @__PURE__ */ React.createElement("div", { style: {
+        fontSize: 11,
+        color: "var(--text-faint)",
+        fontWeight: 600,
+        letterSpacing: 0.5,
+        paddingBottom: 6,
+        borderBottom: "1px dashed var(--border)",
+        marginBottom: 2
+      } }, it.headerLabel), itemLines.map((ln, j) => /* @__PURE__ */ React.createElement("div", { key: j, style: { display: "flex", alignItems: "baseline", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: {
         color: "var(--mint)",
         fontSize: 16,
         fontWeight: 700,
@@ -11447,6 +11459,21 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
       const accountGroupCount = Array.isArray(data.accountGroups) ? data.accountGroups.length : 0;
       setShowPasteImport(false);
       setPasteImportText("");
+      let exportedTimeText = "";
+      try {
+        if (data.exportedAt) {
+          const d = new Date(data.exportedAt);
+          if (!isNaN(d.getTime())) {
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, "0");
+            const dd = String(d.getDate()).padStart(2, "0");
+            const hh = String(d.getHours()).padStart(2, "0");
+            const mi = String(d.getMinutes()).padStart(2, "0");
+            exportedTimeText = `${yyyy}/${mm}/${dd} ${hh}:${mi}`;
+          }
+        }
+      } catch {
+      }
       const summaryLines = [
         `\u4EA4\u6613\u7D00\u9304 ${txnCount} \u7B46`,
         `\u5E33\u6236 ${acctCount} \u500B`
@@ -11455,7 +11482,7 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
       if (holdingCount > 0) summaryLines.push(`\u6301\u80A1 ${holdingCount} \u6A94`);
       if (accountGroupCount > 0) summaryLines.push(`\u5B50\u6A19\u7C64 ${accountGroupCount} \u500B`);
       const items = [
-        { card: true, lines: summaryLines }
+        { card: true, lines: summaryLines, headerLabel: exportedTimeText ? `\u5099\u4EFD\u6642\u9593  ${exportedTimeText}` : null }
       ];
       if (hasPrefs) {
         items.push("\u4E00\u4F75\u9084\u539F \u504F\u597D\u8A2D\u5B9A");
@@ -11768,9 +11795,10 @@ ${reasonTxt},\u8981\u7ACB\u5373\u5099\u4EFD\u55CE?`,
     if (blockKey === "dataStat") {
       const catCount = (state.categories.expense?.length || 0) + (state.categories.income?.length || 0);
       const subCount = (state.categories.expense || []).reduce((sum, c) => sum + (c.subs?.length || 0), 0) + (state.categories.income || []).reduce((sum, c) => sum + (c.subs?.length || 0), 0);
+      const _isRealTransfer = (t) => t.transferRole === "out" || t.transferRole === "in" || t.transferRole === "fee";
       const txnByType = {
-        income: state.transactions.filter((t) => t.type === "income" && !t.transferRole).length,
-        expense: state.transactions.filter((t) => t.type === "expense" && !t.transferRole).length,
+        income: state.transactions.filter((t) => t.type === "income" && !_isRealTransfer(t)).length,
+        expense: state.transactions.filter((t) => t.type === "expense" && !_isRealTransfer(t)).length,
         transfer: state.transactions.filter((t) => t.transferRole === "out").length
         // 一對轉出/轉入算一筆
       };
@@ -18945,7 +18973,7 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
   if (!isInvest) {
     txns = txns.filter((t) => {
       if (listFilter === "all") return true;
-      const isTrueTransfer = !!t.transferRole;
+      const isTrueTransfer = t.transferRole === "out" || t.transferRole === "in" || t.transferRole === "fee";
       if (listFilter === "transfer") return isTrueTransfer;
       return t.type === listFilter && !isTrueTransfer;
     });
@@ -19591,7 +19619,7 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
           fontWeight: 500,
           marginBottom: 8,
           paddingLeft: 4
-        } }, "\u4EA4\u6613\u7D00\u9304"), !isInvest && !editMode && /* @__PURE__ */ React.createElement("div", { style: { ...styles.recentFilterBar, marginBottom: 8 }, onClick: (e) => e.stopPropagation() }, [
+        } }, "\u4EA4\u6613\u7D00\u9304"), !isInvest && !editMode && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 8 }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: styles.recentFilterBar }, [
           { key: "transfer", label: "\u8F49\u5E33" },
           { key: "income", label: "\u6536\u5165" },
           { key: "expense", label: "\u652F\u51FA" },
@@ -19607,7 +19635,7 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
             onClick: () => setListFilter(opt.key)
           },
           opt.label
-        )), /* @__PURE__ */ React.createElement(ListSortControl, { sortMode, setSortMode })), txns.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: styles.emptyAccountHint }, emptyText) : /* @__PURE__ */ React.createElement("div", { style: styles.txnList }, txns.slice(0, visibleCount).map((t) => /* @__PURE__ */ React.createElement(
+        )), /* @__PURE__ */ React.createElement(ListSortControl, { sortMode, setSortMode }))), txns.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: styles.emptyAccountHint }, emptyText) : /* @__PURE__ */ React.createElement("div", { style: styles.txnList }, txns.slice(0, visibleCount).map((t) => /* @__PURE__ */ React.createElement(
           TxnRow,
           {
             key: t.id,
