@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FY";
+const APP_VERSION = "1150520GA";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -14652,13 +14652,16 @@ function CalcTriggerInput({
   const triggerRef = React.useRef(null);
   const openCalc = () => {
     if (disabled) return;
-    if (document.activeElement && typeof document.activeElement.blur === "function") {
-      document.activeElement.blur();
+    const ae = document.activeElement;
+    const isTextInput = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA");
+    if (isTextInput && typeof ae.blur === "function") {
+      ae.blur();
     }
     if (clearOnOpen) {
       onChange("");
     }
-    setShow(true);
+    const showDelay = isTextInput ? 150 : 0;
+    setTimeout(() => setShow(true), showDelay);
     setTimeout(() => {
       const el = triggerRef.current;
       if (!el) return;
@@ -14687,7 +14690,7 @@ function CalcTriggerInput({
           el._calcShiftedBackdrop = dialogBd;
         }
       }
-    }, 180);
+    }, showDelay + 180);
   };
   const handleCalcClose = () => {
     const el = triggerRef.current;
@@ -14717,9 +14720,10 @@ function CalcTriggerInput({
       ref: triggerRef,
       onPointerDown: (e) => {
         if (disabled) return;
-        if (document.activeElement && document.activeElement !== e.currentTarget) {
-          if (typeof document.activeElement.blur === "function") {
-            document.activeElement.blur();
+        const ae = document.activeElement;
+        if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA") && ae !== e.currentTarget) {
+          if (typeof ae.blur === "function") {
+            ae.blur();
           }
         }
       },
@@ -23368,6 +23372,14 @@ class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
+document.addEventListener("touchstart", (e) => {
+  const ae = document.activeElement;
+  if (!ae) return;
+  if (ae.tagName !== "INPUT" && ae.tagName !== "TEXTAREA") return;
+  const target = e.target;
+  if (ae === target || ae.contains(target)) return;
+  if (typeof ae.blur === "function") ae.blur();
+}, { capture: true, passive: true });
 const _container = document.getElementById("root");
 if (_container) {
   const _root = ReactDOM.createRoot(_container);
