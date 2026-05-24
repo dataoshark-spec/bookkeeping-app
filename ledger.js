@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520GE";
+const APP_VERSION = "1150520GF";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -5673,6 +5673,8 @@ function UpdateMarketValueDialog({ holding, shares, cost, onClose, onConfirm }) 
   const [value, setValue] = useState(String(holding.marketValue || ""));
   const [locked, setLocked] = useState(true);
   const swipe = useSwipeBack(onClose, { isCenterDialog: true });
+  const [calcLift, setCalcLift] = useState(0);
+  const calcLiftCtx = React.useMemo(() => ({ setLift: setCalcLift }), []);
   const handleSubmit = () => {
     const trimmed = String(value || "").trim();
     if (trimmed === "") {
@@ -5682,14 +5684,14 @@ function UpdateMarketValueDialog({ holding, shares, cost, onClose, onConfirm }) 
     const mv = parseFloat(trimmed) || 0;
     onConfirm(mv);
   };
-  return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdropWithCalc, onClick: onClose }, /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement(CalcLiftContext.Provider, { value: calcLiftCtx }, /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: onClose }, /* @__PURE__ */ React.createElement(
     "div",
     {
       ref: swipe.ref,
       style: {
         ...styles.centerDialogCard,
-        transform: `translateX(${swipe.dragX}px)`,
-        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+        transform: `translate(${swipe.dragX}px, ${-calcLift}px)`,
+        transition: "transform 0.22s ease-out"
       },
       onClick: (e) => e.stopPropagation()
     },
@@ -5755,7 +5757,7 @@ function UpdateMarketValueDialog({ holding, shares, cost, onClose, onConfirm }) 
       },
       "\u78BA\u8A8D"
     ))
-  ));
+  )));
 }
 function EditHoldingFieldDialog({ holding, field, relTxnCount, toast, onClose, onSubmitSymbol, onSubmitName }) {
   const isSymbolMode = field === "symbol";
@@ -5893,6 +5895,8 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
   const [locked, setLocked] = useState(true);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const swipe = useSwipeBack(onClose, { isCenterDialog: true });
+  const [calcLift, setCalcLift] = useState(0);
+  const calcLiftCtx = React.useMemo(() => ({ setLift: setCalcLift }), []);
   const handleSubmit = () => {
     const newShares = Number(shares) || 0;
     const newCost = Number(totalCost) || 0;
@@ -5937,14 +5941,14 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
   if (showDatePicker) {
     return /* @__PURE__ */ React.createElement(DatePicker, { value: date, onChange: (d) => setDate(d), onClose: () => setShowDatePicker(false) });
   }
-  return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdropWithCalc, onClick: onClose }, /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement(CalcLiftContext.Provider, { value: calcLiftCtx }, /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: onClose }, /* @__PURE__ */ React.createElement(
     "div",
     {
       ref: swipe.ref,
       style: {
         ...styles.centerDialogCard,
-        transform: `translateX(${swipe.dragX}px)`,
-        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+        transform: `translate(${swipe.dragX}px, ${-calcLift}px)`,
+        transition: "transform 0.22s ease-out"
       },
       onClick: (e) => e.stopPropagation()
     },
@@ -6051,7 +6055,7 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
       },
       "\u78BA\u8A8D"
     ))
-  ));
+  )));
 }
 function BuyHoldingSheet({ state, account, prefillSymbol, onClose, onConfirm, toast, toastRich, onRequestCreateAccount }) {
   const swipe = useSwipeBack(onClose);
@@ -14636,6 +14640,7 @@ function ColorPickerDialog({ initial, onCancel, onConfirm }) {
     )
   );
 }
+const CalcLiftContext = React.createContext({ setLift: null });
 function CalcTriggerInput({
   value,
   onChange,
@@ -14653,6 +14658,7 @@ function CalcTriggerInput({
 }) {
   const [show, setShow] = React.useState(false);
   const triggerRef = React.useRef(null);
+  const { setLift } = React.useContext(CalcLiftContext);
   const openCalc = () => {
     if (disabled) return;
     const ae = document.activeElement;
@@ -14685,26 +14691,14 @@ function CalcTriggerInput({
       if (delta <= 0) return;
       if (scroller && scroller !== document.body) {
         scroller.scrollBy({ top: delta, behavior: "smooth" });
+      } else if (typeof setLift === "function") {
+        setLift(delta);
       }
     }, showDelay + 180);
   };
   const handleCalcClose = () => {
-    const el = triggerRef.current;
-    if (el && el._calcShiftedBackdrop) {
-      const bd = el._calcShiftedBackdrop;
-      bd.style.alignItems = bd.dataset.prevAlignItems || "";
-      bd.style.paddingBottom = bd.dataset.prevPaddingBottom || "";
-      delete bd.dataset.prevAlignItems;
-      delete bd.dataset.prevPaddingBottom;
-      el._calcShiftedBackdrop = null;
-    }
-    if (el && el._calcShiftedCard) {
-      const cd = el._calcShiftedCard;
-      cd.style.transform = cd.dataset.prevTransform || "";
-      cd.style.transition = cd.dataset.prevTransition || "";
-      delete cd.dataset.prevTransform;
-      delete cd.dataset.prevTransition;
-      el._calcShiftedCard = null;
+    if (typeof setLift === "function") {
+      setLift(0);
     }
     setShow(false);
   };
@@ -23085,21 +23079,6 @@ const styles = {
     zIndex: 300,
     padding: 20
   },
-  // [v555GE] 給有計算機 trigger 的 dialog 用:dialog 永遠靠上 + 底部 480 永遠保留給計算機
-  //   完全靜態,沒有任何 JS 動態調整(避免狀態殘留撐高 dialog)
-  centerDialogBackdropWithCalc: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: "rgba(0,0,0,0.55)",
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "center",
-    zIndex: 300,
-    padding: "40px 20px 480px"
-  },
   centerDialogCard: {
     background: "var(--bg-card)",
     borderRadius: 18,
@@ -23423,25 +23402,23 @@ document.addEventListener("touchstart", (e) => {
     };
     window.addEventListener("popstate", (e) => {
       const now = Date.now();
-      if (now - lastPopAt <= 1e3) {
+      if (lastPopAt && now - lastPopAt <= 1e3) {
         hideHint();
         lastPopAt = 0;
         return;
       }
       lastPopAt = now;
-      setTimeout(() => {
-        try {
-          history.pushState({ guard: true }, "");
-        } catch {
-        }
-      }, 0);
+      try {
+        history.pushState({ guard: true }, "");
+      } catch {
+      }
       showHint();
       setTimeout(() => {
-        if (Date.now() - lastPopAt >= 1e3) {
+        if (lastPopAt === now) {
           hideHint();
           lastPopAt = 0;
         }
-      }, 1100);
+      }, 1500);
     });
   } catch {
   }
