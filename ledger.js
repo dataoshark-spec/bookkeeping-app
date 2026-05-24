@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FX";
+const APP_VERSION = "1150520FY";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -5672,7 +5672,7 @@ function SellSheet({ state, account, onClose, onConfirm, toast }) {
 function UpdateMarketValueDialog({ holding, shares, cost, onClose, onConfirm }) {
   const [value, setValue] = useState(String(holding.marketValue || ""));
   const [locked, setLocked] = useState(true);
-  const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
+  const swipe = useSwipeBack(onClose, { isCenterDialog: true });
   const handleSubmit = () => {
     const trimmed = String(value || "").trim();
     if (trimmed === "") {
@@ -5682,44 +5682,47 @@ function UpdateMarketValueDialog({ holding, shares, cost, onClose, onConfirm }) 
     const mv = parseFloat(trimmed) || 0;
     onConfirm(mv);
   };
-  return /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: onClose }, /* @__PURE__ */ React.createElement(
     "div",
     {
-      "data-sheet": "true",
+      ref: swipe.ref,
       style: {
-        ...styles.sheet,
+        ...styles.centerDialogCard,
         transform: `translateX(${swipe.dragX}px)`,
         transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
       },
-      ref: swipe.ref
+      onClick: (e) => e.stopPropagation()
     },
-    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: { minWidth: 50 } }), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, "\u66F4\u65B0 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontWeight: 700 } }, " ", holding.symbol, " "), " \u76EE\u524D\u5E02\u503C"), /* @__PURE__ */ React.createElement("div", { onClick: onClose, style: { ...styles.sheetClose, textAlign: "right" } }, "\u53D6\u6D88")),
-    holding.name && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", textAlign: "center", marginTop: -4, marginBottom: 8 } }, holding.name),
-    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: {
+    /* @__PURE__ */ React.createElement("div", { style: {
+      padding: "14px 18px 10px",
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 8
+    } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600 } }, "\u66F4\u65B0 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontWeight: 700 } }, " ", holding.symbol, " "), " \u76EE\u524D\u5E02\u503C"), holding.name && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2 } }, holding.name)), /* @__PURE__ */ React.createElement("div", { onClick: onClose, style: { color: "var(--text-dim)", fontSize: 13, cursor: "pointer", padding: "2px 4px" } }, "\u53D6\u6D88")),
+    /* @__PURE__ */ React.createElement("div", { style: { padding: "0 18px 18px" } }, /* @__PURE__ */ React.createElement("div", { style: {
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
-      marginBottom: 16,
-      padding: "10px 12px",
+      marginBottom: 14,
+      padding: "8px 12px",
       background: locked ? "var(--bg-card)" : "rgba(217, 104, 119, 0.06)",
       border: "1.5px solid",
       borderColor: locked ? "var(--border)" : "var(--pink)",
-      borderRadius: 10,
-      transition: "background 0.15s, border-color 0.15s"
+      borderRadius: 10
     } }, /* @__PURE__ */ React.createElement("span", { style: {
       ...styles.lockLabel,
       color: locked ? "var(--text-dim)" : "var(--pink)",
       display: "flex",
       alignItems: "center",
       gap: 6
-    } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: locked ? "lock" : "unlock", size: 14, color: locked ? "var(--text-dim)" : "var(--pink)" }), locked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+    } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: locked ? "lock" : "unlock", size: 13, color: locked ? "var(--text-dim)" : "var(--pink)" }), locked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
       "div",
       {
         style: { ...styles.toggleTrack, background: locked ? "var(--bg-card)" : "var(--pink)" },
         onClick: () => setLocked((v) => !v)
       },
       /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: locked ? "translateX(0)" : "translateX(18px)" } })
-    )), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 8 } }, "\u6301\u6709 ", shares.toLocaleString(), " \u80A1 \xB7 \u76EE\u524D\u5E02\u503C\u7E3D\u984D(NT$)"), /* @__PURE__ */ React.createElement(
+    )), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u6301\u6709 ", shares.toLocaleString(), " \u80A1 \xB7 \u76EE\u524D\u5E02\u503C\u7E3D\u984D(NT$)"), /* @__PURE__ */ React.createElement(
       CalcTriggerInput,
       {
         value,
@@ -5728,9 +5731,9 @@ function UpdateMarketValueDialog({ holding, shares, cost, onClose, onConfirm }) 
         fontSize: 20,
         fontWeight: 700,
         disabled: locked,
-        style: { padding: "14px 14px", borderRadius: 12 }
+        style: { padding: "12px 14px", borderRadius: 12 }
       }
-    ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 8, lineHeight: 1.6 } }, cost ? `\u7559\u7A7A \u2192 \u7528\u6210\u672C ${cost.toLocaleString()} \u7576\u5E02\u503C` : "\u7CFB\u7D71\u6703\u6839\u64DA\u6B64\u91D1\u984D\u986F\u793A\u6D6E\u52D5\u640D\u76CA,\u4E26\u5F71\u97FF\u5E33\u6236\u7E3D\u5E02\u503C"), /* @__PURE__ */ React.createElement(
+    ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 6, lineHeight: 1.6 } }, cost ? `\u7559\u7A7A \u2192 \u7528\u6210\u672C ${cost.toLocaleString()} \u7576\u5E02\u503C` : "\u7CFB\u7D71\u6703\u6839\u64DA\u6B64\u91D1\u984D\u986F\u793A\u6D6E\u52D5\u640D\u76CA,\u4E26\u5F71\u97FF\u5E33\u6236\u7E3D\u5E02\u503C"), /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: handleSubmit,
@@ -5738,7 +5741,7 @@ function UpdateMarketValueDialog({ holding, shares, cost, onClose, onConfirm }) 
         style: {
           width: "100%",
           padding: "14px",
-          marginTop: 20,
+          marginTop: 16,
           background: locked ? "var(--bg-card)" : "var(--mint)",
           color: locked ? "var(--text-faint)" : "#fff",
           border: "none",
@@ -5751,7 +5754,7 @@ function UpdateMarketValueDialog({ holding, shares, cost, onClose, onConfirm }) 
       },
       "\u78BA\u8A8D"
     ))
-  );
+  ));
 }
 function EditHoldingFieldDialog({ holding, field, relTxnCount, toast, onClose, onSubmitSymbol, onSubmitName }) {
   const isSymbolMode = field === "symbol";
@@ -5887,7 +5890,7 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
   const [totalCost, setTotalCost] = useState(String(trade.totalCost || ""));
   const [locked, setLocked] = useState(true);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
+  const swipe = useSwipeBack(onClose, { isCenterDialog: true });
   const handleSubmit = () => {
     const newShares = Number(shares) || 0;
     const newCost = Number(totalCost) || 0;
@@ -5932,37 +5935,40 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
   if (showDatePicker) {
     return /* @__PURE__ */ React.createElement(DatePicker, { value: date, onChange: (d) => setDate(d), onClose: () => setShowDatePicker(false) });
   }
-  return /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: onClose }, /* @__PURE__ */ React.createElement(
     "div",
     {
-      "data-sheet": "true",
+      ref: swipe.ref,
       style: {
-        ...styles.sheet,
+        ...styles.centerDialogCard,
         transform: `translateX(${swipe.dragX}px)`,
         transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
       },
-      ref: swipe.ref
+      onClick: (e) => e.stopPropagation()
     },
-    /* @__PURE__ */ React.createElement("div", { style: styles.sheetHead }, /* @__PURE__ */ React.createElement("div", { style: { minWidth: 50 } }), /* @__PURE__ */ React.createElement("div", { style: styles.sheetTitle }, "\u7DE8\u8F2F\u8CB7\u9032\u7D00\u9304"), /* @__PURE__ */ React.createElement("div", { onClick: onClose, style: { ...styles.sheetClose, textAlign: "right" } }, "\u53D6\u6D88")),
-    /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", textAlign: "center", marginTop: -4, marginBottom: 8 } }, holding.symbol, holding.name ? ` \xB7 ${holding.name}` : ""),
-    /* @__PURE__ */ React.createElement("div", { style: styles.sheetScroll }, /* @__PURE__ */ React.createElement("div", { style: {
+    /* @__PURE__ */ React.createElement("div", { style: {
+      padding: "14px 18px 10px",
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 8
+    } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600 } }, "\u7DE8\u8F2F\u8CB7\u9032\u7D00\u9304"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2 } }, holding.symbol, holding.name ? ` \xB7 ${holding.name}` : "")), /* @__PURE__ */ React.createElement("div", { onClick: onClose, style: { color: "var(--text-dim)", fontSize: 13, cursor: "pointer", padding: "2px 4px" } }, "\u53D6\u6D88")),
+    /* @__PURE__ */ React.createElement("div", { style: { padding: "0 18px 18px" } }, /* @__PURE__ */ React.createElement("div", { style: {
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
-      marginBottom: 16,
-      padding: "10px 12px",
+      marginBottom: 14,
+      padding: "8px 12px",
       background: locked ? "var(--bg-card)" : "rgba(217, 104, 119, 0.06)",
       border: "1.5px solid",
       borderColor: locked ? "var(--border)" : "var(--pink)",
-      borderRadius: 10,
-      transition: "background 0.15s, border-color 0.15s"
+      borderRadius: 10
     } }, /* @__PURE__ */ React.createElement("span", { style: {
       ...styles.lockLabel,
       color: locked ? "var(--text-dim)" : "var(--pink)",
       display: "flex",
       alignItems: "center",
       gap: 6
-    } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: locked ? "lock" : "unlock", size: 14, color: locked ? "var(--text-dim)" : "var(--pink)" }), locked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+    } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: locked ? "lock" : "unlock", size: 13, color: locked ? "var(--text-dim)" : "var(--pink)" }), locked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
       "div",
       {
         style: { ...styles.toggleTrack, background: locked ? "var(--bg-card)" : "var(--pink)" },
@@ -5977,14 +5983,14 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
         },
         style: {
           width: "100%",
-          padding: "14px",
-          fontSize: 16,
+          padding: "12px 14px",
+          fontSize: 15,
           background: "var(--bg-card)",
           color: locked ? "var(--text-dim)" : "var(--text)",
           border: "1.5px solid var(--border)",
           borderRadius: 12,
           boxSizing: "border-box",
-          marginBottom: 14,
+          marginBottom: 12,
           opacity: locked ? 0.6 : 1,
           fontFamily: "var(--num-font)",
           cursor: locked ? "not-allowed" : "pointer",
@@ -6003,11 +6009,11 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
         value: shares,
         onChange: setShares,
         placeholder: "0",
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: 600,
         disabled: locked,
         clearOnOpen: true,
-        style: { padding: "14px", borderRadius: 12, marginBottom: 14 }
+        style: { padding: "12px 14px", borderRadius: 12, marginBottom: 12 }
       }
     ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u7E3D\u6210\u672C ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 11 } }, "(\u542B\u624B\u7E8C\u8CBB)")), /* @__PURE__ */ React.createElement(
       CalcTriggerInput,
@@ -6015,11 +6021,11 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
         value: totalCost,
         onChange: setTotalCost,
         placeholder: "0",
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: 600,
         disabled: locked,
         clearOnOpen: true,
-        style: { padding: "14px", borderRadius: 12 }
+        style: { padding: "12px 14px", borderRadius: 12 }
       }
     ), /* @__PURE__ */ React.createElement(
       "button",
@@ -6029,7 +6035,7 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
         style: {
           width: "100%",
           padding: "14px",
-          marginTop: 20,
+          marginTop: 16,
           background: locked ? "var(--bg-card)" : "var(--mint)",
           color: locked ? "var(--text-faint)" : "#fff",
           border: "none",
@@ -6042,7 +6048,7 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
       },
       "\u78BA\u8A8D"
     ))
-  );
+  ));
 }
 function BuyHoldingSheet({ state, account, prefillSymbol, onClose, onConfirm, toast, toastRich, onRequestCreateAccount }) {
   const swipe = useSwipeBack(onClose);
@@ -14673,6 +14679,13 @@ function CalcTriggerInput({
       if (delta <= 0) return;
       if (scroller && scroller !== document.body) {
         scroller.scrollBy({ top: delta, behavior: "smooth" });
+      } else {
+        const dialogBd = el.closest('[data-picker-backdrop="true"]');
+        if (dialogBd && dialogBd !== calcBackdrop) {
+          dialogBd.dataset.prevPaddingBottom = dialogBd.style.paddingBottom || "";
+          dialogBd.style.paddingBottom = `${calcHeight + 12}px`;
+          el._calcShiftedBackdrop = dialogBd;
+        }
       }
     }, 180);
   };
@@ -14732,15 +14745,18 @@ function CalcTriggerInput({
       }
     },
     displayValue || placeholder
-  ), show && /* @__PURE__ */ React.createElement(
-    CalculatorSheet,
-    {
-      expr: value === "0" ? "" : String(value || ""),
-      onChange: (v) => onChange(v),
-      mainColor: "var(--mint)",
-      onMainColor: "#1a1a1a",
-      onClose: handleCalcClose
-    }
+  ), show && ReactDOM.createPortal(
+    /* @__PURE__ */ React.createElement(
+      CalculatorSheet,
+      {
+        expr: value === "0" ? "" : String(value || ""),
+        onChange: (v) => onChange(v),
+        mainColor: "var(--mint)",
+        onMainColor: "#1a1a1a",
+        onClose: handleCalcClose
+      }
+    ),
+    document.body
   ));
 }
 function CalculatorSheet({ expr, onChange, mainColor, onMainColor, onClose }) {
