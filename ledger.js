@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520GA";
+const APP_VERSION = "1150520GC";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -5742,14 +5742,15 @@ function UpdateMarketValueDialog({ holding, shares, cost, onClose, onConfirm }) 
           width: "100%",
           padding: "14px",
           marginTop: 16,
-          background: locked ? "var(--bg-card)" : "var(--mint)",
-          color: locked ? "var(--text-faint)" : "#fff",
+          // [v555GB] locked 時用 mint 淡化(不是白底淡文字),確保使用者看得到按鈕存在
+          background: "var(--mint)",
+          color: "#fff",
           border: "none",
           borderRadius: 12,
           fontSize: 15,
           fontWeight: 600,
           cursor: locked ? "not-allowed" : "pointer",
-          opacity: locked ? 0.6 : 1
+          opacity: locked ? 0.4 : 1
         }
       },
       "\u78BA\u8A8D"
@@ -5870,14 +5871,15 @@ function EditHoldingFieldDialog({ holding, field, relTxnCount, toast, onClose, o
         style: {
           flex: 1,
           padding: "12px",
-          background: locked ? "var(--bg-card)" : "var(--mint)",
-          color: locked ? "var(--text-faint)" : "#fff",
+          // [v555GB] locked 時用 mint 淡化(不是白底淡文字),確保使用者看得到按鈕存在
+          background: "var(--mint)",
+          color: "#fff",
           border: "none",
           borderRadius: 12,
           fontSize: 14,
           fontWeight: 600,
           cursor: locked ? "not-allowed" : "pointer",
-          opacity: locked ? 0.6 : 1
+          opacity: locked ? 0.4 : 1
         }
       },
       "\u78BA\u8A8D"
@@ -6036,14 +6038,15 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
           width: "100%",
           padding: "14px",
           marginTop: 16,
-          background: locked ? "var(--bg-card)" : "var(--mint)",
-          color: locked ? "var(--text-faint)" : "#fff",
+          // [v555GB] locked 時用 mint 淡化(不是白底淡文字),確保使用者看得到按鈕存在
+          background: "var(--mint)",
+          color: "#fff",
           border: "none",
           borderRadius: 12,
           fontSize: 15,
           fontWeight: 600,
           cursor: locked ? "not-allowed" : "pointer",
-          opacity: locked ? 0.6 : 1
+          opacity: locked ? 0.4 : 1
         }
       },
       "\u78BA\u8A8D"
@@ -23380,6 +23383,51 @@ document.addEventListener("touchstart", (e) => {
   if (ae === target || ae.contains(target)) return;
   if (typeof ae.blur === "function") ae.blur();
 }, { capture: true, passive: true });
+(function setupBackGuard() {
+  try {
+    history.pushState({ guard: true }, "");
+    let lastPopAt = 0;
+    let toastEl = null;
+    const showHint = () => {
+      if (toastEl) {
+        toastEl.style.opacity = "1";
+        return;
+      }
+      toastEl = document.createElement("div");
+      toastEl.textContent = "\u518D\u6ED1\u4E00\u6B21\u96E2\u958B";
+      toastEl.style.cssText = "position:fixed;left:50%;bottom:calc(40px + env(safe-area-inset-bottom));transform:translateX(-50%);background:rgba(20,20,20,0.92);color:#fff;padding:10px 18px;border-radius:22px;font-size:14px;z-index:99999;pointer-events:none;box-shadow:0 4px 20px rgba(0,0,0,0.3);transition:opacity 0.2s;font-weight:500;letter-spacing:0.5px";
+      document.body.appendChild(toastEl);
+    };
+    const hideHint = () => {
+      if (!toastEl) return;
+      const el = toastEl;
+      toastEl = null;
+      el.style.opacity = "0";
+      setTimeout(() => {
+        try {
+          el.remove();
+        } catch {
+        }
+      }, 250);
+    };
+    window.addEventListener("popstate", (e) => {
+      const now = Date.now();
+      if (now - lastPopAt <= 1e3) {
+        hideHint();
+        return;
+      }
+      lastPopAt = now;
+      history.pushState({ guard: true }, "");
+      showHint();
+      setTimeout(() => {
+        if (Date.now() - lastPopAt >= 1e3) {
+          hideHint();
+        }
+      }, 1100);
+    });
+  } catch {
+  }
+})();
 const _container = document.getElementById("root");
 if (_container) {
   const _root = ReactDOM.createRoot(_container);
