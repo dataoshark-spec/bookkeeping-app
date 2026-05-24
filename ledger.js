@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FS";
+const APP_VERSION = "1150520FT";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -14667,35 +14667,31 @@ function CalcTriggerInput({
       if (scroller && scroller !== document.body) {
         scroller.scrollBy({ top: delta, behavior: "smooth" });
       } else {
-        let card = el.parentElement;
-        while (card && card !== document.body) {
-          const cs = window.getComputedStyle(card);
-          if (cs.borderRadius && parseInt(cs.borderRadius) >= 14) {
-            break;
-          }
-          card = card.parentElement;
-        }
-        if (card && card !== document.body) {
-          const cardRect = card.getBoundingClientRect();
-          const maxPush = Math.max(0, cardRect.top - 12);
-          const safeDelta = Math.min(delta, maxPush);
-          if (safeDelta > 8) {
-            card.style.transition = "transform 0.2s ease-out";
-            card.style.transform = `translateY(-${safeDelta}px)`;
-            el._calcShiftedCard = card;
-          }
+        let bd = el.closest('[data-picker-backdrop="true"]');
+        if (bd === calcBackdrop) bd = null;
+        if (bd) {
+          bd.dataset.prevAlignItems = bd.style.alignItems || "";
+          bd.dataset.prevPaddingBottom = bd.style.paddingBottom || "";
+          bd.style.alignItems = "flex-end";
+          bd.style.paddingBottom = `${calcHeight + 12}px`;
+          el._calcShiftedBackdrop = bd;
         }
       }
     }, 180);
   };
   const handleCalcClose = () => {
     const el = triggerRef.current;
+    if (el && el._calcShiftedBackdrop) {
+      const bd = el._calcShiftedBackdrop;
+      bd.style.alignItems = bd.dataset.prevAlignItems || "";
+      bd.style.paddingBottom = bd.dataset.prevPaddingBottom || "";
+      delete bd.dataset.prevAlignItems;
+      delete bd.dataset.prevPaddingBottom;
+      el._calcShiftedBackdrop = null;
+    }
     if (el && el._calcShiftedCard) {
-      const card = el._calcShiftedCard;
-      card.style.transform = "";
-      setTimeout(() => {
-        card.style.transition = "";
-      }, 250);
+      el._calcShiftedCard.style.transform = "";
+      el._calcShiftedCard.style.transition = "";
       el._calcShiftedCard = null;
     }
     setShow(false);
