@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FT";
+const APP_VERSION = "1150520FV";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -4875,7 +4875,7 @@ function Block({ blockKey, title, headerRight, editMode, isFirst, isLast, onMove
       dragClone = el.cloneNode(true);
       dragClone.setAttribute("data-drag-clone", "true");
       const elRadius = getComputedStyle(el).borderRadius || "12px";
-      dragClone.style.cssText = `position:fixed;top:${rect.top}px;left:${rect.left}px;width:${rect.width}px;z-index:9998;opacity:0.55;transform:scale(1.03) rotate(-0.5deg);box-shadow:0 16px 40px rgba(0,0,0,0.6), 0 0 0 2px rgba(126,224,192,0.4);pointer-events:none;margin:0;border-radius:${elRadius};`;
+      dragClone.style.cssText = `position:fixed;top:${rect.top}px;left:${rect.left}px;width:${rect.width}px;height:${rect.height}px;box-sizing:border-box;z-index:9998;opacity:0.55;box-shadow:0 16px 40px rgba(0,0,0,0.6), 0 0 0 2px rgba(126,224,192,0.4);pointer-events:none;margin:0;border-radius:${elRadius};`;
       document.body.appendChild(dragClone);
       el.style.display = "none";
       document.body.style.touchAction = "none";
@@ -5665,6 +5665,7 @@ function SellSheet({ state, account, onClose, onConfirm, toast }) {
 function UpdateMarketValueDialog({ holding, shares, cost, onClose, onConfirm }) {
   const [value, setValue] = useState(String(holding.marketValue || ""));
   const [locked, setLocked] = useState(true);
+  const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
   const handleSubmit = () => {
     const trimmed = String(value || "").trim();
     if (trimmed === "") {
@@ -5674,79 +5675,94 @@ function UpdateMarketValueDialog({ holding, shares, cost, onClose, onConfirm }) 
     const mv = parseFloat(trimmed) || 0;
     onConfirm(mv);
   };
-  return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: onClose }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: {
-    padding: "14px 18px",
-    borderBottom: "1px solid var(--border)",
-    display: "flex",
-    alignItems: "flex-start",
-    gap: 8
-  } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600 } }, "\u66F4\u65B0 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontWeight: 700 } }, " ", holding.symbol, " "), " \u76EE\u524D\u5E02\u503C"), holding.name && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2 } }, holding.name)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: {
-    ...styles.lockLabel,
-    color: locked ? "var(--text-dim)" : "var(--pink)",
-    display: "flex",
-    alignItems: "center",
-    gap: 4
-  } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: locked ? "lock" : "unlock", size: 12, color: locked ? "var(--text-dim)" : "var(--pink)" }), locked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: onClose }, /* @__PURE__ */ React.createElement(
     "div",
     {
-      style: { ...styles.toggleTrack, background: locked ? "var(--bg-card)" : "var(--pink)" },
-      onClick: () => setLocked((v) => !v)
-    },
-    /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: locked ? "translateX(0)" : "translateX(18px)" } })
-  ))), /* @__PURE__ */ React.createElement("div", { style: { padding: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 8 } }, "\u6301\u6709 ", shares.toLocaleString(), " \u80A1 \xB7 \u76EE\u524D\u5E02\u503C\u7E3D\u984D(NT$)"), /* @__PURE__ */ React.createElement(
-    CalcTriggerInput,
-    {
-      value,
-      onChange: setValue,
-      placeholder: cost ? String(cost) : "0",
-      fontSize: 18,
-      fontWeight: 600,
-      disabled: locked,
-      style: { padding: "12px 14px", borderRadius: 12 }
-    }
-  ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 6, lineHeight: 1.6 } }, cost ? `\u7559\u7A7A \u2192 \u7528\u6210\u672C ${cost.toLocaleString()} \u7576\u5E02\u503C` : "\u7CFB\u7D71\u6703\u6839\u64DA\u6B64\u91D1\u984D\u986F\u793A\u6D6E\u52D5\u640D\u76CA,\u4E26\u5F71\u97FF\u5E33\u6236\u7E3D\u5E02\u503C")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "0 14px 14px" } }, /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      onClick: onClose,
+      ref: swipe.ref,
       style: {
-        flex: 1,
-        padding: "12px",
-        background: "transparent",
-        color: "var(--pink-text)",
-        border: "1.5px solid var(--pink)",
-        borderRadius: 12,
-        fontSize: 14,
-        fontWeight: 600,
-        cursor: "pointer"
-      }
+        ...styles.centerDialogCard,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
+      },
+      onClick: (e) => e.stopPropagation()
     },
-    "\u53D6\u6D88"
-  ), /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      onClick: handleSubmit,
-      disabled: locked,
-      style: {
-        flex: 1,
-        padding: "12px",
-        background: locked ? "var(--bg-card)" : "var(--mint)",
-        color: locked ? "var(--text-faint)" : "#fff",
-        border: "none",
-        borderRadius: 12,
-        fontSize: 14,
+    /* @__PURE__ */ React.createElement("div", { style: {
+      padding: "14px 18px",
+      borderBottom: "1px solid var(--border)",
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 8
+    } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600 } }, "\u66F4\u65B0 ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontWeight: 700 } }, " ", holding.symbol, " "), " \u76EE\u524D\u5E02\u503C"), holding.name && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2 } }, holding.name)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: {
+      ...styles.lockLabel,
+      color: locked ? "var(--text-dim)" : "var(--pink)",
+      display: "flex",
+      alignItems: "center",
+      gap: 4
+    } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: locked ? "lock" : "unlock", size: 12, color: locked ? "var(--text-dim)" : "var(--pink)" }), locked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: { ...styles.toggleTrack, background: locked ? "var(--bg-card)" : "var(--pink)" },
+        onClick: () => setLocked((v) => !v)
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: locked ? "translateX(0)" : "translateX(18px)" } })
+    ))),
+    /* @__PURE__ */ React.createElement("div", { style: { padding: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 8 } }, "\u6301\u6709 ", shares.toLocaleString(), " \u80A1 \xB7 \u76EE\u524D\u5E02\u503C\u7E3D\u984D(NT$)"), /* @__PURE__ */ React.createElement(
+      CalcTriggerInput,
+      {
+        value,
+        onChange: setValue,
+        placeholder: cost ? String(cost) : "0",
+        fontSize: 18,
         fontWeight: 600,
-        cursor: locked ? "not-allowed" : "pointer",
-        opacity: locked ? 0.6 : 1
+        disabled: locked,
+        style: { padding: "12px 14px", borderRadius: 12 }
       }
-    },
-    "\u78BA\u8A8D"
-  ))));
+    ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginTop: 6, lineHeight: 1.6 } }, cost ? `\u7559\u7A7A \u2192 \u7528\u6210\u672C ${cost.toLocaleString()} \u7576\u5E02\u503C` : "\u7CFB\u7D71\u6703\u6839\u64DA\u6B64\u91D1\u984D\u986F\u793A\u6D6E\u52D5\u640D\u76CA,\u4E26\u5F71\u97FF\u5E33\u6236\u7E3D\u5E02\u503C")),
+    /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "0 14px 14px" } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: onClose,
+        style: {
+          flex: 1,
+          padding: "12px",
+          background: "transparent",
+          color: "var(--pink-text)",
+          border: "1.5px solid var(--pink)",
+          borderRadius: 12,
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: "pointer"
+        }
+      },
+      "\u53D6\u6D88"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: handleSubmit,
+        disabled: locked,
+        style: {
+          flex: 1,
+          padding: "12px",
+          background: locked ? "var(--bg-card)" : "var(--mint)",
+          color: locked ? "var(--text-faint)" : "#fff",
+          border: "none",
+          borderRadius: 12,
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: locked ? "not-allowed" : "pointer",
+          opacity: locked ? 0.6 : 1
+        }
+      },
+      "\u78BA\u8A8D"
+    ))
+  ));
 }
 function EditHoldingFieldDialog({ holding, field, relTxnCount, toast, onClose, onSubmitSymbol, onSubmitName }) {
   const isSymbolMode = field === "symbol";
   const currentValue = isSymbolMode ? holding.symbol || "" : holding.name || "";
   const [value, setValue] = useState(currentValue);
   const [locked, setLocked] = useState(true);
+  const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
   const titleText = isSymbolMode ? "\u7DE8\u8F2F\u80A1\u7968\u4EE3\u865F" : "\u7DE8\u8F2F\u80A1\u7968\u540D\u7A31";
   const placeholderText = isSymbolMode ? "\u4F8B:RKLB\u30012330" : "\u4F8B:\u53F0\u7A4D\u96FB\u3001Rocket Lab";
   const labelText = isSymbolMode ? "\u4EE3\u865F" : "\u80A1\u7968\u540D\u7A31";
@@ -5772,88 +5788,102 @@ function EditHoldingFieldDialog({ holding, field, relTxnCount, toast, onClose, o
       onSubmitName(newName);
     }
   };
-  return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: onClose }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: {
-    padding: "14px 18px",
-    borderBottom: "1px solid var(--border)",
-    display: "flex",
-    alignItems: "flex-start",
-    gap: 8
-  } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600 } }, titleText), isSymbolMode && relTxnCount > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 4, lineHeight: 1.5 } }, "\u4EE3\u865F\u8B8A\u66F4\u6703\u540C\u6B65\u66F4\u65B0", " ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontWeight: 700 } }, " ", relTxnCount, " \u7B46", " "), " ", "\u76F8\u95DC\u7D00\u9304")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: {
-    ...styles.lockLabel,
-    color: locked ? "var(--text-dim)" : "var(--pink)",
-    display: "flex",
-    alignItems: "center",
-    gap: 4
-  } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: locked ? "lock" : "unlock", size: 12, color: locked ? "var(--text-dim)" : "var(--pink)" }), locked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: onClose }, /* @__PURE__ */ React.createElement(
     "div",
     {
-      style: { ...styles.toggleTrack, background: locked ? "var(--bg-card)" : "var(--pink)" },
-      onClick: () => setLocked((v) => !v)
-    },
-    /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: locked ? "translateX(0)" : "translateX(18px)" } })
-  ))), /* @__PURE__ */ React.createElement("div", { style: { padding: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, labelText), /* @__PURE__ */ React.createElement(
-    "input",
-    {
-      type: "text",
-      value,
-      onChange: (e) => {
-        const v = e.target.value;
-        setValue(isSymbolMode ? v.toUpperCase() : v);
+      ref: swipe.ref,
+      style: {
+        ...styles.centerDialogCard,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
       },
-      disabled: locked,
-      placeholder: placeholderText,
-      maxLength: isSymbolMode ? 20 : 40,
-      style: {
-        width: "100%",
-        padding: "12px 14px",
-        fontSize: isSymbolMode ? 16 : 15,
-        fontWeight: isSymbolMode ? 600 : 400,
-        background: "var(--bg-card)",
-        color: locked ? "var(--text-dim)" : "var(--text)",
-        border: "1.5px solid var(--border)",
-        borderRadius: 12,
-        outline: "none",
-        boxSizing: "border-box",
-        opacity: locked ? 0.6 : 1
-      }
-    }
-  )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "0 14px 14px" } }, /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      onClick: onClose,
-      style: {
-        flex: 1,
-        padding: "12px",
-        background: "transparent",
-        color: "var(--pink-text)",
-        border: "1.5px solid var(--pink)",
-        borderRadius: 12,
-        fontSize: 14,
-        fontWeight: 600,
-        cursor: "pointer"
-      }
+      onClick: (e) => e.stopPropagation()
     },
-    "\u53D6\u6D88"
-  ), /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      onClick: handleSubmit,
-      disabled: locked,
-      style: {
-        flex: 1,
-        padding: "12px",
-        background: locked ? "var(--bg-card)" : "var(--mint)",
-        color: locked ? "var(--text-faint)" : "#fff",
-        border: "none",
-        borderRadius: 12,
-        fontSize: 14,
-        fontWeight: 600,
-        cursor: locked ? "not-allowed" : "pointer",
-        opacity: locked ? 0.6 : 1
+    /* @__PURE__ */ React.createElement("div", { style: {
+      padding: "14px 18px",
+      borderBottom: "1px solid var(--border)",
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 8
+    } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600 } }, titleText), isSymbolMode && relTxnCount > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 4, lineHeight: 1.5 } }, "\u4EE3\u865F\u8B8A\u66F4\u6703\u540C\u6B65\u66F4\u65B0", " ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--pink-text)", fontWeight: 700 } }, " ", relTxnCount, " \u7B46", " "), " ", "\u76F8\u95DC\u7D00\u9304")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: {
+      ...styles.lockLabel,
+      color: locked ? "var(--text-dim)" : "var(--pink)",
+      display: "flex",
+      alignItems: "center",
+      gap: 4
+    } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: locked ? "lock" : "unlock", size: 12, color: locked ? "var(--text-dim)" : "var(--pink)" }), locked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: { ...styles.toggleTrack, background: locked ? "var(--bg-card)" : "var(--pink)" },
+        onClick: () => setLocked((v) => !v)
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: locked ? "translateX(0)" : "translateX(18px)" } })
+    ))),
+    /* @__PURE__ */ React.createElement("div", { style: { padding: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, labelText), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "text",
+        value,
+        onChange: (e) => {
+          const v = e.target.value;
+          setValue(isSymbolMode ? v.toUpperCase() : v);
+        },
+        disabled: locked,
+        placeholder: placeholderText,
+        maxLength: isSymbolMode ? 20 : 40,
+        style: {
+          width: "100%",
+          padding: "12px 14px",
+          fontSize: isSymbolMode ? 16 : 15,
+          fontWeight: isSymbolMode ? 600 : 400,
+          background: "var(--bg-card)",
+          color: locked ? "var(--text-dim)" : "var(--text)",
+          border: "1.5px solid var(--border)",
+          borderRadius: 12,
+          outline: "none",
+          boxSizing: "border-box",
+          opacity: locked ? 0.6 : 1
+        }
       }
-    },
-    "\u78BA\u8A8D"
-  ))));
+    )),
+    /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "0 14px 14px" } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: onClose,
+        style: {
+          flex: 1,
+          padding: "12px",
+          background: "transparent",
+          color: "var(--pink-text)",
+          border: "1.5px solid var(--pink)",
+          borderRadius: 12,
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: "pointer"
+        }
+      },
+      "\u53D6\u6D88"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: handleSubmit,
+        disabled: locked,
+        style: {
+          flex: 1,
+          padding: "12px",
+          background: locked ? "var(--bg-card)" : "var(--mint)",
+          color: locked ? "var(--text-faint)" : "#fff",
+          border: "none",
+          borderRadius: 12,
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: locked ? "not-allowed" : "pointer",
+          opacity: locked ? 0.6 : 1
+        }
+      },
+      "\u78BA\u8A8D"
+    ))
+  ));
 }
 function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setConfirmDialog }) {
   const [date, setDate] = useState(trade.date || "");
@@ -5861,6 +5891,7 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
   const [totalCost, setTotalCost] = useState(String(trade.totalCost || ""));
   const [locked, setLocked] = useState(true);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
   const handleSubmit = () => {
     const newShares = Number(shares) || 0;
     const newCost = Number(totalCost) || 0;
@@ -5920,114 +5951,128 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
       }
     });
   };
-  return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: onClose }, /* @__PURE__ */ React.createElement("div", { style: styles.centerDialogCard, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: {
-    padding: "14px 18px",
-    borderBottom: "1px solid var(--border)",
-    display: "flex",
-    alignItems: "center",
-    gap: 8
-  } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600 } }, "\u7DE8\u8F2F\u8CB7\u9032\u7D00\u9304"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2 } }, holding.symbol, holding.name ? ` \xB7 ${holding.name}` : "")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: {
-    ...styles.lockLabel,
-    color: locked ? "var(--text-dim)" : "var(--pink)",
-    display: "flex",
-    alignItems: "center",
-    gap: 4
-  } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: locked ? "lock" : "unlock", size: 12, color: locked ? "var(--text-dim)" : "var(--pink)" }), locked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: onClose }, /* @__PURE__ */ React.createElement(
     "div",
     {
-      style: { ...styles.toggleTrack, background: locked ? "var(--bg-card)" : "var(--pink)" },
-      onClick: () => setLocked((v) => !v)
-    },
-    /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: locked ? "translateX(0)" : "translateX(18px)" } })
-  ))), /* @__PURE__ */ React.createElement("div", { style: { padding: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u65E5\u671F"), /* @__PURE__ */ React.createElement(
-    "div",
-    {
-      onClick: () => {
-        if (!locked) setShowDatePicker(true);
+      ref: swipe.ref,
+      style: {
+        ...styles.centerDialogCard,
+        transform: `translateX(${swipe.dragX}px)`,
+        transition: swipe.dragX === 0 ? "transform 0.22s ease-out" : "none"
       },
-      style: {
-        width: "100%",
-        padding: "12px 14px",
+      onClick: (e) => e.stopPropagation()
+    },
+    /* @__PURE__ */ React.createElement("div", { style: {
+      padding: "14px 18px",
+      borderBottom: "1px solid var(--border)",
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600 } }, "\u7DE8\u8F2F\u8CB7\u9032\u7D00\u9304"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--text-dim)", marginTop: 2 } }, holding.symbol, holding.name ? ` \xB7 ${holding.name}` : "")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: {
+      ...styles.lockLabel,
+      color: locked ? "var(--text-dim)" : "var(--pink)",
+      display: "flex",
+      alignItems: "center",
+      gap: 4
+    } }, /* @__PURE__ */ React.createElement(TypeIcon, { name: locked ? "lock" : "unlock", size: 12, color: locked ? "var(--text-dim)" : "var(--pink)" }), locked ? "\u9396\u5B9A\u4E2D" : "\u5DF2\u89E3\u9396"), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: { ...styles.toggleTrack, background: locked ? "var(--bg-card)" : "var(--pink)" },
+        onClick: () => setLocked((v) => !v)
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { ...styles.toggleThumb, transform: locked ? "translateX(0)" : "translateX(18px)" } })
+    ))),
+    /* @__PURE__ */ React.createElement("div", { style: { padding: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u65E5\u671F"), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick: () => {
+          if (!locked) setShowDatePicker(true);
+        },
+        style: {
+          width: "100%",
+          padding: "12px 14px",
+          fontSize: 15,
+          background: "var(--bg-card)",
+          color: locked ? "var(--text-dim)" : "var(--text)",
+          border: "1.5px solid var(--border)",
+          borderRadius: 12,
+          boxSizing: "border-box",
+          marginBottom: 14,
+          opacity: locked ? 0.6 : 1,
+          fontFamily: "var(--num-font)",
+          cursor: locked ? "not-allowed" : "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          WebkitTapHighlightColor: "transparent",
+          userSelect: "none"
+        }
+      },
+      /* @__PURE__ */ React.createElement("span", null, date ? date.replace(/-/g, "/") : "\u9078\u64C7\u65E5\u671F"),
+      /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 13 } }, "\u203A")
+    ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u80A1\u6578 ", consumed > 0 && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 11 } }, "(\u5DF2\u8CE3 ", consumed.toLocaleString(), " \u80A1)")), /* @__PURE__ */ React.createElement(
+      CalcTriggerInput,
+      {
+        value: shares,
+        onChange: setShares,
+        placeholder: "0",
         fontSize: 15,
-        background: "var(--bg-card)",
-        color: locked ? "var(--text-dim)" : "var(--text)",
-        border: "1.5px solid var(--border)",
-        borderRadius: 12,
-        boxSizing: "border-box",
-        marginBottom: 14,
-        opacity: locked ? 0.6 : 1,
-        fontFamily: "var(--num-font)",
-        cursor: locked ? "not-allowed" : "pointer",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        WebkitTapHighlightColor: "transparent",
-        userSelect: "none"
+        fontWeight: 500,
+        disabled: locked,
+        clearOnOpen: true,
+        style: { padding: "12px 14px", borderRadius: 12, marginBottom: 14 }
       }
-    },
-    /* @__PURE__ */ React.createElement("span", null, date ? date.replace(/-/g, "/") : "\u9078\u64C7\u65E5\u671F"),
-    /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 13 } }, "\u203A")
-  ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u80A1\u6578 ", consumed > 0 && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 11 } }, "(\u5DF2\u8CE3 ", consumed.toLocaleString(), " \u80A1)")), /* @__PURE__ */ React.createElement(
-    CalcTriggerInput,
-    {
-      value: shares,
-      onChange: setShares,
-      placeholder: "0",
-      fontSize: 15,
-      fontWeight: 500,
-      disabled: locked,
-      clearOnOpen: true,
-      style: { padding: "12px 14px", borderRadius: 12, marginBottom: 14 }
-    }
-  ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u7E3D\u6210\u672C ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 11 } }, "(\u542B\u624B\u7E8C\u8CBB)")), /* @__PURE__ */ React.createElement(
-    CalcTriggerInput,
-    {
-      value: totalCost,
-      onChange: setTotalCost,
-      placeholder: "0",
-      fontSize: 16,
-      fontWeight: 600,
-      disabled: locked,
-      clearOnOpen: true,
-      style: { padding: "12px 14px", borderRadius: 12 }
-    }
-  )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "0 14px 14px" } }, /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      onClick: onClose,
-      style: {
-        flex: 1,
-        padding: "12px",
-        background: "transparent",
-        color: "var(--pink-text)",
-        border: "1.5px solid var(--pink)",
-        borderRadius: 12,
-        fontSize: 14,
+    ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--text-dim)", marginBottom: 6 } }, "\u7E3D\u6210\u672C ", /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 11 } }, "(\u542B\u624B\u7E8C\u8CBB)")), /* @__PURE__ */ React.createElement(
+      CalcTriggerInput,
+      {
+        value: totalCost,
+        onChange: setTotalCost,
+        placeholder: "0",
+        fontSize: 16,
         fontWeight: 600,
-        cursor: "pointer"
+        disabled: locked,
+        clearOnOpen: true,
+        style: { padding: "12px 14px", borderRadius: 12 }
       }
-    },
-    "\u53D6\u6D88"
-  ), /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      onClick: handleSubmit,
-      disabled: locked,
-      style: {
-        flex: 1,
-        padding: "12px",
-        background: locked ? "var(--bg-card)" : "var(--mint)",
-        color: locked ? "var(--text-faint)" : "#fff",
-        border: "none",
-        borderRadius: 12,
-        fontSize: 14,
-        fontWeight: 600,
-        cursor: locked ? "not-allowed" : "pointer",
-        opacity: locked ? 0.6 : 1
-      }
-    },
-    "\u78BA\u8A8D"
-  )))), showDatePicker && /* @__PURE__ */ React.createElement(
+    )),
+    /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, padding: "0 14px 14px" } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: onClose,
+        style: {
+          flex: 1,
+          padding: "12px",
+          background: "transparent",
+          color: "var(--pink-text)",
+          border: "1.5px solid var(--pink)",
+          borderRadius: 12,
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: "pointer"
+        }
+      },
+      "\u53D6\u6D88"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: handleSubmit,
+        disabled: locked,
+        style: {
+          flex: 1,
+          padding: "12px",
+          background: locked ? "var(--bg-card)" : "var(--mint)",
+          color: locked ? "var(--text-faint)" : "#fff",
+          border: "none",
+          borderRadius: 12,
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: locked ? "not-allowed" : "pointer",
+          opacity: locked ? 0.6 : 1
+        }
+      },
+      "\u78BA\u8A8D"
+    ))
+  )), showDatePicker && /* @__PURE__ */ React.createElement(
     DatePicker,
     {
       value: date,
@@ -7687,7 +7732,6 @@ function HoldingSubTagPickerSheet({
         box-sizing: border-box;
         z-index: 9998;
         opacity: 0.55;
-        transform: scale(1.03) rotate(-0.5deg);
         box-shadow: 0 16px 40px rgba(0,0,0,0.6), 0 0 0 2px rgba(126,224,192,0.4);
         pointer-events: none;
         margin: 0;
@@ -19424,7 +19468,6 @@ function AccountDetailSheet({ state, catIcon, account, onClose, onClickTxn, onSe
         box-sizing: border-box;
         z-index: 9998;
         opacity: 0.55;
-        transform: scale(1.03) rotate(-0.5deg);
         box-shadow: 0 16px 40px rgba(0,0,0,0.6), 0 0 0 2px rgba(126,224,192,0.4);
         pointer-events: none;
         margin: 0;
