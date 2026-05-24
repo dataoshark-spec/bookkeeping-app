@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520FV";
+const APP_VERSION = "1150520FW";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -910,7 +910,7 @@ function useNotePref() {
   return pref;
 }
 function useSwipeBack(onBack, options = {}) {
-  const { skipInPickerBackdrop = false, noDrag = false } = options;
+  const { skipInPickerBackdrop = false, noDrag = false, isCenterDialog = false } = options;
   const [dragX, setDragX] = useState(0);
   const onBackRef = React.useRef(onBack);
   React.useEffect(() => {
@@ -941,6 +941,13 @@ function useSwipeBack(onBack, options = {}) {
       if (skipInPickerBackdrop && target && target.closest?.("[data-picker-backdrop]")) {
         startX = null;
         return;
+      }
+      if (isCenterDialog && target) {
+        const innerBackdrop = target.closest?.("[data-picker-backdrop]");
+        if (innerBackdrop && innerBackdrop !== el && el.contains(innerBackdrop)) {
+          startX = null;
+          return;
+        }
       }
       if (document.body.hasAttribute("data-drag-active")) {
         startX = null;
@@ -5665,7 +5672,7 @@ function SellSheet({ state, account, onClose, onConfirm, toast }) {
 function UpdateMarketValueDialog({ holding, shares, cost, onClose, onConfirm }) {
   const [value, setValue] = useState(String(holding.marketValue || ""));
   const [locked, setLocked] = useState(true);
-  const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
+  const swipe = useSwipeBack(onClose, { isCenterDialog: true });
   const handleSubmit = () => {
     const trimmed = String(value || "").trim();
     if (trimmed === "") {
@@ -5762,7 +5769,7 @@ function EditHoldingFieldDialog({ holding, field, relTxnCount, toast, onClose, o
   const currentValue = isSymbolMode ? holding.symbol || "" : holding.name || "";
   const [value, setValue] = useState(currentValue);
   const [locked, setLocked] = useState(true);
-  const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
+  const swipe = useSwipeBack(onClose, { isCenterDialog: true });
   const titleText = isSymbolMode ? "\u7DE8\u8F2F\u80A1\u7968\u4EE3\u865F" : "\u7DE8\u8F2F\u80A1\u7968\u540D\u7A31";
   const placeholderText = isSymbolMode ? "\u4F8B:RKLB\u30012330" : "\u4F8B:\u53F0\u7A4D\u96FB\u3001Rocket Lab";
   const labelText = isSymbolMode ? "\u4EE3\u865F" : "\u80A1\u7968\u540D\u7A31";
@@ -5891,7 +5898,7 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
   const [totalCost, setTotalCost] = useState(String(trade.totalCost || ""));
   const [locked, setLocked] = useState(true);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const swipe = useSwipeBack(onClose, { skipInPickerBackdrop: true });
+  const swipe = useSwipeBack(onClose, { isCenterDialog: true });
   const handleSubmit = () => {
     const newShares = Number(shares) || 0;
     const newCost = Number(totalCost) || 0;
@@ -14710,16 +14717,6 @@ function CalcTriggerInput({
       if (delta <= 0) return;
       if (scroller && scroller !== document.body) {
         scroller.scrollBy({ top: delta, behavior: "smooth" });
-      } else {
-        let bd = el.closest('[data-picker-backdrop="true"]');
-        if (bd === calcBackdrop) bd = null;
-        if (bd) {
-          bd.dataset.prevAlignItems = bd.style.alignItems || "";
-          bd.dataset.prevPaddingBottom = bd.style.paddingBottom || "";
-          bd.style.alignItems = "flex-end";
-          bd.style.paddingBottom = `${calcHeight + 12}px`;
-          el._calcShiftedBackdrop = bd;
-        }
       }
     }, 180);
   };
@@ -14749,6 +14746,14 @@ function CalcTriggerInput({
     "div",
     {
       ref: triggerRef,
+      onPointerDown: (e) => {
+        if (disabled) return;
+        if (document.activeElement && document.activeElement !== e.currentTarget) {
+          if (typeof document.activeElement.blur === "function") {
+            document.activeElement.blur();
+          }
+        }
+      },
       onClick: openCalc,
       style: {
         width: "100%",
@@ -23100,17 +23105,21 @@ const styles = {
     bottom: 0,
     background: "rgba(0,0,0,0.55)",
     display: "flex",
-    alignItems: "center",
+    // [v555FW] flex-start 靠上 + paddingTop 40,配合 card maxHeight 永不撞計算機
+    alignItems: "flex-start",
     justifyContent: "center",
     zIndex: 300,
-    padding: 20
+    padding: "40px 20px 20px"
   },
   centerDialogCard: {
     background: "var(--bg-card)",
     borderRadius: 18,
     width: "100%",
     maxWidth: 340,
-    overflow: "hidden",
+    // [v555FW] 預留底部 520px 給計算機(實際計算機 ~460px + 安全 60px),
+    //   dialog 永遠在計算機上方,內容超過自動 scroll
+    maxHeight: "calc(100dvh - 540px)",
+    overflowY: "auto",
     boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
     border: "1px solid var(--border)"
   },
