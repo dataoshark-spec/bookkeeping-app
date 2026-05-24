@@ -1,6 +1,6 @@
 const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "ledger_v16";
-const APP_VERSION = "1150520GC";
+const APP_VERSION = "1150520GE";
 const BLOCK_ORDER_KEY = "ledger_block_order_v15";
 const NOTE_COLOR_KEY = "ledger_note_color_v1";
 const DEFAULT_NOTE_COLOR = "";
@@ -5682,7 +5682,7 @@ function UpdateMarketValueDialog({ holding, shares, cost, onClose, onConfirm }) 
     const mv = parseFloat(trimmed) || 0;
     onConfirm(mv);
   };
-  return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: onClose }, /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdropWithCalc, onClick: onClose }, /* @__PURE__ */ React.createElement(
     "div",
     {
       ref: swipe.ref,
@@ -5937,7 +5937,7 @@ function EditBuyTradeDialog({ trade, holding, consumed, onClose, onConfirm, setC
   if (showDatePicker) {
     return /* @__PURE__ */ React.createElement(DatePicker, { value: date, onChange: (d) => setDate(d), onClose: () => setShowDatePicker(false) });
   }
-  return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdrop, onClick: onClose }, /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { "data-picker-backdrop": "true", style: styles.centerDialogBackdropWithCalc, onClick: onClose }, /* @__PURE__ */ React.createElement(
     "div",
     {
       ref: swipe.ref,
@@ -14685,13 +14685,6 @@ function CalcTriggerInput({
       if (delta <= 0) return;
       if (scroller && scroller !== document.body) {
         scroller.scrollBy({ top: delta, behavior: "smooth" });
-      } else {
-        const dialogBd = el.closest('[data-picker-backdrop="true"]');
-        if (dialogBd && dialogBd !== calcBackdrop) {
-          dialogBd.dataset.prevPaddingBottom = dialogBd.style.paddingBottom || "";
-          dialogBd.style.paddingBottom = `${calcHeight + 12}px`;
-          el._calcShiftedBackdrop = dialogBd;
-        }
       }
     }, showDelay + 180);
   };
@@ -14706,8 +14699,11 @@ function CalcTriggerInput({
       el._calcShiftedBackdrop = null;
     }
     if (el && el._calcShiftedCard) {
-      el._calcShiftedCard.style.transform = "";
-      el._calcShiftedCard.style.transition = "";
+      const cd = el._calcShiftedCard;
+      cd.style.transform = cd.dataset.prevTransform || "";
+      cd.style.transition = cd.dataset.prevTransition || "";
+      delete cd.dataset.prevTransform;
+      delete cd.dataset.prevTransition;
       el._calcShiftedCard = null;
     }
     setShow(false);
@@ -23089,6 +23085,21 @@ const styles = {
     zIndex: 300,
     padding: 20
   },
+  // [v555GE] 給有計算機 trigger 的 dialog 用:dialog 永遠靠上 + 底部 480 永遠保留給計算機
+  //   完全靜態,沒有任何 JS 動態調整(避免狀態殘留撐高 dialog)
+  centerDialogBackdropWithCalc: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: "rgba(0,0,0,0.55)",
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "center",
+    zIndex: 300,
+    padding: "40px 20px 480px"
+  },
   centerDialogCard: {
     background: "var(--bg-card)",
     borderRadius: 18,
@@ -23414,14 +23425,21 @@ document.addEventListener("touchstart", (e) => {
       const now = Date.now();
       if (now - lastPopAt <= 1e3) {
         hideHint();
+        lastPopAt = 0;
         return;
       }
       lastPopAt = now;
-      history.pushState({ guard: true }, "");
+      setTimeout(() => {
+        try {
+          history.pushState({ guard: true }, "");
+        } catch {
+        }
+      }, 0);
       showHint();
       setTimeout(() => {
         if (Date.now() - lastPopAt >= 1e3) {
           hideHint();
+          lastPopAt = 0;
         }
       }, 1100);
     });
