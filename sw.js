@@ -1,6 +1,6 @@
 // Service Worker — 記帳 LEDGER 個人版
 
-const CACHE_VERSION = 'ledger-v876';
+const CACHE_VERSION = 'ledger-v878';
 const CACHE_NAME = `${CACHE_VERSION}-cache`;
 
 const PRECACHE_URLS = [
