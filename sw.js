@@ -1,6 +1,6 @@
 // Service Worker — 記帳 LEDGER 個人版
 
-const CACHE_VERSION = 'ledger-v1421';
+const CACHE_VERSION = 'ledger-v1423';
 const CACHE_NAME = `${CACHE_VERSION}-cache`;
 
 const PRECACHE_URLS = [
@@ -62,7 +62,7 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => null);
+        .catch(() => cached || new Response('', { status: 504, statusText: 'Offline' })); // [v555AEJ] 離線且無快取時回合法 Response,避免 respondWith(null) 拋錯
       // 有快取就秒回快取(背景靜默更新);沒有才等網路
       return cached || fetchPromise;
     })
