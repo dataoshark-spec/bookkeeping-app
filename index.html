@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#f5f6f8" id="themeColorMeta" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="記帳" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
+  <link rel="apple-touch-icon" href="./icon-180.png" />
+
+  <!-- 中文字體 -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" />
+
+  <title>記帳 LEDGER 個人版</title>
+
+  <!-- 主題色:啟動時立即決定,避免閃屏 -->
+  <script>
+    (function() {
+      try {
+        var theme = localStorage.getItem('ledger_theme_v1') || 'light';
+        var bg = theme === 'light' ? '#f5f6f8' : '#141619';
+        document.documentElement.style.background = bg;
+        // 提前注入,讓首屏底色正確
+        document.write('<style>html,body,#root,#splash{background:' + bg + ' !important;}</style>');
+        // 更新狀態列顏色
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', bg);
+      } catch (e) {}
+    })();
+  </script>
+
+  <style>
+    html, body, #root {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      background: #f5f6f8;
+      overflow: hidden;
+    }
+    body {
+      font-family: 'Noto Sans TC', -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
+    }
+
+    /* 啟動遮罩:擋住裸 HTML 階段,直到 React 掛載 */
+    #splash {
+      position: fixed; inset: 0; z-index: 10000;
+      display: flex; align-items: center; justify-content: center;
+      background: #f5f6f8;
+      transition: opacity 0.2s ease-out;
+    }
+    #splash img {
+      width: 96px; height: 96px;
+      animation: splashPulse 1.6s ease-in-out infinite;
+    }
+    @keyframes splashPulse {
+      0%, 100% { opacity: 0.6; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.04); }
+    }
+    #splash.hide { opacity: 0; pointer-events: none; }
+
+    /* 安裝橫幅樣式 — 仿 Android 原生橫幅版型 */
+    #installBanner {
+      position: fixed;
+      left: 10px; right: 10px; bottom: 10px;
+      z-index: 9998;
+      display: none;
+      align-items: center; gap: 11px;
+      padding: 10px 10px 10px 12px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #2c8666 0%, #225f4c 100%);
+      color: #fff;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.28);
+      font-family: 'Noto Sans TC', sans-serif;
+    }
+    #installBanner .bannerIcon {
+      flex-shrink: 0;
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.14);
+      display: flex; align-items: center; justify-content: center;
+    }
+    #installBanner .bannerIcon svg {
+      width: 21px; height: 21px;
+    }
+    #installBanner .text {
+      flex: 1;
+      min-width: 0;
+      line-height: 1.35;
+      font-size: 12.5px;
+    }
+    #installBanner .text b { font-weight: 700; }
+    #installBanner button {
+      border: none; cursor: pointer; padding: 0;
+    }
+    #installBtn {
+      flex-shrink: 0;
+      width: 76px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(180deg, #f6d06b 0%, #e8b945 100%);
+      color: #3a2d05;
+      border-radius: 8px;
+      font-size: 14px; font-weight: 700;
+      letter-spacing: 1px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.4);
+      transition: transform 0.08s;
+    }
+    #installBtn:active { transform: translateY(1px); }
+    #installClose {
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.16); color: #fff;
+      width: 30px; height: 30px; border-radius: 50%;
+      font-size: 17px;
+      display: flex; align-items: center; justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <!-- 啟動遮罩(顯示 icon 直到 React 掛載) -->
+  <div id="splash">
+    <img src="./icon-192.png" alt="記帳" />
+  </div>
+
+  <div id="root"></div>
+
+  <!-- Android Chrome 的安裝橫幅 -->
+  <div id="installBanner">
+    <div class="bannerIcon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+      </svg>
+    </div>
+    <div class="text">將「<b>記帳</b>」安裝至桌面,離線也能用</div>
+    <button id="installBtn">安裝</button>
+    <button id="installClose" aria-label="關閉">×</button>
+  </div>
+
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="./ledger.js"></script>
+
+  <script>
+    // React 掛載完成後,淡出啟動遮罩
+    (function() {
+      function hideSplash() {
+        var s = document.getElementById('splash');
+        if (!s) return;
+        s.classList.add('hide');
+        setTimeout(function() { s.remove(); }, 220);
+      }
+      // 等 React 掛載完(root 裡有東西就表示 App 已 render)
+      function check() {
+        var root = document.getElementById('root');
+        if (root && root.childElementCount > 0) {
+          hideSplash();
+        } else {
+          setTimeout(check, 30);
+        }
+      }
+      check();
+      // 保險:最多 3 秒一定淡出
+      setTimeout(hideSplash, 3000);
+    })();
+
+    // Service Worker 註冊
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+
+    // 安裝橫幅(Android Chrome)
+    let deferredPrompt = null;
+    function isStandalone() {
+      return window.matchMedia('(display-mode: standalone)').matches
+          || window.navigator.standalone === true;
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (isStandalone()) return;
+      try { if (localStorage.getItem('ledger_install_dismissed_v1')) return; } catch {}
+      document.getElementById('installBanner').style.display = 'flex';
+    });
+
+    document.getElementById('installBtn').onclick = async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      document.getElementById('installBanner').style.display = 'none';
+    };
+    document.getElementById('installClose').onclick = () => {
+      document.getElementById('installBanner').style.display = 'none';
+      try { localStorage.setItem('ledger_install_dismissed_v1', '1'); } catch {}
+    };
+
+    window.addEventListener('appinstalled', () => {
+      document.getElementById('installBanner').style.display = 'none';
+      try { localStorage.setItem('ledger_install_dismissed_v1', '1'); } catch {}
+    });
+  </script>
+</body>
+</html>
