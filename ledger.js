@@ -12200,40 +12200,56 @@
     };
     const PAGE_SIZE = 150;
     const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-    const filterTouchSubmitRef = useRef(false);
+    const lastFilterActionRef = useRef(null);
     React.useEffect(() => {
       setVisibleCount(PAGE_SIZE);
     }, [filterMode, fStart, fEnd, fType, fAccount, fCategory, fSubCategory, fKeyword, sortMode, listFilter, currentMonth]);
-    const blurActiveFilterField = () => {
+    // #region agent log
+    const logFilterDebug = (message, data, hypothesisId) => {
+      const entry = { message, hypothesisId, data, ts: Date.now() };
       try {
-        if (document.activeElement && typeof document.activeElement.blur === "function") {
-          document.activeElement.blur();
-        }
+        const key = "ledger_filter_debug_v1";
+        const prev = JSON.parse(localStorage.getItem(key) || "[]");
+        prev.push(entry);
+        localStorage.setItem(key, JSON.stringify(prev.slice(-20)));
+      } catch {
+      }
+      fetch("http://127.0.0.1:7831/ingest/4e79e014-a5fb-41e9-abd9-7f3b371c0cca", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "66fdea" },
+        body: JSON.stringify({ sessionId: "66fdea", runId: "repro-1", hypothesisId, location: "preview.html:12499", message, data, timestamp: Date.now() })
+      }).catch(() => {
+      });
+    };
+    const showFilterDebugAlert = (reason) => {
+      try {
+        const items = JSON.parse(localStorage.getItem("ledger_filter_debug_v1") || "[]");
+        const base = items[0]?.ts || Date.now();
+        const lines = items.slice(-6).map((item) => `${item.ts - base}ms ${item.message}`);
+        window.alert([`DEBUG: ${reason}`, ...lines].join("\n"));
       } catch {
       }
     };
-    const applyFilter = () => {
+    // #endregion
+    const applyFilter = (source = "unknown") => {
+      // #region agent log
+      logFilterDebug("applyFilter called", {
+        source,
+        activeTag: document.activeElement?.tagName || null,
+        showFilter,
+        filterMode,
+        fPickerOpen,
+        keywordLength: fKeyword.length,
+        msSinceLastFilterAction: lastFilterActionRef.current ? Date.now() - lastFilterActionRef.current.ts : null
+      }, "H1");
+      // #endregion
+      lastFilterActionRef.current = { source, ts: Date.now() };
       if (fStart > fEnd) {
         if (toast) toast("\u8D77\u59CB\u65E5\u671F\u4E0D\u80FD\u665A\u65BC\u7D50\u675F\u65E5\u671F");
         return;
       }
-      setFPickerOpen(null);
       setFilterMode(true);
       setShowFilter(false);
-    };
-    const handleFilterTouchStart = (e) => {
-      filterTouchSubmitRef.current = true;
-      e.preventDefault();
-      blurActiveFilterField();
-      applyFilter();
-    };
-    const handleFilterClick = () => {
-      if (filterTouchSubmitRef.current) {
-        filterTouchSubmitRef.current = false;
-        return;
-      }
-      blurActiveFilterField();
-      applyFilter();
     };
     const clearFilter = () => {
       setFilterMode(false);
@@ -12644,6 +12660,20 @@
                       if (selectMode) {
                         toggleSelect(t.id);
                       } else {
+                        // #region agent log
+                        logFilterDebug("txn row clicked", {
+                          txnId: t.id,
+                          date: t.date,
+                          amount: t.amount,
+                          showFilter,
+                          filterMode,
+                          fPickerOpen,
+                          msSinceLastFilterAction: lastFilterActionRef.current ? Date.now() - lastFilterActionRef.current.ts : null
+                        }, "H3");
+                        // #endregion
+                        if (lastFilterActionRef.current && Date.now() - lastFilterActionRef.current.ts < 1500) {
+                          showFilterDebugAlert("txn-row-after-filter");
+                        }
                         onClickTxn(t);
                       }
                     },
@@ -12813,7 +12843,22 @@
             "button",
             {
               style: { ...styles.field, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center" },
-              onClick: () => setFPickerOpen("account")
+              onClick: () => {
+                // #region agent log
+                logFilterDebug("account picker button clicked", {
+                  activeTag: document.activeElement?.tagName || null,
+                  showFilter,
+                  filterMode,
+                  fPickerOpen,
+                  keywordLength: fKeyword.length,
+                  msSinceLastFilterAction: lastFilterActionRef.current ? Date.now() - lastFilterActionRef.current.ts : null
+                }, "H2");
+                // #endregion
+                if (lastFilterActionRef.current && Date.now() - lastFilterActionRef.current.ts < 1500) {
+                  showFilterDebugAlert("account-picker-after-filter");
+                }
+                setFPickerOpen("account");
+              }
             },
             /* @__PURE__ */ React.createElement("span", { style: { flex: 1, color: fAccount === "all" ? "var(--text-dim)" : "var(--text)" } }, fAccount === "all" ? "\u5168\u90E8\u5E33\u6236" : acct ? acct.name : "\u5168\u90E8\u5E33\u6236"),
             /* @__PURE__ */ React.createElement("span", { style: { color: "var(--text-faint)", fontSize: 16 } }, "\u203A")
@@ -12853,7 +12898,31 @@
             onChange: (e) => setFKeyword(e.target.value),
             placeholder: "\u641C\u5C0B\u5206\u985E\u6216\u5099\u8A3B"
           }
-        ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 20 } }, /* @__PURE__ */ React.createElement("button", { style: { ...styles.saveBtn, background: "var(--mint)", color: "var(--on-mint)", width: "calc(50% - 5px)", flexGrow: 0, flexShrink: 0, marginTop: 0, boxSizing: "border-box" }, onTouchStart: handleFilterTouchStart, onClick: handleFilterClick }, "\u7BE9\u9078"), /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, width: "calc(50% - 5px)", flexGrow: 0, flexShrink: 0, marginTop: 0, boxSizing: "border-box" }, onClick: () => setShowFilter(false) }, "\u53D6\u6D88")))
+        ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 20 } }, /* @__PURE__ */ React.createElement("button", { style: { ...styles.saveBtn, background: "var(--mint)", color: "var(--on-mint)", width: "calc(50% - 5px)", flexGrow: 0, flexShrink: 0, marginTop: 0, boxSizing: "border-box" }, onTouchStart: (e) => {
+          // #region agent log
+          logFilterDebug("filter button touchstart", {
+            activeTag: document.activeElement?.tagName || null,
+            targetTag: e.target?.tagName || null,
+            showFilter,
+            filterMode,
+            fPickerOpen,
+            keywordLength: fKeyword.length
+          }, "H1");
+          // #endregion
+        }, onClick: (e) => {
+          // #region agent log
+          logFilterDebug("filter button click", {
+            activeTag: document.activeElement?.tagName || null,
+            targetTag: e.target?.tagName || null,
+            detail: e.detail,
+            showFilter,
+            filterMode,
+            fPickerOpen,
+            keywordLength: fKeyword.length
+          }, "H4");
+          // #endregion
+          applyFilter("click");
+        } }, "\u7BE9\u9078"), /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, width: "calc(50% - 5px)", flexGrow: 0, flexShrink: 0, marginTop: 0, boxSizing: "border-box" }, onClick: () => setShowFilter(false) }, "\u53D6\u6D88")))
       ),
       fEditField && /* @__PURE__ */ React.createElement(
         DatePicker,
