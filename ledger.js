@@ -12200,16 +12200,40 @@
     };
     const PAGE_SIZE = 150;
     const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+    const filterTouchSubmitRef = useRef(false);
     React.useEffect(() => {
       setVisibleCount(PAGE_SIZE);
     }, [filterMode, fStart, fEnd, fType, fAccount, fCategory, fSubCategory, fKeyword, sortMode, listFilter, currentMonth]);
+    const blurActiveFilterField = () => {
+      try {
+        if (document.activeElement && typeof document.activeElement.blur === "function") {
+          document.activeElement.blur();
+        }
+      } catch {
+      }
+    };
     const applyFilter = () => {
       if (fStart > fEnd) {
         if (toast) toast("\u8D77\u59CB\u65E5\u671F\u4E0D\u80FD\u665A\u65BC\u7D50\u675F\u65E5\u671F");
         return;
       }
+      setFPickerOpen(null);
       setFilterMode(true);
       setShowFilter(false);
+    };
+    const handleFilterTouchStart = (e) => {
+      filterTouchSubmitRef.current = true;
+      e.preventDefault();
+      blurActiveFilterField();
+      applyFilter();
+    };
+    const handleFilterClick = () => {
+      if (filterTouchSubmitRef.current) {
+        filterTouchSubmitRef.current = false;
+        return;
+      }
+      blurActiveFilterField();
+      applyFilter();
     };
     const clearFilter = () => {
       setFilterMode(false);
@@ -12829,7 +12853,7 @@
             onChange: (e) => setFKeyword(e.target.value),
             placeholder: "\u641C\u5C0B\u5206\u985E\u6216\u5099\u8A3B"
           }
-        ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 20 } }, /* @__PURE__ */ React.createElement("button", { style: { ...styles.saveBtn, background: "var(--mint)", color: "var(--on-mint)", width: "calc(50% - 5px)", flexGrow: 0, flexShrink: 0, marginTop: 0, boxSizing: "border-box" }, onClick: applyFilter }, "\u7BE9\u9078"), /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, width: "calc(50% - 5px)", flexGrow: 0, flexShrink: 0, marginTop: 0, boxSizing: "border-box" }, onClick: () => setShowFilter(false) }, "\u53D6\u6D88")))
+        ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 20 } }, /* @__PURE__ */ React.createElement("button", { style: { ...styles.saveBtn, background: "var(--mint)", color: "var(--on-mint)", width: "calc(50% - 5px)", flexGrow: 0, flexShrink: 0, marginTop: 0, boxSizing: "border-box" }, onTouchStart: handleFilterTouchStart, onClick: handleFilterClick }, "\u7BE9\u9078"), /* @__PURE__ */ React.createElement("button", { style: { ...styles.deleteBtn, width: "calc(50% - 5px)", flexGrow: 0, flexShrink: 0, marginTop: 0, boxSizing: "border-box" }, onClick: () => setShowFilter(false) }, "\u53D6\u6D88")))
       ),
       fEditField && /* @__PURE__ */ React.createElement(
         DatePicker,
