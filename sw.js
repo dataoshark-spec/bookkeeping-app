@@ -1,6 +1,6 @@
 // Service Worker — 記帳 LEDGER 個人版
 
-const CACHE_VERSION = 'ledger-2026.09.08B';
+const CACHE_VERSION = 'ledger-2026.09.08C';
 const CACHE_NAME = `${CACHE_VERSION}-cache`;
 
 const PRECACHE_URLS = [
@@ -29,7 +29,7 @@ self.addEventListener('activate', (event) => {
           const dated=k.match(/^ledger-(\d{4}\.\d{2}\.\d{2}[A-Z])-cache$/);
           const legacy=k.match(/^ledger-(\d{3})(\d{2})(\d{2})([A-Z])-cache$/);
           const tag=dated ? dated[1] : legacy ? String(Number(legacy[1])+1911)+'.'+legacy[2]+'.'+legacy[3]+legacy[4] : null;
-          return tag !== null && tag < '2026.09.08B';
+          return tag !== null && tag < '2026.09.08C';
         })
           .map((k) => caches.delete(k))
       ))
