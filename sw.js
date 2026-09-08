@@ -1,13 +1,12 @@
 // Service Worker — 記帳 LEDGER 個人版
 
-const CACHE_VERSION = 'ledger-1150812F';
+const CACHE_VERSION = 'ledger-2026.09.08A';
 const CACHE_NAME = `${CACHE_VERSION}-cache`;
 
 const PRECACHE_URLS = [
   './',
   './index.html',
   './manifest.json',
-  './ledger.js',
   './icon-192.png',
   './icon-512.png',
   './icon-180.png',
@@ -25,7 +24,14 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(
-        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
+        // 只清除此記帳 App 已知命名格式的舊版；保留其他 App、未知命名與更新版本。
+        keys.filter((k) => {
+          const dated=k.match(/^ledger-(\d{4}\.\d{2}\.\d{2}[A-Z])-cache$/);
+          const legacy=k.match(/^ledger-(\d{3})(\d{2})(\d{2})([A-Z])-cache$/);
+          const tag=dated ? dated[1] : legacy ? String(Number(legacy[1])+1911)+'.'+legacy[2]+'.'+legacy[3]+legacy[4] : null;
+          return tag !== null && tag < '2026.09.08A';
+        })
+          .map((k) => caches.delete(k))
       ))
       .then(() => self.clients.claim())
   );
@@ -52,7 +58,7 @@ self.addEventListener('fetch', (event) => {
 
   // 同源:Cache First + 背景更新
   event.respondWith(
-    caches.match(req).then((cached) => {
+    caches.match(req, { cacheName: CACHE_NAME }).then((cached) => {
       // 背景抓新版(成功就更新快取),不阻塞回應
       const fetchPromise = fetch(req)
         .then((response) => {
