@@ -1,6 +1,6 @@
 // Service Worker — 記帳軟體
-const CACHE_VERSION = 'ledger-2026.10.01J';
-const VERSION_TAG = '2026.10.01J';
+const CACHE_VERSION = 'ledger-2026.10.01K';
+const VERSION_TAG = '2026.10.01K';
 const APP_SCOPE = new URL(self.registration.scope);
 const CACHE_PREFIX = `ledger-scope-v1|${encodeURIComponent(APP_SCOPE.href)}|`;
 const CACHE_NAME = `${CACHE_PREFIX}${VERSION_TAG}|cache`;
